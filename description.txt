@@ -1,1 +1,1 @@
-cdemo: A python coding template to be used for a quick start.
+maep: A python package to implement LLM-based multi-agent system from a entropy perspective.
