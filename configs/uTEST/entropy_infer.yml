@@ -1,0 +1,41 @@
+
+# Configuration file for testing the BasicAgent
+
+data:
+  data_name: GSM8K
+  data_path: EXPERIMENT/data/GSM8K
+
+environment:
+  dotenv_path: .env
+  
+lm_name: &lm_name "Qwen/Qwen2.5-0.5B"
+
+graph_config:
+  recursion_limit: 150
+
+inference_config: &infer
+  # Options: "cuda" (NVIDIA), "mps" (Mac), "cpu"
+  device: "mps"
+  # Options: "float16", "bfloat16", "float32" (use float32 for CPU/MPS stability if needed)
+  torch_dtype: "float32"
+  device_map: "auto"
+
+entropy_config: &entropy
+  
+generation_config: &gen
+  max_new_tokens: 30
+  do_sample: false
+  temperature: 1.0
+  top_p: 1.0
+  # pad_token_id: 50256
+
+save_folder: "EXPERIMENT/uTEST/EntropySingle"
+
+agents:
+  SingleSolver:
+    lm_name: *lm_name
+    inference_config: *infer
+    entropy_config: *entropy
+    generation_config: *gen
+
+

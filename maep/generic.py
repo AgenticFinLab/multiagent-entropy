@@ -261,9 +261,6 @@ class BaseEntropyInference(ABC):
     - inference_config: Backend/runtime settings (e.g., device, tensor_parallel).
     - generation_config: Decoding hyperparameters (e.g., `max_new_tokens`, `temperature`, `top_p`).
 
-    Orchestration Contract
-    - Subclasses implement message rendering/encoding, the first forward, latent realignment/injection, optional truncation, and final decoding.
-    - The `infer_batch` method coordinates these steps using abstract hooks.
     """
 
     def __init__(
@@ -278,7 +275,7 @@ class BaseEntropyInference(ABC):
         self.lm_name = lm_name
         # Backend/runtime settings (e.g., device, tensor parallel)
         self.inference_config = inference_config
-        # Latent reasoning settings (steps, realignment, truncation policy)
+        # Entropy exposure settings
         self.entropy_config = entropy_config
         # Decoding hyperparameters (max_new_tokens, temperature, top_p)
         self.generation_config = generation_config

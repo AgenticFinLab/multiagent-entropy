@@ -88,10 +88,6 @@ class HFEntropyInference(BaseEntropyInference):
         """
         Convert message batches into model-ready inputs.
 
-        Causality & Principle
-        - Use chat template to render prompts; encode to `input_ids` and `attention_mask` to control prefill precisely.
-        - Avoid high-level generate-on-text; latent reasoning needs access to IDs/masks and hidden states.
-
         Returns
         - prompts: List[str], length B
         - input_ids: Tensor [B, L], dtype=torch.long
