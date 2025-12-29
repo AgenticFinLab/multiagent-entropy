@@ -31,6 +31,8 @@ from functools import partial
 from langgraph.graph import StateGraph, END
 from langgraph.graph.state import CompiledStateGraph
 
+from lmbase.inference.base import InferInput, InferOutput
+
 from maep.generic import AgentState, BaseAgents
 from maep.entropy_infer import HFEntropyInference
 
@@ -58,18 +60,7 @@ class FanAgentsTwoLayer(BaseAgents):
     """A two-layer fan-in multi-agent structure."""
 
     def define_agent_models(self):
-        """
-        Construct latent HF inference as the agent LM.
-
-        Requires `run_config` with keys:
-        - lm_name: HF model identifier
-        - inference_config: device/dtype and backend options
-        - entropy_config: entropy-related configuration
-        - generation_config: decoding hyperparameters
-
-        Effect
-        - Initializes `HFEntropyInference` which internally loads tokenizer/model and validates pad token.
-        """
+        """Construct HFEntropyInference."""
         self.agents_lm = HFEntropyInference(
             lm_name=self.run_config["lm_name"],
             inference_config=self.run_config["inference_config"],

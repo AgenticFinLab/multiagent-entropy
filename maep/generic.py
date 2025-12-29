@@ -141,7 +141,14 @@ class BaseAgents(ABC):
         )
 
     def define_agent_models(self):
-        """Define the models for the agent."""
+        """Construct HF inference as the agent LM.
+
+        Requires `run_config` with keys:
+        - lm_name: HF model identifier
+        - inference_config: device/dtype and backend options
+        - entropy_config: entropy-related configuration
+        - generation_config: decoding hyperparameters
+        """
         lm_type = self.run_config["lm_type"]
         model_name = self.run_config["lm_name"]
 
@@ -302,11 +309,22 @@ class BaseEntropyInference(ABC):
         """
         Calculate entropy from logits.
 
+        Entropy H(x) = - Σ p(x) * log(p(x))
+
         Args:
-            logits: Input logits (usually [B, L_g, V]).
+            logits: Input logits tensor.
+                    Shape: [B, L_g, V]
+                    Type: torch.Float
 
         Returns:
-            Calculated entropy (usually [B, L_g]).
+            Calculated entropy tensor.
+            Shape: [B, L_g]
+            Type: torch.Float
+
+        Dimensions:
+            B   : Batch size
+            L_g : Generated sequence length
+            V   : Vocabulary size
         """
 
     @abstractmethod
@@ -346,11 +364,12 @@ class BaseEntropyInference(ABC):
 
         Args:
             infer_inputs: List of InferInput objects containing user/system messages.
+                          Length: B
 
         Returns:
-            A list (batch) of message lists; each inner list follows the single-item format.
-            Example:
-                [[{"role": "user", "content": "Hello"}], [{"role": "user", "content": "Hi"}]]
+            A list (batch) of message lists.
+            Shape: List[List[Dict]] (Length: B)
+            Structure: [[{"role": "user", "content": "..."}], ...]
         """
 
     @abstractmethod
@@ -362,49 +381,70 @@ class BaseEntropyInference(ABC):
 
         Args:
             messages_batch: Batch of message lists.
+                            Length: B
 
         Returns:
             Tuple containing:
             - prompts: List[str], length B.
-            - input_ids: Tensor, shape [B, L].
-            - attention_mask: Tensor, shape [B, L].
-            - tokens_batch: List[List[str]], B lists of tokens.
+            - input_ids: Tensor, shape [B, L]. Type: torch.Long
+            - attention_mask: Tensor, shape [B, L]. Type: torch.Long
+            - tokens_batch: List[List[str]], B lists of tokens, each length L.
 
         Dimensions:
-            See "Standard Dimension Notations" in file header.
+            B : Batch size
+            L : Padded input sequence length
         """
 
     def infer_entropy_hf(
         self,
         input_ids: Any,
-    ) -> Tuple[Any, Any, Any, Any]:
+        attention_mask: Any = None,
+    ) -> Tuple[Any, Any]:
         """
         Execute entropy inference for HuggingFace backend.
 
-        This method should:
-        1. Perform a forward pass with the model.
-        2. Extract logits.
-        3. Compute entropy using `calculate_entropy`.
+        This method performs generation and returns the full output object and computed entropy.
+
+        Args:
+            input_ids: Token IDs tensor.
+                       Shape: [B, L]
+            attention_mask: Attention mask tensor (optional).
+                            Shape: [B, L]
 
         Returns:
-            Tuple containing (logits, entropy, ...).
+            Tuple containing:
+            - outputs: HF ModelOutput object (contains sequences, scores/logits).
+            - entropy: Calculated entropy tensor.
+                       Shape: [B, L_g]
+
+        Dimensions:
+            B   : Batch size
+            L   : Input sequence length
+            L_g : Generated sequence length
         """
         pass
 
     def infer_entropy_vllm(
         self,
         input_ids: Any,
-    ) -> Tuple[Any, Any, Any, Any]:
+    ) -> Tuple[Any, Any]:
         """
         Execute entropy inference for vLLM backend.
 
-        This method should:
-        1. Generate output using the vLLM engine.
-        2. Access logprobs/logits from the result.
-        3. Compute entropy using `calculate_entropy`.
+        This method performs generation via vLLM engine and computes entropy from logprobs.
+
+        Args:
+            input_ids: Token IDs tensor or list.
 
         Returns:
-            Tuple containing (logits, entropy, ...).
+            Tuple containing:
+            - outputs: vLLM output objects.
+            - entropy: Calculated entropy tensor.
+                       Shape: [B, L_g]
+
+        Dimensions:
+            B   : Batch size
+            L_g : Generated sequence length
         """
         pass
 
@@ -420,7 +460,9 @@ class BaseEntropyInference(ABC):
 
         Args:
             infer_inputs: List of inputs to process.
+                          Length: B
 
         Returns:
             List[InferOutput]: List of output objects, one for each input.
+                               Length: B
         """

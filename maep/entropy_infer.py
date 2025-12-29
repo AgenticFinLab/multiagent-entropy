@@ -164,16 +164,28 @@ class HFEntropyInference(BaseEntropyInference):
         self, input_ids: Any, attention_mask: Any = None
     ) -> Tuple[Any, Any]:
         """
-        Perform the model forward pass and extract logits and entropy.
+        Perform generation and return the full output object and entropy.
 
         Args:
             input_ids: Token IDs tensor.
-            attention_mask: Attention mask tensor (optional).
+                       Shape: [B, L]
+            attention_mask: Attention mask tensor.
+                            Shape: [B, L]
 
         Returns:
-            Tuple of (outputs, entropy).
+            Tuple containing:
+            - outputs: HF ModelOutput object.
+            - entropy: Calculated entropy tensor.
+                       Shape: [B, L_g]
+
+        Dimensions:
+            B   : Batch size
+            L   : Input sequence length
+            L_g : Generated sequence length
         """
         with torch.no_grad():
+            # Ensure we get scores and dict output
+            # output_scores=True -> returns tuple of scores (logits)
             outputs = self.model.generate(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
@@ -203,14 +215,16 @@ class HFEntropyInference(BaseEntropyInference):
 
         1. Build messages from inputs.
         2. Encode messages into tensors.
-        3. Run inference to get logits and entropy.
+        3. Run inference to get outputs and entropy.
         4. Package results into InferOutput objects.
 
         Args:
             infer_inputs: List of inputs to process.
+                          Length: B
 
         Returns:
             List of InferOutput objects containing the results.
+            Length: B
         """
         # Record start time
         t0 = time.time()
@@ -224,7 +238,7 @@ class HFEntropyInference(BaseEntropyInference):
 
         # 3. Run inference (HF backend)
         hf_outputs, entropy = self.infer_entropy_hf(input_ids, attention_mask)
-        # [batch_size, seq_len]
+        # [B, L_g]
         responses = self.tokenizer.batch_decode(
             hf_outputs.sequences, skip_special_tokens=True
         )
@@ -235,7 +249,7 @@ class HFEntropyInference(BaseEntropyInference):
 
         # 4. Package results
         infer_outputs = []
-        for i, inp in enumerate(infer_inputs):
+        for i, _ in enumerate(infer_inputs):
 
             infer_outputs.append(
                 InferOutput(
