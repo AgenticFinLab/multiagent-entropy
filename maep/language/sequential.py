@@ -13,7 +13,8 @@ from langgraph.graph.state import CompiledStateGraph
 
 from lmbase.inference.base import InferInput, InferOutput
 
-from lmag.generic import AgentState, BaseAgents
+from maep.generic import AgentState, BaseAgents
+from maep.entropy_infer import HFEntropyInference
 
 PLANNER_SYS = """You are the planner agent. Generate plans that are the general instructions only.
 Do not execute the plan, do not perform any calculations, and do not produce any answers or intermediate numerical results.
@@ -54,6 +55,26 @@ class SequentialAgents(BaseAgents):
     - Uses a shared LLM backend defined in `run_config` (lm_name, inference_config, generation_config).
     - Prompts are initialized via `_get_agent_prompts` using built-in templates.
     """
+
+    def define_agent_models(self):
+        """
+        Construct latent HF inference as the agent LM.
+
+        Requires `run_config` with keys:
+        - lm_name: HF model identifier
+        - inference_config: device/dtype and backend options
+        - entropy_config: entropy-related configuration
+        - generation_config: decoding hyperparameters
+
+        Effect
+        - Initializes `HFEntropyInference` which internally loads tokenizer/model and validates pad token.
+        """
+        self.agents_lm = HFEntropyInference(
+            lm_name=self.run_config["lm_name"],
+            inference_config=self.run_config["inference_config"],
+            entropy_config=self.run_config["entropy_config"],
+            generation_config=self.run_config["generation_config"],
+        )
 
     def _get_agent_prompts(self):
         agent_system_msgs = {}

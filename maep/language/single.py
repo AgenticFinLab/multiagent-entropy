@@ -15,7 +15,7 @@ from langgraph.graph.state import CompiledStateGraph
 from lmbase.inference.base import InferInput, InferOutput
 
 from maep.generic import AgentState, BaseAgents
-from maep.generic import BaseEntropyInference
+from maep.entropy_infer import HFEntropyInference
 
 
 SINGLE_SYS = """You are a precise solver.
@@ -54,9 +54,9 @@ class SingleAgent(BaseAgents):
         - generation_config: decoding hyperparameters
 
         Effect
-        - Initializes `LatentHFInference` which internally loads tokenizer/model and validates pad token.
+        - Initializes `HFEntropyInference` which internally loads tokenizer/model and validates pad token.
         """
-        self.agents_lm = BaseEntropyInference(
+        self.agents_lm = HFEntropyInference(
             lm_name=self.run_config["lm_name"],
             inference_config=self.run_config["inference_config"],
             entropy_config=self.run_config["entropy_config"],

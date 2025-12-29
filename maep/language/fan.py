@@ -31,8 +31,9 @@ from functools import partial
 from langgraph.graph import StateGraph, END
 from langgraph.graph.state import CompiledStateGraph
 
-from lmbase.inference.base import InferInput, InferOutput
-from lmag.generic import AgentState, BaseAgents
+from maep.generic import AgentState, BaseAgents
+from maep.entropy_infer import HFEntropyInference
+
 
 MATH_SYS = """You are the MathAgent. Solve the given question with clear steps."""
 MATH_USER = """Question: {question}
@@ -55,6 +56,26 @@ Provide the final answer concisely."""
 
 class FanAgentsTwoLayer(BaseAgents):
     """A two-layer fan-in multi-agent structure."""
+
+    def define_agent_models(self):
+        """
+        Construct latent HF inference as the agent LM.
+
+        Requires `run_config` with keys:
+        - lm_name: HF model identifier
+        - inference_config: device/dtype and backend options
+        - entropy_config: entropy-related configuration
+        - generation_config: decoding hyperparameters
+
+        Effect
+        - Initializes `HFEntropyInference` which internally loads tokenizer/model and validates pad token.
+        """
+        self.agents_lm = HFEntropyInference(
+            lm_name=self.run_config["lm_name"],
+            inference_config=self.run_config["inference_config"],
+            entropy_config=self.run_config["entropy_config"],
+            generation_config=self.run_config["generation_config"],
+        )
 
     def _get_agent_prompts(self):
         agent_system_msgs = {}

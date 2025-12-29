@@ -10,9 +10,8 @@ Standard Dimension Notations:
 -----------------------------
 B       : Batch size
 L       : Sequence length (generic, after padding)
+L_g     : Sequence length of generated tokens
 V       : Vocabulary size
-H       : Number of attention heads
-D_head  : Dimension of each attention head
 D_h     : Model hidden dimension (hidden size)
 
 ASCII Diagram (Unified Entropy Inference Workflow):
@@ -24,8 +23,8 @@ apply_chat_template → prompts [B]
 tokenizer(prompts, padding=True) → input_ids [B, L], attention_mask [B, L]
   ↓
 infer_entropy (HF / vLLM)
-  - HF: Forward pass → Logits [B, L, V] → Entropy Calculation
-  - vLLM: Generate / Probabilities → Logits / Probs → Entropy Calculation
+  - HF: Forward pass → Logits [B, L_g, V] → Entropy Calculation
+  - vLLM: Generate / Probabilities → Logits [B, L_g, V] → Entropy Calculation
   ↓
 Output:
   - Token-level Entropy
@@ -43,14 +42,14 @@ Common Tensor Shapes and Types:
 -------------------------------
 - input_ids        : [B, L] (Long)
 - attention_mask   : [B, L] (Long)
-- logits           : [B, L, V] (Float)
-- entropy          : [B, L] (Float)
+- logits           : [B, L_g, V] (Float)
+- entropy          : [B, L_g] (Float)
 """
 
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import torch
 from langgraph.graph import MessagesState
@@ -276,6 +275,8 @@ class BaseEntropyInference(ABC):
         self.entropy_config = entropy_config
         # Decoding hyperparameters (max_new_tokens, temperature, top_p)
         self.generation_config = generation_config
+        # Whether to append generation prompt tokens when rendering chat messages
+        self.add_generation_prompt = True
 
         # Runtime device (mandatory)
         # - Single-GPU: set `inference_config["device"]` to "cuda" or "cuda:0"
@@ -302,10 +303,10 @@ class BaseEntropyInference(ABC):
         Calculate entropy from logits.
 
         Args:
-            logits: Input logits (usually [B, L, V]).
+            logits: Input logits (usually [B, L_g, V]).
 
         Returns:
-            Calculated entropy (usually [B, L]).
+            Calculated entropy (usually [B, L_g]).
         """
 
     @abstractmethod
@@ -376,7 +377,7 @@ class BaseEntropyInference(ABC):
     def infer_entropy_hf(
         self,
         input_ids: Any,
-    ):
+    ) -> Tuple[Any, Any, Any, Any]:
         """
         Execute entropy inference for HuggingFace backend.
 
@@ -384,13 +385,16 @@ class BaseEntropyInference(ABC):
         1. Perform a forward pass with the model.
         2. Extract logits.
         3. Compute entropy using `calculate_entropy`.
+
+        Returns:
+            Tuple containing (logits, entropy, ...).
         """
         pass
 
     def infer_entropy_vllm(
         self,
         input_ids: Any,
-    ) -> Tuple[Any, Any, Any, List[float]]:
+    ) -> Tuple[Any, Any, Any, Any]:
         """
         Execute entropy inference for vLLM backend.
 
@@ -398,6 +402,9 @@ class BaseEntropyInference(ABC):
         1. Generate output using the vLLM engine.
         2. Access logprobs/logits from the result.
         3. Compute entropy using `calculate_entropy`.
+
+        Returns:
+            Tuple containing (logits, entropy, ...).
         """
         pass
 
