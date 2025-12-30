@@ -54,6 +54,8 @@ class HFEntropyInference(BaseEntropyInference):
         # - tokenizer outputs: `input_ids [B, L]`, `attention_mask [B, L]`, dtype=torch.long
         # - pad/eos tokens are strings; IDs are integers
         tokenizer = AutoTokenizer.from_pretrained(self.lm_name, use_fast=True)
+        # Set padding side to 'left' for decoder-only architecture
+        tokenizer.padding_side = "left"
         if tokenizer.pad_token_id is None:
             if tokenizer.eos_token is not None:
                 tokenizer.pad_token = tokenizer.eos_token
@@ -242,8 +244,8 @@ class HFEntropyInference(BaseEntropyInference):
         )
 
         # Move results to CPU for storage
-        logits = torch.stack(hf_outputs.scores, dim=1)
-        logits_cpu = logits.detach().cpu()
+        # logits = torch.stack(hf_outputs.scores, dim=1)
+        # logits_cpu = logits.detach().cpu()
         entropy_cpu = entropy.detach().cpu()
 
         # 4. Package results
@@ -258,7 +260,7 @@ class HFEntropyInference(BaseEntropyInference):
                     cost={"time": time.time() - t0},
                     prompt_tokens=tokens_batch[i],
                     extras={
-                        "logits": logits_cpu[i],
+                        # "logits": logits_cpu[i],
                         "entropy": entropy_cpu[i],
                     },
                 )
