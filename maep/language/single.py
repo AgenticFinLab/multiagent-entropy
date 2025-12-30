@@ -53,7 +53,7 @@ class SingleAgent(BaseAgents):
 
     def execute_agent(self, state: AgentState, agent_name: str) -> AgentState:
         """Main solve process of the agent."""
-        # state["input"] is a list containing one dictionary with lists for each field
+        # state["input"] is a dictionary with lists for each field
         samples = state["input"]
         # Get the number of samples from the length of the question list
         num_samples = len(samples["question"])

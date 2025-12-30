@@ -94,48 +94,63 @@ class SequentialAgents(BaseAgents):
         Requires `agent_system_msgs[name]` and `agent_user_msgs[name]` to be present.
         """
         t0 = time.time()
-        question = state["input"][0]["question"]
+        # get all the samples
+        samples = state["input"]
+        # Get the number of samples from the length of the question list
+        num_samples = len(samples["question"])
         num_executed = len(state["agent_executed"])
         execution_idx = num_executed + 1
-
         cur_name = agent_name
-        system_msg = state["agent_system_msgs"][cur_name]
-        user_prompt = state["agent_user_msgs"][cur_name]
 
-        if num_executed > 0:
-            prev_result = state["agent_results"][num_executed - 1]
-            prev_result = list(prev_result.values())[0]
+        # Prepare inputs for all samples
+        infer_inputs = []
+        for i in range(num_samples):
+            question = samples["question"][i]
+            system_msg = state["agent_system_msgs"][cur_name]
+            user_prompt = state["agent_user_msgs"][cur_name]
+            num_executed = len(state["agent_executed"])
 
-            for item in prev_result:
-                # as the '\' and '{}' may exist in the prev_result
-                item = item.replace("\\", "\\\\").replace("{", "{{").replace("}", "}}")
+            if num_executed > 0:
+                prev_result = state["agent_results"][num_executed - 1]
+                prev_result = list(prev_result.values())[0]
+
+                for item in prev_result:
+                    # as the '\' and '{}' may exist in the prev_result
+                    item = (
+                        item.replace("\\", "\\\\").replace("{", "{{").replace("}", "}}")
+                    )
                 user_prompt = user_prompt.format(
                     question=question,
                     block=item,
                 )
-        else:
-            user_prompt = user_prompt.format(question=question)
+                print(f"processed_user_prompt:{user_prompt}")
+            else:
+                user_prompt = user_prompt.format(question=question)
 
-        system_msg = system_msg.replace("{", "{{").replace("}", "}}")
+            system_msg = system_msg.replace("{", "{{").replace("}", "}}")
+            # Create InferInput for this sample
+            infer_input = InferInput(system_msg=system_msg, user_msg=user_prompt)
+            infer_inputs.append(infer_input)
 
-        out_list: List[InferOutput] = self.agents_lm.infer_batch(
-            [
-                InferInput(
-                    system_msg=system_msg,
-                    user_msg=user_prompt,
-                )
-            ]
-        )
+        out_list: List[InferOutput] = self.agents_lm.infer_batch(infer_inputs)
 
-        # Save the out to the folder directly
-        savename = self.get_save_name(cur_name, execution_idx)
-        self.store_manager.save(
-            savename=f"Result_{state['input'][0]['main_id']}-{savename}",
-            data=[out.to_dict() for out in out_list],
-        )
+        # Process results for each sample
+        responses = []
+        # Iterate with main_id for saving
+        for i, (out, main_id) in enumerate(zip(out_list, samples["main_id"])):
+            # Save each sample's result individually
+            savename = self.get_save_name(cur_name, execution_idx)
+            self.store_manager.save(
+                # Use the sample's specific main_id
+                savename=f"Result_{main_id}-{savename}_sample_{i}",
+                # Save individual result
+                data=out.to_dict(),
+            )
+            responses.append(out.response)
 
-        # Update the state
-        state["agent_results"].append({cur_name: [out.response for out in out_list]})
+        # Update the state with all responses
+        # Store list of all responses
+        state["agent_results"].append({cur_name: responses})
         state["cost"].append({cur_name: {"latency": time.time() - t0}})
         state["agent_executed"].append(cur_name)
 

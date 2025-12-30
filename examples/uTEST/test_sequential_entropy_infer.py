@@ -12,7 +12,7 @@ import yaml
 import argparse
 
 from dotenv import load_dotenv
-from maep.language.single import SingleAgent
+from maep.language.sequential import SequentialAgents
 from maep.entropy_infer import HFEntropyInference
 from lmbase.dataset import registry as data_registry
 from lmbase.dataset.base import VisualTextSample
@@ -29,7 +29,7 @@ def main():
         "-c",
         "--config",
         type=str,
-        default="configs/uTEST/entropy_infer.yml",
+        default="configs/uTEST/sequential_entropy_infer.yml",
         help="Path to YAML config file",
     )
     args = parser.parse_args()
@@ -38,12 +38,12 @@ def main():
     with open(config_path, "r", encoding="utf-8") as f:
         run_config = yaml.safe_load(f)
 
-    agent = SingleAgent(run_config=run_config)
+    agent = SequentialAgents(run_config=run_config)
 
     data_cfg = run_config["data"]
     dataset = data_registry.get(config=data_cfg, split="train")
-    sample: VisualTextSample = dataset[0]
-    result = agent.run([sample])
+    sample: VisualTextSample = dataset[:100]
+    result = agent.run(sample)
     final_state = result.final_state
 
     # Save the final state to the json
