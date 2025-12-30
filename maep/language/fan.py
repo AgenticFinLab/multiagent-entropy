@@ -119,37 +119,57 @@ class FanAgentsTwoLayer(BaseAgents):
         Returns:
         - state: updated agent state with results from all layer1 agents.
         """
-        question = state["input"][0]["question"]
+        samples = state["input"]
+        num_samples = len(samples["question"])
+        execution_idx = len(state["agent_executed"]) + 1
 
         def run_one(name: str):
             t0 = time.time()
-            system_msg = (
-                state["agent_system_msgs"][name].replace("{", "{{").replace("}", "}}")
-            )
-            user_prompt = state["agent_user_msgs"][name].format(question=question)
-            out: InferOutput = self.agents_lm.run(
-                InferInput(system_msg=system_msg, user_msg=user_prompt)
-            )
+            # Prepare inputs for all samples
+            infer_inputs = []
+            for i in range(num_samples):
+                question = samples["question"][i]
+                main_id = samples["main_id"][i]
+
+                system_msg = (
+                    state["agent_system_msgs"][name]
+                    .replace("{", "{{")
+                    .replace("}", "}}")
+                )
+                user_prompt = state["agent_user_msgs"][name].format(question=question)
+
+                infer_inputs.append(
+                    InferInput(system_msg=system_msg, user_msg=user_prompt)
+                )
+
+            # Batch inference for all samples
+            out_list: List[InferOutput] = self.agents_lm.infer_batch(infer_inputs)
             latency = time.time() - t0
-            return name, out, latency
+
+            # Process results for each sample
+            responses = []
+            for i, (out, main_id) in enumerate(zip(out_list, samples["main_id"])):
+                # Save each sample's result individually
+                savename = self.get_save_name(name, execution_idx)
+                self.store_manager.save(
+                    savename=f"Result_{main_id}-{savename}_sample_{i}",
+                    data=out.to_dict(),
+                )
+                responses.append(out.response)
+
+            return name, responses, latency
 
         results = []
         # Run all layer-1 agents concurrently via a thread pool; max_workers equals number of agents
-        # Collect results as futures complete (submission order preserved when committing to state)
         with ThreadPoolExecutor(max_workers=len(self.layer1_agents) or 1) as ex:
             futures = [ex.submit(run_one, name) for name in self.layer1_agents]
             for f in futures:
                 results.append(f.result())
 
-        res_map = {n: (out, lat) for n, out, lat in results}
+        res_map = {n: (responses, lat) for n, responses, lat in results}
         for name in self.layer1_agents:
-            out, lat = res_map[name]
-            savename = self.get_save_name(name, len(state["agent_executed"]) + 1)
-            self.store_manager.save(
-                savename=f"Result_{state['input'][0]['main_id']}-{savename}",
-                data=out.to_dict(),
-            )
-            state["agent_results"].append({name: out.response})
+            responses, lat = res_map[name]
+            state["agent_results"].append({name: responses})
             state["cost"].append({name: {"latency": lat}})
             state["agent_executed"].append(name)
 
@@ -163,32 +183,71 @@ class FanAgentsTwoLayer(BaseAgents):
         }
 
     def execute_agent(self, state: AgentState, agent_name: str) -> AgentState:
-        question = state["input"][0]["question"]
+        """
+        Execute a specific agent for multiple samples, using results from layer1 agents as context.
+
+        Args:
+        - state: current agent state.
+        - agent_name: name of the agent to execute.
+
+        Returns:
+        - state: updated agent state with results from the agent for all samples.
+        """
+        samples = state["input"]
+        num_samples = len(samples["question"])
+        execution_idx = len(state["agent_executed"]) + 1
+
         name = agent_name
         t0 = time.time()
-        system_msg = state["agent_system_msgs"][name]
-        user_prompt = state["agent_user_msgs"][name]
-        parts = []
-        for n in self.layer1_agents:
-            for kv in state["agent_results"]:
-                if n in kv:
-                    parts.append(f"[{n}]:\n{kv[n]}\n")
-                    break
-        block = "\n".join(parts)
-        block = block.replace("\\", "\\\\").replace("{", "{{").replace("}", "}}")
-        system_msg = system_msg.replace("{", "{{").replace("}", "}}")
-        user_prompt = user_prompt.format(question=question, block=block)
-        out: InferOutput = self.agents_lm.run(
-            InferInput(system_msg=system_msg, user_msg=user_prompt)
-        )
-        savename = self.get_save_name(name, len(state["agent_executed"]) + 1)
-        self.store_manager.save(
-            savename=f"Result_{state['input'][0]['main_id']}-{savename}",
-            data=out.to_dict(),
-        )
-        state["agent_results"].append({name: out.response})
+
+        # Prepare inputs for all samples
+        infer_inputs = []
+        for i in range(num_samples):
+            question = samples["question"][i]
+            main_id = samples["main_id"][i]
+
+            # Collect results from layer1 agents for this sample
+            parts = []
+            for n in self.layer1_agents:
+                for kv in state["agent_results"]:
+                    if n in kv:
+                        # kv[n] is now a list of responses for all samples
+                        # Get the response for the current sample
+                        if i < len(kv[n]):
+                            parts.append(f"[{n}]:\n{kv[n][i]}\n")
+                        break
+
+            block = "\n".join(parts)
+            block = block.replace("\\", "\\\\").replace("{", "{{").replace("}", "}}")
+
+            system_msg = (
+                state["agent_system_msgs"][name].replace("{", "{{").replace("}", "}}")
+            )
+            user_prompt = state["agent_user_msgs"][name].format(
+                question=question, block=block
+            )
+
+            infer_inputs.append(InferInput(system_msg=system_msg, user_msg=user_prompt))
+
+        # Batch inference for all samples
+        out_list: List[InferOutput] = self.agents_lm.infer_batch(infer_inputs)
+
+        # Process results for each sample
+        responses = []
+        for i, (out, main_id) in enumerate(zip(out_list, samples["main_id"])):
+            # Save each sample's result individually
+            savename = self.get_save_name(name, execution_idx)
+            self.store_manager.save(
+                savename=f"Result_{main_id}-{savename}_sample_{i}",
+                data=out.to_dict(),
+            )
+            responses.append(out.response)
+
+        # Update the state with all responses
+        state["agent_results"].append({name: responses})
         state["cost"].append({name: {"latency": time.time() - t0}})
         state["agent_executed"].append(name)
+
         return {
             "input": state["input"],
             "agent_results": state["agent_results"],
