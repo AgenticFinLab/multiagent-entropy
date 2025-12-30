@@ -29,7 +29,7 @@ def main():
         "-c",
         "--config",
         type=str,
-        default="configs/uTEST/test_single.yml",
+        default="configs/uTEST/entropy_infer.yml",
         help="Path to YAML config file",
     )
     args = parser.parse_args()

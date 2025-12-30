@@ -71,9 +71,10 @@ class SingleAgent(BaseAgents):
         user_msg = user_msg.format(question=question)
 
         # Forward the model to obtain the output
-        out: InferOutput = self.agents_lm.run(
-            InferInput(system_msg=system_msg, user_msg=user_msg)
+        out: InferOutput = self.agents_lm.infer_batch(
+            [InferInput(system_msg=system_msg, user_msg=user_msg)]
         )
+        out = out[0]
         # Save the out to the folder directly
         savename = self.get_save_name(cur_name, execution_idx)
         self.store_manager.save(
