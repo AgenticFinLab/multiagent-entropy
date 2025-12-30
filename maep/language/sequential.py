@@ -102,74 +102,50 @@ class SequentialAgents(BaseAgents):
         execution_idx = num_executed + 1
         cur_name = agent_name
 
-        # get the batch size from config
-        batch_size = self.run_config["data"]["batch_size"]
-        # Process samples in batches if batch_size is provided, otherwise process all at once
-        if batch_size is None:
-            # Process all samples if no batch_size specified
-            batch_size = num_samples
+        # Prepare inputs for all samples
+        infer_inputs = []
+        for i in range(num_samples):
+            question = samples["question"][i]
+            system_msg = state["agent_system_msgs"][cur_name]
+            user_prompt = state["agent_user_msgs"][cur_name]
+            num_executed = len(state["agent_executed"])
 
+            if num_executed > 0:
+                prev_result = state["agent_results"][num_executed - 1]
+                prev_result = list(prev_result.values())[0]
+
+                for item in prev_result:
+                    # as the '\' and '{}' may exist in the prev_result
+                    item = (
+                        item.replace("\\", "\\\\").replace("{", "{{").replace("}", "}}")
+                    )
+                user_prompt = user_prompt.format(
+                    question=question,
+                    block=item,
+                )
+            else:
+                user_prompt = user_prompt.format(question=question)
+
+            system_msg = system_msg.replace("{", "{{").replace("}", "}}")
+            # Create InferInput for this sample
+            infer_input = InferInput(system_msg=system_msg, user_msg=user_prompt)
+            infer_inputs.append(infer_input)
+
+        out_list: List[InferOutput] = self.agents_lm.infer_batch(infer_inputs)
+
+        # Process results for each sample
         responses = []
-
-        # Split samples into batches
-        for start_idx in range(0, num_samples, batch_size):
-            end_idx = min(start_idx + batch_size, num_samples)
-
-            # Collect samples for current batch
-            collect = []
-            for i in range(start_idx, end_idx):
-                question = samples["question"][i]
-                system_msg = state["agent_system_msgs"][cur_name]
-                user_prompt = state["agent_user_msgs"][cur_name]
-                num_executed = len(state["agent_executed"])
-
-                if num_executed > 0:
-                    prev_result = state["agent_results"][num_executed - 1]
-                    prev_result = list(prev_result.values())[0]
-
-                    for item in prev_result:
-                        # as the '\' and '{}' may exist in the prev_result
-                        item = (
-                            item.replace("\\", "\\\\")
-                            .replace("{", "{{")
-                            .replace("}", "}}")
-                        )
-                    user_prompt = user_prompt.format(
-                        question=question,
-                        block=item,
-                    )
-                else:
-                    user_prompt = user_prompt.format(question=question)
-
-                system_msg = system_msg.replace("{", "{{").replace("}", "}}")
-                # Create InferInput for this sample
-                infer_input = InferInput(system_msg=system_msg, user_msg=user_prompt)
-                # Store (input, original_index)
-                collect.append((infer_input, i))
-
-            # Forward the model to obtain the output for current batch
-            if collect:
-                # Extract InferInput objects
-                infer_inputs = [item[0] for item in collect]
-                out_list: List[InferOutput] = self.agents_lm.infer_batch(infer_inputs)
-
-                # Process results for each sample in current batch
-                batch_original_indices = [
-                    item[1] for item in collect
-                ]  # Extract original indices
-
-                for i, (out, original_idx) in enumerate(
-                    zip(out_list, batch_original_indices)
-                ):
-                    # Save each sample's result individually
-                    savename = self.get_save_name(cur_name, execution_idx)
-                    self.store_manager.save(
-                        # Use the sample's specific main_id
-                        savename=f"Result_{samples['main_id'][original_idx]}-{savename}_sample_{original_idx}",
-                        # Save individual result
-                        data=out.to_dict(),
-                    )
-                    responses.append(out.response)
+        # Iterate with main_id for saving
+        for i, (out, main_id) in enumerate(zip(out_list, samples["main_id"])):
+            # Save each sample's result individually
+            savename = self.get_save_name(cur_name, execution_idx)
+            self.store_manager.save(
+                # Use the sample's specific main_id
+                savename=f"Result_{main_id}-{savename}_sample_{i}",
+                # Save individual result
+                data=out.to_dict(),
+            )
+            responses.append(out.response)
 
         # Update the state with all responses
         # Store list of all responses
