@@ -5,7 +5,7 @@ Executable test script for SingleAgent.
 - Command line option `-c/--config` points to the YAML config file
 - Instantiates `SingleAgent` (LangGraph + unified inference backend)
 - Loads a question from the dataset defined in config and prints the answer
-- Run: `python examples/uTEST/test_single.py -c configs/uTEST/test_single.yml`
+- Run: `python examples/uTEST/test_single_entropy_infer.py -c configs/uTEST/single_entropy_infer.yml`
 """
 
 import yaml
