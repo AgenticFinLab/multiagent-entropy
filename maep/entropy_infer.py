@@ -262,3 +262,43 @@ class HFEntropyInference(BaseEntropyInference):
             )
 
         return infer_outputs
+
+    def run(self, infer_inputs: List[InferInput]) -> List[InferOutput]:
+        """
+        Main execution function to run entropy inference on a batch of inputs.
+
+        This method serves as the primary entry point for the HFEntropyInference class, orchestrating the complete pipeline from input processing to result generation.
+        It handles model loading (if not already loaded), input encoding, inference, and result packaging.
+
+        Args:
+            infer_inputs: List of InferInput objects containing the input data
+                        to process. Each InferInput should contain either a
+                        messages list or system_msg/user_msg pair.
+                        Length: B (batch size)
+
+        Returns:
+            List of InferOutput objects containing the processed results.
+            Each InferOutput includes:
+            - prompt: The formatted input prompt
+            - response: The generated response text
+            - raw_response: Raw response (None in this implementation)
+            - cost: Dictionary containing execution metrics (time)
+            - prompt_tokens: List of token strings for the prompt
+            - extras: Dictionary containing logits and entropy tensors
+
+        Raises:
+            RuntimeError: If model or tokenizer are not properly loaded
+            ValueError: If infer_inputs is empty or contains invalid data
+        """
+        # Validate inputs
+        if not infer_inputs:
+            raise ValueError("infer_inputs cannot be empty")
+
+        if not hasattr(self, "model") or self.model is None:
+            self.load_model()
+
+        if not hasattr(self, "tokenizer") or self.tokenizer is None:
+            self.load_tokenizer()
+
+        # Run the batch inference pipeline
+        return self.infer_batch(infer_inputs)
