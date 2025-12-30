@@ -7,7 +7,7 @@ data:
   # The number of samples to be tested
   data_num: 100
   # The number of samples for one inference
-  batch_size: 50
+  batch_size: 10
 
 environment:
   dotenv_path: .env
@@ -27,7 +27,7 @@ inference_config: &infer
 entropy_config: &entropy
   
 generation_config: &gen
-  max_new_tokens: 300
+  max_new_tokens: 16384
   do_sample: false
   temperature: 1.0
   top_p: 1.0
