@@ -8,14 +8,14 @@ data:
 environment:
   dotenv_path: .env
   
-lm_name: &lm_name "Qwen/Qwen2.5-0.5B"
+lm_name: &lm_name "/home/yuxuanzhao/models/Qwen3_1_7B"
 
 graph_config:
   recursion_limit: 150
 
 inference_config: &infer
   # Options: "cuda" (NVIDIA), "mps" (Mac), "cpu"
-  device: "mps"
+  device: "cuda"
   # Options: "float16", "bfloat16", "float32" (use float32 for CPU/MPS stability if needed)
   torch_dtype: "float32"
   device_map: "auto"
