@@ -244,8 +244,8 @@ class HFEntropyInference(BaseEntropyInference):
         )
 
         # Move results to CPU for storage
-        # logits = torch.stack(hf_outputs.scores, dim=1)
-        # logits_cpu = logits.detach().cpu()
+        logits = torch.stack(hf_outputs.scores, dim=1)
+        logits_cpu = logits.detach().cpu()
         entropy_cpu = entropy.detach().cpu()
 
         # 4. Package results
@@ -260,7 +260,7 @@ class HFEntropyInference(BaseEntropyInference):
                     cost={"time": time.time() - t0},
                     prompt_tokens=tokens_batch[i],
                     extras={
-                        # "logits": logits_cpu[i],
+                        "logits": logits_cpu[i],
                         "entropy": entropy_cpu[i],
                     },
                 )
