@@ -4,7 +4,7 @@ Executable test script for SingleAgent.
 - Parses YAML config via PyYAML (yaml.safe_load)
 - Command line option `-c/--config` points to the YAML config file
 - Instantiates `SingleAgent` (LangGraph + unified inference backend)
-- Loads a question from the dataset defined in config and prints the answer
+- Loads questions from the dataset defined in config and runs inference
 - Run: `python examples/uTEST/test_single_entropy_infer.py -c configs/uTEST/single_entropy_infer.yml`
 
 Note:
@@ -15,12 +15,9 @@ Note:
 
 import yaml
 import argparse
-
 from dotenv import load_dotenv
 from maep.language.single import SingleAgent
-from maep.entropy_infer import HFEntropyInference
 from lmbase.dataset import registry as data_registry
-from lmbase.dataset.base import VisualTextSample
 
 
 def main():
@@ -47,20 +44,54 @@ def main():
 
     data_cfg = run_config["data"]
     dataset = data_registry.get(config=data_cfg, split="train")
-    if data_cfg["data_num"] == -1:
-        sample: VisualTextSample = dataset
-    else:
-        sample: VisualTextSample = dataset[: data_cfg["data_num"]]
-    result = agent.run(sample)
-    final_state = result.final_state
 
-    # Save the final state to the json
+    # Determine total samples to process
+    total_samples = (
+        len(dataset)
+        if data_cfg["data_num"] == -1
+        else min(data_cfg["data_num"], len(dataset))
+    )
+    batch_size = data_cfg["batch_size"]
+
+    # Initialize list to store all batch results
+    all_final_states = []
+
+    # Process in batches
+    for start_idx in range(0, total_samples, batch_size):
+        end_idx = min(start_idx + batch_size, total_samples)
+        batch_samples = dataset[start_idx:end_idx]
+
+        print(
+            f"\nProcessing batch {start_idx//batch_size + 1} (samples {start_idx}-{end_idx-1})"
+        )
+
+        # Run agent on current batch
+        result = agent.run(batch_samples)
+        final_state = result.final_state
+
+        # Store batch results
+        all_final_states.extend(final_state["agent_results"])
+
+        # Save intermediate batch results
+        agent.store_manager.save(
+            savename=f"Batch_{start_idx//batch_size + 1}_State",
+            data=final_state,
+        )
+
+        # Print current batch results
+        for i, agent_result in enumerate(final_state["agent_results"]):
+            print(f"Sample {start_idx + i} Answer:", list(agent_result.values())[0])
+
+    # Save combined final state
+    combined_state = {"agent_results": all_final_states}
     agent.store_manager.save(
-        savename="FinalState",
-        data=final_state,
+        savename="Combined_FinalState",
+        data=combined_state,
     )
 
-    print("Final Answer:", list(final_state["agent_results"][-1].values())[0])
+    print("\n=== Processing Complete ===")
+    print(f"Total samples processed: {total_samples}")
+    print(f"Total batches: {len(range(0, total_samples, batch_size))}")
 
 
 if __name__ == "__main__":
