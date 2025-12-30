@@ -6,6 +6,7 @@ Input -> Agent 1 --> Agent 2 --> Agent 3 --> ..... -> Output
 """
 
 import time
+from typing import List
 from functools import partial
 
 from langgraph.graph import StateGraph, END
@@ -23,7 +24,7 @@ PLANNER_USER = """For the question: {question}
 Please only generate plans that are guidances required for the subsequent reasoning for the problem-solving. Do not include any specific calculation or numerical results."""
 
 SOLVER_SYS = """You are the solver agent. Solve strictly according to the provided plans. Execute each step precisely and produce the final result.
-Output the final result into \\box{}."""
+Output the final result into \\boxed{}."""
 SOLVER_USER = """Question: {question}
 ### Plans ###
 {block}
@@ -105,35 +106,36 @@ class SequentialAgents(BaseAgents):
             prev_result = state["agent_results"][num_executed - 1]
             prev_result = list(prev_result.values())[0]
 
-            # as the '\' and '{}' may exist in the prev_result
-            prev_result = (
-                prev_result.replace("\\", "\\\\").replace("{", "{{").replace("}", "}}")
-            )
-            user_prompt = user_prompt.format(
-                question=question,
-                block=prev_result,
-            )
+            for item in prev_result:
+                # as the '\' and '{}' may exist in the prev_result
+                item = item.replace("\\", "\\\\").replace("{", "{{").replace("}", "}}")
+                user_prompt = user_prompt.format(
+                    question=question,
+                    block=item,
+                )
         else:
             user_prompt = user_prompt.format(question=question)
 
         system_msg = system_msg.replace("{", "{{").replace("}", "}}")
 
-        out: InferOutput = self.agents_lm.run(
-            InferInput(
-                system_msg=system_msg,
-                user_msg=user_prompt,
-            )
+        out_list: List[InferOutput] = self.agents_lm.infer_batch(
+            [
+                InferInput(
+                    system_msg=system_msg,
+                    user_msg=user_prompt,
+                )
+            ]
         )
 
         # Save the out to the folder directly
         savename = self.get_save_name(cur_name, execution_idx)
         self.store_manager.save(
             savename=f"Result_{state['input'][0]['main_id']}-{savename}",
-            data=out.to_dict(),
+            data=[out.to_dict() for out in out_list],
         )
 
         # Update the state
-        state["agent_results"].append({cur_name: out.response})
+        state["agent_results"].append({cur_name: [out.response for out in out_list]})
         state["cost"].append({cur_name: {"latency": time.time() - t0}})
         state["agent_executed"].append(cur_name)
 
