@@ -12,7 +12,7 @@ data:
 environment:
   dotenv_path: .env
   
-lm_name: &lm_name "Qwem/Qwen3-0.6B"
+lm_name: &lm_name Qwem/Qwen3-0.6B
 
 graph_config:
   recursion_limit: 150
