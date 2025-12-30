@@ -1,0 +1,6 @@
+# Standard entropy configuration
+
+entropy_config:
+  # Entropy calculation settings
+  calculate_entropy: true
+  # Additional entropy-related parameters can be added here

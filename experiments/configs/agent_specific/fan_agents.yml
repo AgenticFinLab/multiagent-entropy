@@ -1,0 +1,26 @@
+# Fan agent mode configuration
+
+agents:
+  MathAgent:
+    lm_name: "${model_specific.lm_name}"
+    inference_config: "${model_specific.inference_config}"
+    entropy_config: "${entropy_configs.entropy_config}"
+    generation_config: "${base_config.generation_config}"
+    link_to: SummarizerAgent
+  ScienceAgent:
+    lm_name: "${model_specific.lm_name}"
+    inference_config: "${model_specific.inference_config}"
+    entropy_config: "${entropy_configs.entropy_config}"
+    generation_config: "${base_config.generation_config}"
+    link_to: SummarizerAgent
+  CodeAgent:
+    lm_name: "${model_specific.lm_name}"
+    inference_config: "${model_specific.inference_config}"
+    entropy_config: "${entropy_configs.entropy_config}"
+    generation_config: "${base_config.generation_config}"
+    link_to: SummarizerAgent
+  SummarizerAgent:
+    lm_name: "${model_specific.lm_name}"
+    inference_config: "${model_specific.inference_config}"
+    entropy_config: "${entropy_configs.entropy_config}"
+    generation_config: "${base_config.generation_config}"

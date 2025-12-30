@@ -1,0 +1,32 @@
+agent_type: single
+agents:
+  SingleSolver:
+    entropy_config: &id001
+      calculate_entropy: true
+    generation_config: &id002
+      do_sample: false
+      max_new_tokens: 300
+      temperature: 1.0
+      top_p: 1.0
+    inference_config:
+      device_map: auto
+      torch_dtype: float16
+    lm_name: Qwen/Qwen3-0.6B
+data:
+  batch_size: 1
+  data_name: GSM8K
+  data_num: 1
+  data_path: experiments/data/GSM8K
+entropy_config: *id001
+environment:
+  dotenv_path: .env
+experiment_name: qwen3-0.6b_gsm8k_single_agent
+generation_config: *id002
+graph_config:
+  recursion_limit: 150
+inference_config:
+  device: cuda
+  device_map: auto
+  torch_dtype: float16
+lm_name: Qwen/Qwen3-0.6B
+save_folder: experiments/results/raw/qwen3-0.6b_gsm8k_single_agent
