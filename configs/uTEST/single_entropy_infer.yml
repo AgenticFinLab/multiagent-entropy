@@ -5,9 +5,9 @@ data:
   data_name: GSM8K
   data_path: EXPERIMENT/data/GSM8K
   # The number of samples to be tested
-  data_num: 100
+  data_num: 10
   # The number of samples for one inference
-  batch_size: 10
+  batch_size: 1
 
 environment:
   dotenv_path: .env
@@ -27,7 +27,7 @@ inference_config: &infer
 entropy_config: &entropy
   
 generation_config: &gen
-  max_new_tokens: 16384
+  max_new_tokens: 300
   do_sample: false
   temperature: 1.0
   top_p: 1.0

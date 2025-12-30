@@ -138,7 +138,6 @@ class SequentialAgents(BaseAgents):
                         question=question,
                         block=item,
                     )
-                    print(f"processed_user_prompt:{user_prompt}")
                 else:
                     user_prompt = user_prompt.format(question=question)
 
