@@ -42,7 +42,8 @@ def main():
 
     data_cfg = run_config["data"]
     dataset = data_registry.get(config=data_cfg, split="train")
-    sample: VisualTextSample = dataset[:10]
+    sample: VisualTextSample = dataset[: data_cfg["data_num"]]
+
     result = agent.run(sample)
     final_state = result.final_state
 
