@@ -1,11 +1,16 @@
 """
-Executable test script for SingleAgent.
+Executable test script for SequentialAgent.
 
 - Parses YAML config via PyYAML (yaml.safe_load)
 - Command line option `-c/--config` points to the YAML config file
-- Instantiates `SingleAgent` (LangGraph + unified inference backend)
-- Loads a question from the dataset defined in config and prints the answer
+- Instantiates `SequentialAgent` (LangGraph + unified inference backend)
+- Loads questions from the dataset defined in config and runs sequential inference
 - Run: `python examples/uTEST/test_sequential_entropy_infer.py -c configs/uTEST/sequential_entropy_infer.yml`
+
+Note:
+- Update `lm_name` in the config file to point to your local model path
+- Update `device` in the config file according to your hardware (cuda/cpu/mps)
+- configs/uTEST/sequential_entropy_infer.yml
 """
 
 import yaml

@@ -6,6 +6,11 @@ Executable test script for SingleAgent.
 - Instantiates `SingleAgent` (LangGraph + unified inference backend)
 - Loads a question from the dataset defined in config and prints the answer
 - Run: `python examples/uTEST/test_single_entropy_infer.py -c configs/uTEST/single_entropy_infer.yml`
+
+Note:
+- Update `lm_name` in the config file to point to your local model path
+- Update `device` in the config file according to your hardware (cuda/cpu/mps)
+- configs/uTEST/single_entropy_infer.yml
 """
 
 import yaml
