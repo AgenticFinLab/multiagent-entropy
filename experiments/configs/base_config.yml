@@ -4,6 +4,10 @@
 # Available types: single, fan, sequential
 # agent_type: "single"
 
+# Number of rounds for single and sequential agents
+# Default: 3 rounds
+round: 3
+
 # Environment settings
 environment:
   dotenv_path: .env

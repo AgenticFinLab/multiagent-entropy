@@ -5,7 +5,7 @@ data:
   data_name: GSM8K
   data_path: EXPERIMENT/data/GSM8K
   # The number of samples to be tested, -1 for all
-  data_num: 10
+  data_num: 1
   # The number of samples for one inference
   batch_size: 1
 
@@ -26,11 +26,14 @@ inference_config: &infer
 
 entropy_config: &entropy
   
+# Number of rounds for the single-agent pipeline
+round: 3
+
 generation_config: &gen
-  max_new_tokens: 300
-  do_sample: false
-  temperature: 1.0
-  top_p: 1.0
+  max_new_tokens: 2000
+  do_sample: true
+  temperature: 0.6
+  top_p: 0.95
   # pad_token_id: 50256
 
 save_folder: "EXPERIMENT/uTEST/EntropySingle"
