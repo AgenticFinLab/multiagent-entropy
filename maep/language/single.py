@@ -33,6 +33,16 @@ class SingleAgent(BaseAgents):
     - Inherits `run(batch)` for unified execution.
     """
 
+    def __init__(self, run_config: dict):
+        super().__init__(run_config)
+        # Number of rounds for the single-agent pipeline
+        self.round = run_config["round"]
+        # History aggregation flag
+        self.aggregate_history = run_config.get("aggregate_history", False)
+        # History optimization settings
+        self.max_history_chars = run_config.get("max_history_chars", 10000)
+        self.max_history_rounds = run_config.get("max_history_rounds", 0)
+
     def _get_agent_prompts(self):
         agent_system_msgs = {}
         agent_user_msgs = {}
@@ -50,6 +60,89 @@ class SingleAgent(BaseAgents):
             entropy_config=self.run_config["entropy_config"],
             generation_config=self.run_config["generation_config"],
         )
+
+    def format_round_history(self, state: AgentState, sample_idx: int) -> str:
+        """
+        Format the history of all previous rounds for a specific sample.
+        
+        Args:
+            state: Current agent state containing execution history
+            sample_idx: Index of the sample to format history for
+            
+        Returns:
+            Formatted string containing all previous round interactions
+        """
+        if not self.aggregate_history:
+            return ""
+        
+        history_parts = []
+        
+        # Apply max_history_rounds limit
+        start_round = 0
+        if self.max_history_rounds > 0:
+            total_rounds = len(state["agent_results"])
+            start_round = max(0, total_rounds - self.max_history_rounds)
+        
+        for round_idx, agent_result in enumerate(state["agent_results"][start_round:], start=start_round + 1):
+            agent_name = list(agent_result.keys())[0]
+            response = agent_result[agent_name][sample_idx]
+            
+            history_parts.append(
+                f"Round {round_idx} - {agent_name}:\n{response}\n"
+            )
+        
+        if not history_parts:
+            return ""
+        
+        history_text = (
+            "### Previous Rounds History ###\n"
+            + "\n".join(history_parts)
+            + "### End of History ###\n\n"
+        )
+        
+        # Apply max_history_chars limit
+        if self.max_history_chars > 0 and len(history_text) > self.max_history_chars:
+            # Truncate from the beginning to keep most recent history
+            history_text = (
+                "### Previous Rounds History ###\n"
+                + "...[earlier history truncated due to size limit]...\n\n"
+                + history_text[-(self.max_history_chars - 100):]
+            )
+        
+        return history_text
+
+    def build_prompt_with_history(
+        self, 
+        base_prompt: str, 
+        question: str, 
+        state: AgentState, 
+        sample_idx: int
+    ) -> str:
+        """
+        Build the prompt with optional history aggregation.
+        
+        Args:
+            base_prompt: Base prompt template
+            question: Current question
+            state: Current agent state
+            sample_idx: Index of the sample
+            
+        Returns:
+            Complete prompt with history if aggregation is enabled
+        """
+        if not self.aggregate_history:
+            return base_prompt.format(question=question)
+        
+        history = self.format_round_history(state, sample_idx)
+        
+        if history:
+            return (
+                f"{question}\n\n"
+                f"{history}"
+                f"Please consider the previous attempts above and provide your solution."
+            )
+        
+        return base_prompt.format(question=question)
 
     def execute_agent(self, state: AgentState, agent_name: str) -> AgentState:
         """Main solve process of the agent."""
@@ -74,11 +167,14 @@ class SingleAgent(BaseAgents):
             system_msg = state["agent_system_msgs"][cur_name]
             user_msg = state["agent_user_msgs"][cur_name]
             system_msg = system_msg.replace("{", "{{").replace("}", "}}")
-            # Format with the current sample's question
-            user_msg = user_msg.format(question=question)
+            
+            # Build prompt with optional history aggregation
+            formatted_user_msg = self.build_prompt_with_history(
+                user_msg, question, state, i
+            )
 
             # Create InferInput for this sample
-            infer_input = InferInput(system_msg=system_msg, user_msg=user_msg)
+            infer_input = InferInput(system_msg=system_msg, user_msg=formatted_user_msg)
             infer_inputs.append(infer_input)
 
         # Forward the model to obtain the output for all samples
@@ -115,17 +211,42 @@ class SingleAgent(BaseAgents):
             "agent_user_msgs": state["agent_user_msgs"],
         }
 
+    def check_round_limit(self, state: AgentState) -> str:
+        """
+        Check if the number of completed rounds has reached the limit.
+        """
+        # Count how many times the agent has executed
+        agent_name = list(self.agents_config.keys())[0]
+        agent_executions = [
+            name for name in state["agent_executed"] if name == agent_name
+        ]
+        rounds_completed = len(agent_executions)
+
+        if rounds_completed < self.round:
+            return agent_name  # Continue to the same agent
+        return "end"  # End the workflow
+
     def graph(self) -> CompiledStateGraph:
         """
         Build and compile the LangGraph for the single-agent.
         - One node `solve` as entry and terminal
+        - Supports multiple rounds based on the round parameter
         """
         g = StateGraph(AgentState)
         agent_name = list(self.agents_config.keys())[0]
 
         g.add_node(agent_name, partial(self.execute_agent, agent_name=agent_name))
         g.set_entry_point(agent_name)
-        g.add_edge(agent_name, END)
+
+        if self.round > 1:
+            # Add conditional edge to support multiple rounds
+            g.add_conditional_edges(
+                agent_name, self.check_round_limit, {agent_name: agent_name, "end": END}
+            )
+        else:
+            # Single round, direct to end
+            g.add_edge(agent_name, END)
+
         return g.compile()
 
 

@@ -8,6 +8,20 @@
 # Default: 3 rounds
 round: 3
 
+# History aggregation configuration
+# When true, aggregates all previous round interactions, outputs, and context into the next round's prompt
+# Default: false (disabled)
+aggregate_history: false
+
+# History aggregation optimization settings
+# Maximum number of characters to include in aggregated history (0 for no limit)
+# Helps manage memory and token usage
+max_history_chars: 10000
+
+# Maximum number of previous rounds to include in history (0 for all rounds)
+# Helps limit context window size
+max_history_rounds: 0
+
 # Environment settings
 environment:
   dotenv_path: .env

@@ -78,7 +78,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--metrics",
         nargs="+",
-        default=["accuracy", "entropy_mean"],
+        default=["accuracy", "entropy_mean", "round"],
         help="Metrics to extract and visualize",
     )
 
@@ -221,6 +221,10 @@ def extract_metrics(results: Dict[str, Any], metrics: List[str]) -> Dict[str, An
 
         # Add agent type information
         extracted_metrics["agent_type"] = config.get("agent_type", "unknown")
+
+        # Add round information for single and sequential agents
+        if "round" in config:
+            extracted_metrics["round"] = config["round"]
 
     return extracted_metrics
 
