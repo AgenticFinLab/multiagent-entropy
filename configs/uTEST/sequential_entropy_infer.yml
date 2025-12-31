@@ -5,9 +5,9 @@ data:
   data_name: GSM8K
   data_path: EXPERIMENT/data/GSM8K
   # The number of samples to be tested, -1 for all
-  data_num: 1
+  data_num: 4
   # The number of samples for one inference
-  batch_size: 1
+  batch_size: 2
 
 environment:
   dotenv_path: .env
@@ -28,6 +28,17 @@ entropy_config: &entropy
   
 # Number of rounds for the sequential pipeline
 round: 3
+
+# History aggregation configuration
+# When true, aggregates all previous round interactions into the next round's prompt
+aggregate_history: false
+
+# History aggregation optimization settings
+# Maximum number of characters to include in aggregated history (0 for no limit)
+max_history_chars: 10000
+
+# Maximum number of previous rounds to include in history (0 for all rounds)
+max_history_rounds: 0
 
 generation_config: &gen
   max_new_tokens: 2000
