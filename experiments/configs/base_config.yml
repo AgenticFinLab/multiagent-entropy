@@ -22,10 +22,10 @@ inference_config:
 
 # Generation base configuration
 generation_config:
-  max_new_tokens: 300
-  do_sample: false
-  temperature: 1.0
-  top_p: 1.0
+  max_new_tokens: 2000
+  do_sample: true
+  temperature: 0.6
+  top_p: 0.95
 
 # Save folder configuration
 save_folder: "/experiments/results/raw"

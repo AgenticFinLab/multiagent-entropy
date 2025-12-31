@@ -10,19 +10,19 @@ experiments:
     entropy_config: "experiments/configs/entropy_configs/standard.yml"
     agent_type: "single"
     
-  # Experiment 2: Qwen3-0.6B with GSM8K and sequential agent
-  - name: "qwen3-0.6b_gsm8k_sequential_agent"
+  # Experiment 2: Qwen3-0.6B with MMLU and sequential agent
+  - name: "qwen3-0.6b_mmlu_sequential_agent"
     base_config: "experiments/configs/base_config.yml"
     model_config: "experiments/configs/model_specific/qwen3-0.6b.yml"
-    dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
+    dataset_config: "experiments/configs/dataset_specific/mmlu.yml"
     entropy_config: "experiments/configs/entropy_configs/standard.yml"
     agent_type: "sequential"
     
-  # Experiment 3: Qwen3-0.6B with GSM8K and fan agent
-  - name: "qwen3-0.6b_gsm8k_fan_agent"
+  # Experiment 3: Qwen3-0.6B with HumanEval and fan agent
+  - name: "qwen3-0.6b_humaneval_fan_agent"
     base_config: "experiments/configs/base_config.yml"
     model_config: "experiments/configs/model_specific/qwen3-0.6b.yml"
-    dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
+    dataset_config: "experiments/configs/dataset_specific/humaneval.yml"
     entropy_config: "experiments/configs/entropy_configs/standard.yml"
     agent_type: "fan"
 
