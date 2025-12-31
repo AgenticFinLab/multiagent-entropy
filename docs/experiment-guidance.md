@@ -21,10 +21,13 @@ experiments/
 │   └── model_specific/         # Model-specific configuration files
 │       ├── qwen3-1.7b.yml      # Qwen3-1.7B model configuration
 │       └── qwen3-0.6b.yml     # Qwen3-0.6B model configuration
+├── configs_exp/                    # Generated experiment configuration files
 ├── logs/                       # Log files from experiments
 ├── results/                    # Experiment results
 │   ├── aggregated/            # Aggregated results across experiments
+│   │   └── {dataset_name}/    # Results organized by dataset
 │   └── raw/                   # Raw results from individual experiments
+│       └── {dataset_name}/    # Results organized by dataset
 └── scripts/                    # Utility scripts
     ├── config_loader.py       # Configuration loading and merging utilities
     ├── result_aggregator.py   # Result aggregation and visualization utilities
@@ -133,29 +136,29 @@ python experiments/scripts/run_experiment.py \
 ### Command-Line Options
 
 - `-b, --base-config`: Path to base configuration file (default: experiments/configs/base_config.yml)
-- `-m, --model-config`: Path to model-specific configuration file (required)
-- `-d, --dataset-config`: Path to dataset-specific configuration file (required)
-- `-e, --entropy-config`: Path to entropy configuration file (required)
+- `-m, --model-config`: Path to model-specific configuration file (required for single experiment)
+- `-d, --dataset-config`: Path to dataset-specific configuration file (required for single experiment)
+- `-e, --entropy-config`: Path to entropy configuration file (required for single experiment)
 - `-n, --experiment-name`: Name of the experiment (required for single experiment)
 - `--agent-type`: Type of agent configuration to use (single, fan, sequential)
 - `--batch-config`: Path to batch configuration file (for batch experiments)
 - `--dry-run`: Only prepare configurations without running experiments
-- `--save-config`: Save merged configuration to file
+- `--save-config`: Save merged configuration to file (saved in experiments/configs/experiment_configs/ directory)
 
 ## Results Management
 
 ### Raw Results
-Raw experiment results are saved in `experiments/results/raw/<experiment_name>/` directory, including:
+Raw experiment results are saved in `experiments/results/raw/<dataset_name>/<experiment_name>_<timestamp>/` directory, including:
 - Individual batch results (JSON format)
 - Combined final results (JSON format)
 - Tensor files (in traces/tensors directory)
 - Configuration files
 
 ### Aggregated Results
-Aggregated results are saved in `experiments/results/aggregated/` directory, including:
+Aggregated results are saved in `experiments/results/aggregated/<dataset_name>/` directory, including:
 - Experiment summaries (CSV/JSON format)
 - Batch results summaries (CSV/JSON format)
-- Visualizations (PNG files)
+- Visualizations (PNG files) with timestamps in filenames
 
 ## Result Aggregation and Visualization
 
