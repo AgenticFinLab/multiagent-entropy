@@ -1,9 +1,9 @@
 # Dataset-specific configuration for GSM8K
 
 data:
-  data_name: GSM8K
-  data_path: experiments/data/GSM8K
-  split: train
+  data_name: HumanEval
+  data_path: experiments/data/HumanEval
+  split: test
   # The number of samples to be tested, -1 for all
   data_num: 10
   # The number of samples for one inference
