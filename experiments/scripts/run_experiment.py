@@ -147,7 +147,7 @@ def run_single_experiment(
 
         # Load dataset
         data_cfg = config["data"]
-        dataset = data_registry.get(config=data_cfg, split="train")
+        dataset = data_registry.get(config=data_cfg, split=data_cfg["split"])
 
         # Determine total samples to process
         total_samples = (
@@ -269,9 +269,7 @@ def run_batch_experiments(
 
         # Save merged configuration if requested
         if save_config_flag:
-            config_save_path = (
-                f"experiments/configs_exp/{exp['name']}_{time.strftime('%Y%m%d_%H%M%S')}.yml"
-            )
+            config_save_path = f"experiments/configs_exp/{exp['name']}_{time.strftime('%Y%m%d_%H%M%S')}.yml"
             save_config(merged_config, config_save_path)
             logger.info(f"Saved merged configuration to: {config_save_path}")
 
@@ -301,16 +299,16 @@ def main():
 
         # Get dataset name from the first experiment's config
         if results and not args.dry_run:
-            with open(args.batch_config, 'r', encoding='utf-8') as f:
+            with open(args.batch_config, "r", encoding="utf-8") as f:
                 batch_config = yaml.safe_load(f)
-            first_exp = batch_config.get('experiments', [])[0]
-            with open(first_exp['dataset_config'], 'r', encoding='utf-8') as f:
+            first_exp = batch_config.get("experiments", [])[0]
+            with open(first_exp["dataset_config"], "r", encoding="utf-8") as f:
                 dataset_config = yaml.safe_load(f)
-            dataset_name = dataset_config['data']['data_name'].lower()
-            
+            dataset_name = dataset_config["data"]["data_name"].lower()
+
             # Create dataset directory if it doesn't exist
             os.makedirs(f"experiments/results/aggregated/{dataset_name}", exist_ok=True)
-            
+
             # Save batch results summary
             summary_path = f"experiments/results/aggregated/{dataset_name}/batch_results_{time.strftime('%Y%m%d_%H%M%S')}.yml"
             with open(summary_path, "w", encoding="utf-8") as f:
@@ -332,9 +330,7 @@ def main():
 
         # Save merged configuration if requested
         if args.save_config:
-            config_save_path = (
-                f"experiments/configs_exp/{args.experiment_name}_{time.strftime('%Y%m%d_%H%M%S')}.yml"
-            )
+            config_save_path = f"experiments/configs_exp/{args.experiment_name}_{time.strftime('%Y%m%d_%H%M%S')}.yml"
             save_config(merged_config, config_save_path)
             logger.info(f"Saved merged configuration to: {config_save_path}")
 
@@ -344,14 +340,12 @@ def main():
         # Save single experiment results summary
         if not args.dry_run:
             # Get dataset name from merged config
-            dataset_name = merged_config['data']['data_name'].lower()
-            
+            dataset_name = merged_config["data"]["data_name"].lower()
+
             # Create dataset directory if it doesn't exist
             os.makedirs(f"experiments/results/aggregated/{dataset_name}", exist_ok=True)
-            
-            summary_path = (
-                f"experiments/results/aggregated/{dataset_name}/{args.experiment_name}_results_{time.strftime('%Y%m%d_%H%M%S')}.yml"
-            )
+
+            summary_path = f"experiments/results/aggregated/{dataset_name}/{args.experiment_name}_results_{time.strftime('%Y%m%d_%H%M%S')}.yml"
             with open(summary_path, "w", encoding="utf-8") as f:
                 yaml.dump(result, f, default_flow_style=False, allow_unicode=True)
             logger.info(f"Experiment results saved to: {summary_path}")
