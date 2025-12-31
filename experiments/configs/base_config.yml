@@ -11,7 +11,7 @@ round: 3
 # History aggregation configuration
 # When true, aggregates all previous round interactions, outputs, and context into the next round's prompt
 # Default: false (disabled)
-aggregate_history: false
+aggregate_history: true
 
 # History aggregation optimization settings
 # Maximum number of characters to include in aggregated history (0 for no limit)
