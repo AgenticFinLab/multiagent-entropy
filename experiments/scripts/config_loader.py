@@ -27,8 +27,12 @@ Usage:
 
 import os
 import yaml
+import time
 import logging
 from typing import Dict, Any, List
+
+# Ensure log directory exists
+os.makedirs("experiments/logs", exist_ok=True)
 
 # Set up logging
 logging.basicConfig(
@@ -153,9 +157,13 @@ def load_experiment_config(
         dataset_config = load_config(dataset_config_path)
         entropy_config = load_config(entropy_config_path)
 
-        # Create experiment-specific config
+        # Get dataset name for path creation
+        dataset_name = dataset_config['data']['data_name'].lower()
+        
+        # Create experiment-specific config with timestamp
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
         experiment_config = {
-            "save_folder": f"experiments/results/raw/{experiment_name}"
+            "save_folder": f"experiments/results/raw/{dataset_name}/{experiment_name}_{timestamp}"
         }
 
         # Get agent type - prioritize passed parameter, then base config, then default to single
