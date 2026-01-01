@@ -16,3 +16,4 @@ wandb
 einops
 litellm
 langgraph
+accelerate
