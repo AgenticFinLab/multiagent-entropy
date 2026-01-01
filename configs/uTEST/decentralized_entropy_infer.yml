@@ -34,7 +34,8 @@ generation_config: &gen
   # pad_token_id: 50256
 
 save_folder: "EXPERIMENT/uTEST/EntropyDecentralized"
-max_rounds: 2
+# Number of rounds for the Decentralized MAS
+round: 2
 
 agents:
   MathAgent:

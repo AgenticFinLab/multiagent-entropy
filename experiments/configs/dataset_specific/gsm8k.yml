@@ -5,6 +5,6 @@ data:
   data_path: experiments/data/GSM8K
   split: train
   # The number of samples to be tested, -1 for all
-  data_num: 10
+  data_num: 1
   # The number of samples for one inference
   batch_size: 1

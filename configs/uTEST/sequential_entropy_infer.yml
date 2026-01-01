@@ -27,11 +27,11 @@ inference_config: &infer
 entropy_config: &entropy
   
 # Number of rounds for the sequential pipeline
-round: 3
+round: 2
 
 # History aggregation configuration
 # When true, aggregates all previous round interactions into the next round's prompt
-aggregate_history: false
+aggregate_history: true
 
 # History aggregation optimization settings
 # Maximum number of characters to include in aggregated history (0 for no limit)
