@@ -1,4 +1,4 @@
-# Configuration file for testing the OrchestratorRepeatAgents
+# Configuration file for testing the Decentralized MAS (OrchestratorDecentralized)
 
 data:
   data_name: GSM8K

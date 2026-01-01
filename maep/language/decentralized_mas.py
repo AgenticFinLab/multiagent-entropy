@@ -30,10 +30,18 @@ from maep.generic import AgentState
 from maep.language.centralized_mas import OrchestratorCentralized
 
 
-class OrchestratorRepeatAgents(OrchestratorCentralized):
+class OrchestratorDecentralized(OrchestratorCentralized):
     """
-    A two-layer multi-agent structure where N agents run sequentially in a loop (Layer 1),
-    and their outputs are aggregated by an Orchestrator (Layer 2) after P iterations.
+    Decentralized Multi-Agent System (Decentralized MAS) with a repeat loop.
+
+    Structure:
+    - Layer 1 (Agents): N agents run sequentially in a loop for `repeat_count` (P) iterations.
+      - Agent 1 -> Agent 2 -> ... -> Agent N -> (Loop back to Agent 1 if p < P)
+    - Layer 2 (Orchestrator): After P iterations, the Orchestrator aggregates the results.
+
+    Key Difference from Centralized MAS:
+    - In Centralized MAS, agents run in parallel (logically) or sequence but interact with the Orchestrator every round.
+    - In Decentralized MAS, agents interact with EACH OTHER in a loop for P times BEFORE the Orchestrator intervenes.
     """
 
     def __init__(self, run_config: dict):
