@@ -258,7 +258,7 @@ class BaseAgents(ABC):
 
         # 2. Build initial state
         state = {
-            "input": batch,
+            "init_input": batch,
             "agent_results": [],
             "agent_executed": [],
             "cost": [],
