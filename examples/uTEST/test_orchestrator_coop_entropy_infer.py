@@ -1,37 +1,37 @@
 """
-Executable test script for Fan-in (two-layer) agent.
+Executable test script for Orchestrator Coop (two-layer sequential + aggregator) agent.
 
 - Parses YAML config via PyYAML (yaml.safe_load)
 - Command line option `-c/--config` points to the YAML config file
-- Instantiates `FanInAgent` (LangGraph + unified inference backend)
+- Instantiates `OrchestratorAggAgents` (LangGraph + unified inference backend)
 - Loads questions from the dataset defined in config and runs inference
-- Run: `python examples/uTEST/test_fan_entropy_infer.py -c configs/uTEST/fan_entropy_infer.yml`
+- Run: `python examples/uTEST/test_orchestrator_coop_entropy_infer.py -c configs/uTEST/orchestrator_coop_entropy_infer.yml`
 
 Note:
 - Update `lm_name` in the config file to point to your local model path
 - Update `device` in the config file according to your hardware (cuda/cpu/mps)
-- configs/uTEST/fan_entropy_infer.yml
+- configs/uTEST/orchestrator_coop_entropy_infer.yml
 """
 
 import yaml
 import argparse
 from dotenv import load_dotenv
-from maep.language.fan import FanAgentsTwoLayer
+from maep.language.orchestrator_coop import OrchestratorAggAgents
 from lmbase.dataset import registry as data_registry
 
 
 def main():
-    """A demo to test the SingleAgent with a YAML config file."""
+    """A demo to test the OrchestratorAggAgents with a YAML config file."""
     load_dotenv()
 
     parser = argparse.ArgumentParser(
-        description="Run single-agent test with YAML config."
+        description="Run orchestrator coop agent test with YAML config."
     )
     parser.add_argument(
         "-c",
         "--config",
         type=str,
-        default="configs/uTEST/fan_entropy_infer.yml",
+        default="configs/uTEST/orchestrator_coop_entropy_infer.yml",
         help="Path to YAML config file",
     )
     args = parser.parse_args()
@@ -40,7 +40,7 @@ def main():
     with open(config_path, "r", encoding="utf-8") as f:
         run_config = yaml.safe_load(f)
 
-    agent = FanAgentsTwoLayer(run_config=run_config)
+    agent = OrchestratorAggAgents(run_config=run_config)
 
     data_cfg = run_config["data"]
     dataset = data_registry.get(config=data_cfg, split="train")
@@ -79,8 +79,27 @@ def main():
         )
 
         # Print current batch results
-        for i, agent_result in enumerate(final_state["agent_results"]):
-            print(f"Sample {start_idx + i} Answer:", list(agent_result.values())[0])
+        # Note: agent_results structure is List[Dict[agent_name, responses]]
+        # We might want to see the final output from the Orchestrator
+        for i, agent_result_dict in enumerate(final_state["agent_results"]):
+            # The last entry in agent_results usually corresponds to the last executed agent (Orchestrator)
+            # but since it's a list of dicts appended sequentially, let's print the last one if available.
+            pass
+
+        # Print the final result from the Orchestrator for each sample in the batch
+        # We need to find the Orchestrator's output in the state
+        orchestrator_name = "OrchestratorAgent"
+        orchestrator_outputs = []
+        for res in final_state["agent_results"]:
+            if orchestrator_name in res:
+                orchestrator_outputs = res[orchestrator_name]
+                break
+
+        if orchestrator_outputs:
+            for i, out in enumerate(orchestrator_outputs):
+                print(f"Sample {start_idx + i} Orchestrator Answer:", out)
+        else:
+            print("No Orchestrator output found in this batch.")
 
     # Save combined final state
     combined_state = {"agent_results": all_final_states}

@@ -1,27 +1,27 @@
-
-# Configuration file for testing the BasicAgent
+# Configuration file for testing the OrchestratorAggAgents (Coop)
 
 data:
   data_name: GSM8K
   data_path: EXPERIMENT/data/GSM8K
   # The number of samples to be tested, -1 for all
-  data_num: 10
+  data_num: 2
   # The number of samples for one inference
   batch_size: 1
 
 environment:
   dotenv_path: .env
   
-lm_name: &lm_name Qwen/Qwen3-0.6B
+lm_name: &lm_name Qwen/Qwen2.5-1.5B-Instruct
+lm_type: &lm_type hf
 
 graph_config:
   recursion_limit: 150
 
 inference_config: &infer
   # Options: "cuda" (NVIDIA), "mps" (Mac), "cpu"
-  device: "cuda"
+  device: "mps"
   # Options: "float16", "bfloat16", "float32" (use float32 for CPU/MPS stability if needed)
-  torch_dtype: "float32"
+  torch_dtype: "float16"
   device_map: "auto"
 
 entropy_config: &entropy
@@ -33,7 +33,7 @@ generation_config: &gen
   top_p: 1.0
   # pad_token_id: 50256
 
-save_folder: "EXPERIMENT/uTEST/EntropyFan"
+save_folder: "EXPERIMENT/uTEST/EntropyOrchestratorCoop"
 
 agents:
   MathAgent:
@@ -41,22 +41,21 @@ agents:
     inference_config: *infer
     entropy_config: *entropy
     generation_config: *gen
-    link_to: SummarizerAgent
+    link_to: OrchestratorAgent
   ScienceAgent:
     lm_name: *lm_name
     inference_config: *infer
     entropy_config: *entropy
     generation_config: *gen
-    link_to: SummarizerAgent
+    link_to: OrchestratorAgent
   CodeAgent:
     lm_name: *lm_name
     inference_config: *infer
     entropy_config: *entropy
     generation_config: *gen
-    link_to: SummarizerAgent
-  SummarizerAgent:
+    link_to: OrchestratorAgent
+  OrchestratorAgent:
     lm_name: *lm_name
     inference_config: *infer
     entropy_config: *entropy
     generation_config: *gen
-
