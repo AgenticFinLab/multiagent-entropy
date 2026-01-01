@@ -4,14 +4,14 @@ data:
   data_name: GSM8K
   data_path: EXPERIMENT/data/GSM8K
   # The number of samples to be tested, -1 for all
-  data_num: 2
+  data_num: 4
   # The number of samples for one inference
-  batch_size: 1
+  batch_size: 2
 
 environment:
   dotenv_path: .env
   
-lm_name: &lm_name Qwen/Qwen2.5-1.5B-Instruct
+lm_name: &lm_name Qwen/Qwen3-0.6B
 lm_type: &lm_type hf
 
 graph_config:
@@ -19,7 +19,7 @@ graph_config:
 
 inference_config: &infer
   # Options: "cuda" (NVIDIA), "mps" (Mac), "cpu"
-  device: "mps"
+  device: "cuda"
   # Options: "float16", "bfloat16", "float32" (use float32 for CPU/MPS stability if needed)
   torch_dtype: "float16"
   device_map: "auto"
@@ -27,10 +27,10 @@ inference_config: &infer
 entropy_config: &entropy
   
 generation_config: &gen
-  max_new_tokens: 300
-  do_sample: false
-  temperature: 1.0
-  top_p: 1.0
+  max_new_tokens: 2000
+  do_sample: true
+  temperature: 0.6
+  top_p: 0.95
   # pad_token_id: 50256
 
 save_folder: "EXPERIMENT/uTEST/EntropyOrchestratorRepeat"

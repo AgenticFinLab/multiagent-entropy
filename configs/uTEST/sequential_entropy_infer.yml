@@ -21,7 +21,7 @@ inference_config: &infer
   # Options: "cuda" (NVIDIA), "mps" (Mac), "cpu"
   device: "cuda"
   # Options: "float16", "bfloat16", "float32" (use float32 for CPU/MPS stability if needed)
-  torch_dtype: "float32"
+  torch_dtype: "float16"
   device_map: "auto"
 
 entropy_config: &entropy
