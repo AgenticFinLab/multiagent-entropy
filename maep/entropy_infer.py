@@ -35,16 +35,34 @@ class HFEntropyInference(BaseEntropyInference):
 
         This method initializes `self.model` using `AutoModelForCausalLM`.
         It respects the `inference_config` for device placement and data types.
+        Supports multi-GPU via device_map configuration.
         """
         print(f"[HFEntropyInference] Loading model: {self.lm_name}")
         model_kwargs = self.inference_config.get("model_kwargs", {})
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.lm_name,
-            trust_remote_code=True,
-            torch_dtype=self.torch_dtype,
-            **model_kwargs,
-        )
-        self.model.to(self.device)
+
+        # Check if device_map is specified in inference_config for multi-GPU support
+        # device_map can be "auto", "balanced", or a custom dict mapping layers to devices
+        device_map = self.inference_config.get("device_map", None)
+
+        if device_map:
+            # Multi-GPU mode: use device_map for parallel inference
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.lm_name,
+                trust_remote_code=True,
+                torch_dtype=self.torch_dtype,
+                device_map=device_map,
+                **model_kwargs,
+            )
+        else:
+            # Single-GPU mode: load model and move to specified device
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.lm_name,
+                trust_remote_code=True,
+                torch_dtype=self.torch_dtype,
+                **model_kwargs,
+            )
+            self.model.to(self.device)
+
         self.model.eval()
 
     def load_tokenizer(self):
@@ -244,9 +262,7 @@ class HFEntropyInference(BaseEntropyInference):
         generated_ids = hf_outputs.sequences[:, input_len:]
 
         # [B, L_g]
-        responses = self.tokenizer.batch_decode(
-            generated_ids, skip_special_tokens=True
-        )
+        responses = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
 
         # Move results to CPU for storage
         logits = torch.stack(hf_outputs.scores, dim=1)
