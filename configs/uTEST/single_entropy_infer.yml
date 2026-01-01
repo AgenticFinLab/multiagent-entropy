@@ -27,7 +27,7 @@ inference_config: &infer
 entropy_config: &entropy
   
 # Number of rounds for the single-agent pipeline
-round: 2
+round: 1
 
 # History aggregation configuration
 # When true, aggregates all previous round interactions into the next round's prompt
@@ -35,7 +35,7 @@ aggregate_history: true
 
 # History aggregation optimization settings
 # Maximum number of characters to include in aggregated history (0 for no limit)
-max_history_chars: 10000
+max_history_chars: 0
 
 # Maximum number of previous rounds to include in history (0 for all rounds)
 max_history_rounds: 0
