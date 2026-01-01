@@ -33,7 +33,7 @@ generation_config: &gen
   top_p: 0.95
   # pad_token_id: 50256
 
-save_folder: "EXPERIMENT/uTEST/EntropyOrchestratorCoop"
+save_folder: "EXPERIMENT/uTEST/EntropyCentralized"
 max_rounds: 2
 
 agents:
