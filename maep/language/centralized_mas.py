@@ -120,15 +120,16 @@ class OrchestratorCentralized(BaseAgents):
         - state: updated agent state.
         """
         samples = state["init_input"]
-        num_samples = len(samples)
+        # Get the number of samples from the length of the question list
+        num_samples = len(samples["question"])
         execution_idx = len(state["agent_executed"]) + 1
 
         t0 = time.time()
         # Prepare inputs for all samples
         infer_inputs = []
         for i in range(num_samples):
-            question = samples[i]["question"]
-            main_id = samples[i]["main_id"]
+            question = samples["question"][i]
+            main_id = samples["main_id"][i]
 
             system_msg = (
                 state["agent_system_msgs"][name].replace("{", "{{").replace("}", "}}")
@@ -159,7 +160,7 @@ class OrchestratorCentralized(BaseAgents):
         # Process results for each sample
         responses = []
         for i, out in enumerate(out_list):
-            main_id = samples[i]["main_id"]
+            main_id = samples["main_id"][i]
             # Save each sample's result individually
             savename = self.get_save_name(name, execution_idx)
             self.store_manager.save(
@@ -195,7 +196,8 @@ class OrchestratorCentralized(BaseAgents):
         - state: updated agent state with the orchestrator's final result.
         """
         samples = state["init_input"]
-        num_samples = len(samples)
+        # Get the number of samples from the length of the question list
+        num_samples = len(samples["question"])
         execution_idx = len(state["agent_executed"]) + 1
         name = self.orchestrator
 
@@ -204,8 +206,8 @@ class OrchestratorCentralized(BaseAgents):
         # Prepare inputs for all samples
         infer_inputs = []
         for i in range(num_samples):
-            question = samples[i]["question"]
-            main_id = samples[i]["main_id"]
+            question = samples["question"][i]
+            main_id = samples["main_id"][i]
 
             # Aggregate results from layer1 agents for this sample
             # state["agent_results"] is a list of dicts: [{"Agent1": [res_sample0, ...]}, ...]
@@ -240,7 +242,7 @@ class OrchestratorCentralized(BaseAgents):
         # Process results
         responses = []
         for i, out in enumerate(out_list):
-            main_id = samples[i]["main_id"]
+            main_id = samples["main_id"][i]
             savename = self.get_save_name(name, execution_idx)
             self.store_manager.save(
                 savename=f"Result_{main_id}-{savename}_sample_{i}",
