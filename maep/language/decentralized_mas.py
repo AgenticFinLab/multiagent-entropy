@@ -46,7 +46,7 @@ class OrchestratorDecentralized(OrchestratorCentralized):
 
     def __init__(self, run_config: dict):
         super().__init__(run_config)
-        self.repeat_count = run_config.get("repeat_count", 1)
+        self.repeat_count = run_config["round"]
 
     def execute_sub_agent(self, state: AgentState, name: str) -> AgentState:
         """

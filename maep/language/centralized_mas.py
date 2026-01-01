@@ -24,7 +24,7 @@ Core Idea
 
 Key Features:
 - **Centralized Control**: The Orchestrator acts as the single source of truth and final decision maker.
-- **Iterative Refinement (Optional)**: Supports multi-round execution where the Orchestrator's feedback is fed back to Layer 1 agents for refinement (controlled by `max_rounds`).
+- **Iterative Refinement (Optional)**: Supports multi-round execution where the Orchestrator's feedback is fed back to Layer 1 agents for refinement (controlled by `round`).
 
 Corresponding to the MAS (Centralized Multi-Agent System) [1] where a central node coordinates distributed agents.
 
@@ -56,7 +56,7 @@ class OrchestratorCentralized(BaseAgents):
     - Layer 2 (Orchestrator): A central authority that aggregates Layer 1 outputs and provides feedback.
 
     Iteration Logic (R-rounds):
-    - The process repeats for a maximum of `R` rounds (defined by `max_rounds`).
+    - The process repeats for a maximum of `R` rounds (defined by `round`).
     - Round `r` (1 <= r <= R):
       1. Layer 1 agents execute, incorporating feedback from the Orchestrator (from round `r-1`).
       2. Orchestrator executes, aggregating all Layer 1 outputs from the current round.
@@ -88,11 +88,9 @@ class OrchestratorCentralized(BaseAgents):
 
     def __init__(self, run_config):
         super().__init__(run_config)
-        self.max_rounds = run_config["max_rounds"]
-        # Get layer-1 agents and layer-2 agent
+        self.round = run_config["round"]
         self.layer1_agents: List[str] = None
         self.orchestrator: str = None
-
         self.get_layer_agents()
 
     def get_layer_agents(self):
@@ -279,14 +277,14 @@ class OrchestratorCentralized(BaseAgents):
     def check_outer_loop(self, state: AgentState) -> str:
         """
         Determine whether to start a new Outer Loop or End.
-        Checks if Orchestrator execution count < max_rounds (R).
+        Checks if Orchestrator execution count < round (R).
         """
         orch_executions = [
             name for name in state["agent_executed"] if name == self.orchestrator
         ]
         num_orch = len(orch_executions)
 
-        if num_orch < self.max_rounds:
+        if num_orch < self.round:
             return "continue"  # Go back to Layer 1
         return "finish"  # End
 
