@@ -55,5 +55,8 @@ agents:
     inference_config: *infer
     entropy_config: *entropy
     generation_config: *gen
+    
+    sys_message: "examples.uTEST.prompts:SINGLE_SYS"
+    user_message: "examples.uTEST.prompts:SINGLE_USER"
 
 

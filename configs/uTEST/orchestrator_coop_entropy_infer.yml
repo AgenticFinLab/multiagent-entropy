@@ -41,21 +41,33 @@ agents:
     inference_config: *infer
     entropy_config: *entropy
     generation_config: *gen
-    link_to: OrchestratorAgent
+
+    sys_message: "examples.uTEST.prompts:MATH_SYS"
+    user_message: "examples.uTEST.prompts:MATH_USER"
+
   ScienceAgent:
     lm_name: *lm_name
     inference_config: *infer
     entropy_config: *entropy
     generation_config: *gen
-    link_to: OrchestratorAgent
+
+    sys_message: "examples.uTEST.prompts:SCIENCE_SYS"
+    user_message: "examples.uTEST.prompts:SCIENCE_USER"
+
   CodeAgent:
     lm_name: *lm_name
     inference_config: *infer
     entropy_config: *entropy
     generation_config: *gen
-    link_to: OrchestratorAgent
+
+    sys_message: "examples.uTEST.prompts:CODE_SYS"
+    user_message: "examples.uTEST.prompts:CODE_USER"
+
   OrchestratorAgent:
     lm_name: *lm_name
     inference_config: *infer
     entropy_config: *entropy
     generation_config: *gen
+
+    sys_message: "examples.uTEST.prompts:ORCHESTRATOR_SYS"
+    user_message: "examples.uTEST.prompts:ORCHESTRATOR_USER"

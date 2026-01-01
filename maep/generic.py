@@ -47,6 +47,8 @@ Common Tensor Shapes and Types:
 """
 
 import os
+import sys
+import importlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple
@@ -139,6 +141,41 @@ class BaseAgents(ABC):
             file_format="json",
             block_size=500,
         )
+
+    def _load_from_module(self, import_path: str) -> Any:
+        """
+        Load an object (variable, class, function) from a string format "module.path:ObjectName".
+
+        Args:
+            import_path: String in format "module.path:ObjectName"
+
+        Returns:
+            The loaded object.
+        """
+        if ":" not in import_path:
+            raise ValueError(
+                f"Invalid import format: {import_path}. Expected 'module.path:ObjectName'"
+            )
+
+        module_path, obj_name = import_path.split(":")
+
+        try:
+            module = importlib.import_module(module_path)
+        except ImportError as e:
+            # Try adding current directory to path if not found
+            if os.getcwd() not in sys.path:
+                sys.path.append(os.getcwd())
+            try:
+                module = importlib.import_module(module_path)
+            except ImportError:
+                raise ImportError(
+                    f"Could not import module '{module_path}'. Error: {e}"
+                )
+
+        if not hasattr(module, obj_name):
+            raise ValueError(f"Object '{obj_name}' not found in module '{module_path}'")
+
+        return getattr(module, obj_name)
 
     def define_agent_models(self):
         """Construct HF inference as the agent LM.

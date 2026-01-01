@@ -19,14 +19,6 @@ from maep.generic import AgentState, BaseAgents
 from maep.entropy_infer import HFEntropyInference
 
 
-SINGLE_SYS = """You are a precise solver.
-Solve the problem correctly and concisely."""
-
-SINGLE_USER = """Question:
-{question}
-"""
-
-
 class SingleAgent(BaseAgents):
     """Minimal single-agent built with LangGraph.
     - One node `solve`: render -> generate -> write answer
@@ -47,8 +39,11 @@ class SingleAgent(BaseAgents):
         agent_system_msgs = {}
         agent_user_msgs = {}
 
-        agent_system_msgs["SingleSolver"] = SINGLE_SYS
-        agent_user_msgs["SingleSolver"] = SINGLE_USER
+        for name, config in self.agents_config.items():
+            if "sys_message" in config:
+                agent_system_msgs[name] = self._load_from_module(config["sys_message"])
+            if "user_message" in config:
+                agent_user_msgs[name] = self._load_from_module(config["user_message"])
 
         return agent_system_msgs, agent_user_msgs
 

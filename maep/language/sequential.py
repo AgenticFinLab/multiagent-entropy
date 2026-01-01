@@ -17,37 +17,6 @@ from lmbase.inference.base import InferInput, InferOutput
 from maep.generic import AgentState, BaseAgents
 from maep.entropy_infer import HFEntropyInference
 
-PLANNER_SYS = """You are the planner agent. Generate plans that are the general instructions only.
-Do not execute the plan, do not perform any calculations, and do not produce any answers or intermediate numerical results.
-Output a structured, numbered plans."""
-PLANNER_USER = """For the question: {question}
-Please only generate plans that are guidances required for the subsequent reasoning for the problem-solving. Do not include any specific calculation or numerical results."""
-
-SOLVER_SYS = """You are the solver agent. Solve strictly according to the provided plans. Execute each step precisely and produce the final result.
-Output the final result into \\boxed{}."""
-SOLVER_USER = """Question: {question}
-### Plans ###
-{block}
-### Plans ###
-Follow the plans to solve the question step by step."""
-
-CRITIC_SYS = """You are the critic agent. Review the solver's solution in detail, re-derive independently, and correct any mistakes.
-Keep the review terse."""
-CRITIC_USER = """Review the solution for: {question}
-### Solution ###
-{block}
-### Solution ###
-
-If corrections are needed, output the mistaken steps and the analysis, otherwise output 'Correct'."""
-
-JUDGER_SYS = """You are the final judge. Audit only the final candidate and ensure it is correct."""
-JUDGER_USER = """Final check for: {question}
-### Solution ###
-{block}
-### Solution ###
-
-If correct, output only the final answer with no words, no labels, and no steps."""
-
 
 class SequentialAgents(BaseAgents):
     """Sequential pipeline of agents using chat-style messages.
@@ -187,23 +156,13 @@ class SequentialAgents(BaseAgents):
     def _get_agent_prompts(self):
         agent_system_msgs = {}
         agent_user_msgs = {}
-        for name in self.agents_config.keys():
-            if name == "planner":
-                agent_system_msgs[name] = PLANNER_SYS
-                agent_user_msgs[name] = PLANNER_USER
-            elif name == "solver":
-                agent_system_msgs[name] = SOLVER_SYS
-                agent_user_msgs[name] = SOLVER_USER
-            elif name == "critic":
-                agent_system_msgs[name] = CRITIC_SYS
-                agent_user_msgs[name] = CRITIC_USER
-            elif name == "judger":
-                agent_system_msgs[name] = JUDGER_SYS
-                agent_user_msgs[name] = JUDGER_USER
-            else:
-                raise ValueError(
-                    f"Unknown agent name '{name}'. Define templates or extend _get_agent_prompts mapping."
-                )
+        
+        for name, config in self.agents_config.items():
+            if "sys_message" in config:
+                agent_system_msgs[name] = self._load_from_module(config["sys_message"])
+            if "user_message" in config:
+                agent_user_msgs[name] = self._load_from_module(config["user_message"])
+                
         return agent_system_msgs, agent_user_msgs
 
     def execute_agent(self, state: AgentState, agent_name: str) -> AgentState:

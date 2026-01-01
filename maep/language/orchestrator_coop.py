@@ -32,32 +32,7 @@ from maep.generic import AgentState, BaseAgents
 from maep.entropy_infer import HFEntropyInference
 
 # --- Prompts ---
-
-# Layer 1 Agents (example roles)
-MATH_SYS = """You are the MathAgent. Solve the given question with clear steps."""
-MATH_USER = """Question: {question}
-Provide a concise mathematical solution, showing key steps."""
-
-SCIENCE_SYS = """You are the ScienceAgent. Analyze and solve the given question with scientific reasoning."""
-SCIENCE_USER = """Question: {question}
-Explain your scientific reasoning and provide a final result."""
-
-CODE_SYS = """You are the CodeAgent. Provide a self-contained Python function that solves the problem."""
-CODE_USER = """Question: {question}
-Write a single self-contained Python function in a markdown code block that solves the problem."""
-
-# Layer 2 Orchestrator
-ORCHESTRATOR_SYS = """You are the Orchestrator Agent. Your task is to aggregate the solutions provided by the first-layer agents and produce a final, comprehensive answer.
-Analyze the provided solutions, resolve any conflicts, and synthesize a coherent final response."""
-
-ORCHESTRATOR_USER = """Question: {question}
-
-Here are the solutions from the expert agents:
-=== Solutions ===
-{block}
-=== Solutions ===
-
-Based on these inputs, provide the final answer."""
+# Removed hardcoded prompts. Now loaded from config.
 
 
 class OrchestratorAggAgents(BaseAgents):
@@ -78,23 +53,13 @@ class OrchestratorAggAgents(BaseAgents):
     def _get_agent_prompts(self):
         agent_system_msgs = {}
         agent_user_msgs = {}
-        for name in self.agents_config.keys():
-            if name == "MathAgent":
-                agent_system_msgs[name] = MATH_SYS
-                agent_user_msgs[name] = MATH_USER
-            elif name == "ScienceAgent":
-                agent_system_msgs[name] = SCIENCE_SYS
-                agent_user_msgs[name] = SCIENCE_USER
-            elif name == "CodeAgent":
-                agent_system_msgs[name] = CODE_SYS
-                agent_user_msgs[name] = CODE_USER
-            elif name == "OrchestratorAgent":
-                agent_system_msgs[name] = ORCHESTRATOR_SYS
-                agent_user_msgs[name] = ORCHESTRATOR_USER
-            else:
-                raise ValueError(
-                    f"Unknown agent name '{name}'. Extend _get_agent_prompts mapping."
-                )
+        
+        for name, config in self.agents_config.items():
+            if "sys_message" in config:
+                agent_system_msgs[name] = self._load_from_module(config["sys_message"])
+            if "user_message" in config:
+                agent_user_msgs[name] = self._load_from_module(config["user_message"])
+                
         return agent_system_msgs, agent_user_msgs
 
     def __init__(self, run_config):
