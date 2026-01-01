@@ -5,12 +5,12 @@ Executable test script for Centralized MAS (two-layer sequential + aggregator) a
 - Command line option `-c/--config` points to the YAML config file
 - Instantiates `OrchestratorAggAgents` (from centralized_mas.py)
 - Loads questions from the dataset defined in config and runs inference
-- Run: `python examples/uTEST/test_orchestrator_coop_entropy_infer.py -c configs/uTEST/orchestrator_coop_entropy_infer.yml`
+- Run: `python examples/uTEST/test_centralized_entropy_infer.py -c configs/uTEST/centralized_entropy_infer.yml`
 
 Note:
 - Update `lm_name` in the config file to point to your local model path
 - Update `device` in the config file according to your hardware (cuda/cpu/mps)
-- configs/uTEST/orchestrator_coop_entropy_infer.yml
+- configs/uTEST/centralized_entropy_infer.yml
 """
 
 import yaml
