@@ -71,10 +71,9 @@ class OrchestratorDecentralized(OrchestratorCentralized):
                 last_agent_name = list(last_result.keys())[0]
                 last_responses = last_result[last_agent_name]
 
-                if i < len(last_responses):
-                    prev_context = (
-                        f"\n\nContext from {last_agent_name}:\n{last_responses[i]}"
-                    )
+                prev_context = (
+                    f"\n\nContext from {last_agent_name}:\n{last_responses[i]}"
+                )
 
             # 2. Format Prompt
             system_msg = (
@@ -142,8 +141,7 @@ class OrchestratorDecentralized(OrchestratorCentralized):
                 # result_dict is {agent_name: [responses]}
                 agent_name = list(result_dict.keys())[0]
                 responses = result_dict[agent_name]
-                if i < len(responses):
-                    parts.append(f"[{agent_name}]:\n{responses[i]}\n")
+                parts.append(f"[{agent_name}]:\n{responses[i]}\n")
 
             block = "\n".join(parts)
             block = block.replace("\\", "\\\\").replace("{", "{{").replace("}", "}}")
