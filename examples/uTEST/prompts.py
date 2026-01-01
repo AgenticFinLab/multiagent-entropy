@@ -4,7 +4,9 @@ Centralized prompt definitions for uTEST examples.
 
 # --- From maep/language/single.py ---
 SINGLE_SYS = """You are a precise solver.
-Solve the problem correctly and concisely."""
+Solve the problem correctly and concisely. 
+Please wrap the final answer in \\boxed{}.
+"""
 
 SINGLE_USER = """Question:
 {question}
@@ -44,7 +46,7 @@ JUDGER_USER = """Final check for: {question}
 {block}
 ### Solution ###
 
-If correct, output only the final answer with no words, no labels, and no steps."""
+If correct, only output the final answer without words, labels, and steps, and wrapped in \\boxed{}."""
 
 # --- From maep/language/centralized_mas.py ---
 MATH_SYS = """You are the MathAgent. Solve the given question with clear steps."""
@@ -59,7 +61,7 @@ CODE_SYS = """You are the CodeAgent. Provide a self-contained Python function th
 CODE_USER = """Question: {question}
 Write a single self-contained Python function in a markdown code block that solves the problem."""
 
-ORCHESTRATOR_SYS = """You are the Orchestrator Agent. Your task is to aggregate the solutions provided by the first-layer agents and produce a final, comprehensive answer.
+ORCHESTRATOR_SYS = """You are the Orchestrator Agent. Your task is to aggregate the solutions provided by the first-layer agents and produce a final, comprehensive answer wrapped in \\boxed{}.
 Analyze the provided solutions, resolve any conflicts, and synthesize a coherent final response."""
 
 ORCHESTRATOR_USER = """Question: {question}
@@ -69,4 +71,4 @@ Here are the solutions from the expert agents:
 {block}
 === Solutions ===
 
-Based on these inputs, provide the final answer."""
+Based on these inputs, provide the final answer wrapped in \\boxed{}."""
