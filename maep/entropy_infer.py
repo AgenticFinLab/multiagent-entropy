@@ -238,9 +238,14 @@ class HFEntropyInference(BaseEntropyInference):
 
         # 3. Run inference (HF backend)
         hf_outputs, entropy = self.infer_entropy_hf(input_ids, attention_mask)
+
+        # Slice to get only generated tokens
+        input_len = input_ids.shape[-1]
+        generated_ids = hf_outputs.sequences[:, input_len:]
+
         # [B, L_g]
         responses = self.tokenizer.batch_decode(
-            hf_outputs.sequences, skip_special_tokens=True
+            generated_ids, skip_special_tokens=True
         )
 
         # Move results to CPU for storage

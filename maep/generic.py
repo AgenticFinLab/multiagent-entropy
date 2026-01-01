@@ -69,7 +69,7 @@ class AgentState(MessagesState):
     - Standardize prompt sourcing, per-stage outputs, and lightweight bookkeeping across agents.
 
     Fields
-    - sample: Arbitrary payload to carry input context (e.g., {"question": "..."}).
+    - init_input: List[Any], arbitrary payload to carry input context (e.g., [{"question": "..."}]).
     - agent_results: Ordered list of per-stage outputs; each item is a dict like {"name": <agent_name>, "output": <string>}.
     - agent_executed: Ordered list of agent names that have executed; mirrors the sequence without payload.
     - cost: Per-stage metrics or accounting records (e.g., {agent_name: {"latency": seconds}}); schema is project-defined.
@@ -81,7 +81,7 @@ class AgentState(MessagesState):
     - agent_results and agent_executed grow monotonically as stages execute.
     """
 
-    input: Any
+    init_input: List[Any]
     agent_results: List[Dict[str, Any]]
     agent_executed: List[str]
 

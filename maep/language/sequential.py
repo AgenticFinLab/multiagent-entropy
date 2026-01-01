@@ -213,7 +213,7 @@ class SequentialAgents(BaseAgents):
         """
         t0 = time.time()
         # get all the samples
-        samples = state["input"]
+        samples = state["init_input"]
         # Get the number of samples from the length of the question list
         num_samples = len(samples["question"])
         num_executed = len(state["agent_executed"])
@@ -271,7 +271,8 @@ class SequentialAgents(BaseAgents):
         # Process results for each sample
         responses = []
         # Iterate with main_id for saving
-        for i, (out, main_id) in enumerate(zip(out_list, samples["main_id"])):
+        for i, out in enumerate(out_list):
+            main_id = samples[i]["main_id"]
             # Save each sample's result individually
             savename = self.get_save_name(cur_name, execution_idx)
             self.store_manager.save(
@@ -289,7 +290,7 @@ class SequentialAgents(BaseAgents):
         state["agent_executed"].append(cur_name)
 
         return {
-            "input": state["input"],
+            "init_input": state["init_input"],
             "agent_results": state["agent_results"],
             "agent_executed": state["agent_executed"],
             "cost": state["cost"],
