@@ -5,7 +5,7 @@ Executable test script for Orchestrator Repeat (looping sequential + aggregator)
 - Command line option `-c/--config` points to the YAML config file
 - Instantiates `OrchestratorRepeatAgents`
 - Loads questions from the dataset defined in config and runs inference
-- Run: `python examples/uTEST/test_decentralized_entropy_infer.py -c configs/uTEST/decentralized_mas_entropy_infer.yml`
+- Run: `python examples/uTEST/test_decentralized_entropy_infer.py -c configs/uTEST/decentralized_entropy_infer.yml`
 """
 
 import yaml

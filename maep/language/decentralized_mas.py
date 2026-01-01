@@ -53,14 +53,14 @@ class OrchestratorDecentralized(OrchestratorCentralized):
         Execute a single layer1 agent, incorporating context from the previous agent execution.
         """
         samples = state["init_input"]
-        num_samples = len(samples)
+        num_samples = len(samples["question"])
         execution_idx = len(state["agent_executed"]) + 1
 
         t0 = time.time()
         # Prepare inputs for all samples
         infer_inputs = []
         for i in range(num_samples):
-            question = samples[i]["question"]
+            question = samples["question"][i]
 
             # 1. Build context from previous agent's output if available
             prev_context = ""
@@ -93,7 +93,7 @@ class OrchestratorDecentralized(OrchestratorCentralized):
         # Process results
         responses = []
         for i, out in enumerate(out_list):
-            main_id = samples[i]["main_id"]
+            main_id = samples["main_id"][i]
             savename = self.get_save_name(name, execution_idx)
             self.store_manager.save(
                 savename=f"Result_{main_id}-{savename}_sample_{i}",
@@ -120,7 +120,7 @@ class OrchestratorDecentralized(OrchestratorCentralized):
         Execute the Orchestrator agent to aggregate results from the LAST loop of Layer 1.
         """
         samples = state["init_input"]
-        num_samples = len(samples)
+        num_samples = len(samples["question"])
         execution_idx = len(state["agent_executed"]) + 1
         name = self.orchestrator
 
@@ -134,7 +134,7 @@ class OrchestratorDecentralized(OrchestratorCentralized):
         # Prepare inputs
         infer_inputs = []
         for i in range(num_samples):
-            question = samples[i]["question"]
+            question = samples["question"][i]
 
             parts = []
             for result_dict in relevant_results:
@@ -162,7 +162,7 @@ class OrchestratorDecentralized(OrchestratorCentralized):
         # Process results
         responses = []
         for i, out in enumerate(out_list):
-            main_id = samples[i]["main_id"]
+            main_id = samples["main_id"][i]
             savename = self.get_save_name(name, execution_idx)
             self.store_manager.save(
                 savename=f"Result_{main_id}-{savename}_sample_{i}",
