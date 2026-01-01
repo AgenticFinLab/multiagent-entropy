@@ -161,16 +161,11 @@ class BaseAgents(ABC):
 
         try:
             module = importlib.import_module(module_path)
-        except ImportError as e:
+        except ImportError:
             # Try adding current directory to path if not found
             if os.getcwd() not in sys.path:
                 sys.path.append(os.getcwd())
-            try:
-                module = importlib.import_module(module_path)
-            except ImportError:
-                raise ImportError(
-                    f"Could not import module '{module_path}'. Error: {e}"
-                )
+            module = importlib.import_module(module_path)
 
         if not hasattr(module, obj_name):
             raise ValueError(f"Object '{obj_name}' not found in module '{module_path}'")

@@ -1,4 +1,4 @@
-# Configuration file for testing the OrchestratorAggAgents (Coop)
+# Configuration file for testing the OrchestratorRepeatAgents
 
 data:
   data_name: GSM8K
@@ -33,7 +33,8 @@ generation_config: &gen
   top_p: 1.0
   # pad_token_id: 50256
 
-save_folder: "EXPERIMENT/uTEST/EntropyOrchestratorCoop"
+save_folder: "EXPERIMENT/uTEST/EntropyOrchestratorRepeat"
+repeat_count: 2
 
 agents:
   MathAgent:

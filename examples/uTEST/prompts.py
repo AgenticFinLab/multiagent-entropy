@@ -46,7 +46,7 @@ JUDGER_USER = """Final check for: {question}
 
 If correct, output only the final answer with no words, no labels, and no steps."""
 
-# --- From maep/language/orchestrator_coop.py ---
+# --- From maep/language/centralized_mas.py ---
 MATH_SYS = """You are the MathAgent. Solve the given question with clear steps."""
 MATH_USER = """Question: {question}
 Provide a concise mathematical solution, showing key steps."""

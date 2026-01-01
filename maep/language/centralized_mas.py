@@ -1,22 +1,34 @@
 """
-Orchestrator-Aggregator (two-layer) multi-agent structure with LangGraph.
+Centralized Multi-Agent System (MAS) structure with LangGraph.
 
 Diagram
       Input
         │
-    ┌─────┴─────┐
-    ▼     ▼     ▼
-Agent1 Agent2 Agent3   (Layer 1: parallel agents)
-    └─────┬─────┘
         ▼
-   Orchestrator        (Layer 2: aggregator)
-        │
-      Output
+    ┌───┴───┐ <───────────────────────────┐
+    ▼       ▼                             │
+ Agent1   Agent2 ... (Layer 1: Agents)    │
+    └─────┬─────┘                         │
+          ▼                               │
+     Orchestrator    (Layer 2)            │
+          │                               │
+          ├─────── (r < R: Feedback) ─────┘
+          │
+          ▼ (r == R)
+        Output
 
 Core Idea
-- Multiple nodes in the graph:
-  1) `Agent1` ... `AgentN`: run first-layer agents sequentially (but logically parallel tasks).
-  2) `orchestrator`: aggregates the outputs from layer 1 and produces a final result.
+- Two-layer architecture:
+  1) Layer 1: Multiple domain-specific agents (Agent1...AgentN) execute in parallel (logically) or sequentially to generate initial solutions.
+  2) Layer 2: A Centralized Orchestrator aggregates these solutions, resolves conflicts, and produces the final output.
+
+Key Features:
+- **Centralized Control**: The Orchestrator acts as the single source of truth and final decision maker.
+- **Iterative Refinement (Optional)**: Supports multi-round execution where the Orchestrator's feedback is fed back to Layer 1 agents for refinement (controlled by `max_rounds`).
+
+Corresponding to the MAS (Centralized Multi-Agent System) [1] where a central node coordinates distributed agents.
+
+[1]. Towards a Science of Scaling Agent Systems.
 """
 
 import time
@@ -35,10 +47,22 @@ from maep.entropy_infer import HFEntropyInference
 # Removed hardcoded prompts. Now loaded from config.
 
 
-class OrchestratorAggAgents(BaseAgents):
+class OrchestratorCentralized(BaseAgents):
     """
-    A two-layer multi-agent structure where N agents run in parallel (Layer 1),
-    and their outputs are aggregated by an Orchestrator (Layer 2).
+    Centralized Multi-Agent System (Centralized MAS).
+
+    Architecture:
+    - Layer 1 (Workers): Multiple domain-specific agents (e.g., Math, Code) run in parallel/sequence.
+    - Layer 2 (Orchestrator): A central authority that aggregates Layer 1 outputs and provides feedback.
+
+    Iteration Logic (R-rounds):
+    - The process repeats for a maximum of `R` rounds (defined by `max_rounds`).
+    - Round `r` (1 <= r <= R):
+      1. Layer 1 agents execute, incorporating feedback from the Orchestrator (from round `r-1`).
+      2. Orchestrator executes, aggregating all Layer 1 outputs from the current round.
+      3. If `r < R`, the Orchestrator's output serves as feedback for the next round `r+1`.
+      4. If `r == R`, the process terminates, and the Orchestrator's output is final.
+
     """
 
     def define_agent_models(self):
@@ -53,17 +77,18 @@ class OrchestratorAggAgents(BaseAgents):
     def _get_agent_prompts(self):
         agent_system_msgs = {}
         agent_user_msgs = {}
-        
+
         for name, config in self.agents_config.items():
             if "sys_message" in config:
                 agent_system_msgs[name] = self._load_from_module(config["sys_message"])
             if "user_message" in config:
                 agent_user_msgs[name] = self._load_from_module(config["user_message"])
-                
+
         return agent_system_msgs, agent_user_msgs
 
     def __init__(self, run_config):
         super().__init__(run_config)
+        self.max_rounds = run_config["max_rounds"]
         # Get layer-1 agents and layer-2 agent
         self.layer1_agents: List[str] = None
         self.orchestrator: str = None
@@ -108,7 +133,22 @@ class OrchestratorAggAgents(BaseAgents):
             system_msg = (
                 state["agent_system_msgs"][name].replace("{", "{{").replace("}", "}}")
             )
-            user_prompt = state["agent_user_msgs"][name].format(question=question)
+            base_user_prompt = state["agent_user_msgs"][name].format(question=question)
+
+            # Build context from Orchestrator (if available from previous outer loop)
+            orch_context = ""
+            # Find the most recent Orchestrator result
+            # We search backwards
+            for result_dict in reversed(state["agent_results"]):
+                if self.orchestrator in result_dict:
+                    orch_responses = result_dict[self.orchestrator]
+                    orch_context = (
+                        f"\n\nGuidance from {self.orchestrator}:\n{orch_responses[i]}"
+                    )
+                    break
+
+            # Append context
+            user_prompt = f"{base_user_prompt}{orch_context}"
 
             infer_inputs.append(InferInput(system_msg=system_msg, user_msg=user_prompt))
 
@@ -170,14 +210,14 @@ class OrchestratorAggAgents(BaseAgents):
             # Aggregate results from layer1 agents for this sample
             # state["agent_results"] is a list of dicts: [{"Agent1": [res_sample0, ...]}, ...]
             # We need to extract the i-th sample's response from each layer 1 agent
+            # CRITICAL: We must get the LATEST result from the current round, so we search backwards.
             parts = []
             for agent_name in self.layer1_agents:
-                # Find the result for this agent
-                for result_dict in state["agent_results"]:
+                # Find the result for this agent (most recent)
+                for result_dict in reversed(state["agent_results"]):
                     if agent_name in result_dict:
                         responses = result_dict[agent_name]
-                        if i < len(responses):
-                            parts.append(f"[{agent_name}]:\n{responses[i]}\n")
+                        parts.append(f"[{agent_name}]:\n{responses[i]}\n")
                         break
 
             block = "\n".join(parts)
@@ -234,6 +274,20 @@ class OrchestratorAggAgents(BaseAgents):
         else:
             raise ValueError(f"Unknown agent: {agent_name}")
 
+    def check_outer_loop(self, state: AgentState) -> str:
+        """
+        Determine whether to start a new Outer Loop or End.
+        Checks if Orchestrator execution count < max_rounds (R).
+        """
+        orch_executions = [
+            name for name in state["agent_executed"] if name == self.orchestrator
+        ]
+        num_orch = len(orch_executions)
+
+        if num_orch < self.max_rounds:
+            return "continue"  # Go back to Layer 1
+        return "finish"  # End
+
     def graph(self) -> CompiledStateGraph:
         """
         Build and compile the two-layer Orchestrator-Aggregator LangGraph.
@@ -272,6 +326,11 @@ class OrchestratorAggAgents(BaseAgents):
             # Edge case: No layer 1 agents? Directly entry to orchestrator
             g.set_entry_point("orchestrator")
 
-        g.add_edge("orchestrator", END)
+        # 4. Add Conditional Edge from Orchestrator (Outer Loop Control)
+        g.add_conditional_edges(
+            "orchestrator",
+            self.check_outer_loop,
+            {"continue": self.layer1_agents[0], "finish": END},
+        )
 
         return g.compile()
