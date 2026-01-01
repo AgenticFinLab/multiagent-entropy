@@ -4,10 +4,11 @@ Experiment runner script for large-scale batch processing.
 
 This script provides a command-line interface to run experiments with different configurations, supporting both single experiment runs and batch processing of multiple configurations.
 
-It supports three agent modes: single, fan, and sequential.
+It supports three agent modes: single, and sequential.
 """
 
 import os
+import json
 import yaml
 import time
 import logging
@@ -15,7 +16,6 @@ import argparse
 from typing import Dict, Any, List
 
 from maep.language.single import SingleAgent
-from maep.language.fan import FanAgentsTwoLayer
 from maep.language.sequential import SequentialAgents
 from lmbase.dataset import registry as data_registry
 from config_loader import load_experiment_config, save_config
@@ -71,8 +71,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--agent-type",
         type=str,
-        choices=["single", "fan", "sequential"],
-        help="Type of agent configuration to use (single/fan/sequential)",
+        choices=["single", "sequential"],
+        help="Type of agent configuration to use (single/sequential)",
     )
 
     # Batch experiment mode
@@ -138,8 +138,6 @@ def run_single_experiment(
         # Initialize agent based on agent_type
         if agent_type == "single":
             agent = SingleAgent(run_config=config)
-        elif agent_type == "fan":
-            agent = FanAgentsTwoLayer(run_config=config)
         elif agent_type == "sequential":
             agent = SequentialAgents(run_config=config)
         else:
@@ -149,12 +147,24 @@ def run_single_experiment(
         data_cfg = config["data"]
         dataset = data_registry.get(config=data_cfg, split=data_cfg["split"])
 
+        # Save all samples to local disk
+        data_save_dir = f"experiments/data/{data_cfg['data_name']}"
+        os.makedirs(data_save_dir, exist_ok=True)
+        dataset_save_path = os.path.join(
+            data_save_dir,
+            f"{data_cfg['split']}-all-samples.json",
+        )
+        all_samples = [dataset[i] for i in range(len(dataset))]
+        with open(dataset_save_path, "w", encoding="utf-8") as f:
+            json.dump(all_samples, f, ensure_ascii=False, indent=2)
+
         # Determine total samples to process
         total_samples = (
             len(dataset)
             if data_cfg["data_num"] == -1
             else min(data_cfg["data_num"], len(dataset))
         )
+
         batch_size = data_cfg["batch_size"]
 
         logger.info(f"Processing {total_samples} samples in batches of {batch_size}")
