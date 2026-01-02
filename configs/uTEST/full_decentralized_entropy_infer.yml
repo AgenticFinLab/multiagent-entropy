@@ -1,0 +1,75 @@
+# Configuration file for testing the Decentralized MAS (OrchestratorDecentralized)
+
+data:
+  data_name: GSM8K
+  data_path: EXPERIMENT/data/GSM8K
+  # The number of samples to be tested, -1 for all
+  data_num: 1
+  # The number of samples for one inference
+  batch_size: 1
+
+environment:
+  dotenv_path: .env
+  
+lm_name: &lm_name Qwen/Qwen3-0.6B
+lm_type: &lm_type hf
+
+graph_config:
+  recursion_limit: 150
+
+inference_config: &infer
+  # Options: "cuda" (NVIDIA), "mps" (Mac), "cpu"
+  device: "cuda"
+  # Options: "float16", "bfloat16", "float32" (use float32 for CPU/MPS stability if needed)
+  torch_dtype: "float16"
+  device_map: "auto"
+
+entropy_config: &entropy
+  
+generation_config: &gen
+  max_new_tokens: 2000
+  do_sample: true
+  temperature: 0.6
+  top_p: 0.95
+  # pad_token_id: 50256
+
+save_folder: "EXPERIMENT/uTEST/EntropyFullDecentralized"
+# Number of rounds for the Decentralized MAS
+round: 2
+
+agents:
+  MathAgent:
+    lm_name: *lm_name
+    inference_config: *infer
+    entropy_config: *entropy
+    generation_config: *gen
+
+    sys_message: "examples.uTEST.prompts:MATH_SYS"
+    user_message: "examples.uTEST.prompts:MATH_USER"
+
+  ScienceAgent:
+    lm_name: *lm_name
+    inference_config: *infer
+    entropy_config: *entropy
+    generation_config: *gen
+
+    sys_message: "examples.uTEST.prompts:SCIENCE_SYS"
+    user_message: "examples.uTEST.prompts:SCIENCE_USER"
+
+  CodeAgent:
+    lm_name: *lm_name
+    inference_config: *infer
+    entropy_config: *entropy
+    generation_config: *gen
+
+    sys_message: "examples.uTEST.prompts:CODE_SYS"
+    user_message: "examples.uTEST.prompts:CODE_USER"
+
+  OrchestratorAgent:
+    lm_name: *lm_name
+    inference_config: *infer
+    entropy_config: *entropy
+    generation_config: *gen
+
+    sys_message: "examples.uTEST.prompts:ORCHESTRATOR_SYS"
+    user_message: "examples.uTEST.prompts:ORCHESTRATOR_USER"
