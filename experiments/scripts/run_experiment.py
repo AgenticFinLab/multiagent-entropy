@@ -4,7 +4,7 @@ Experiment runner script for large-scale batch processing.
 
 This script provides a command-line interface to run experiments with different configurations, supporting both single experiment runs and batch processing of multiple configurations.
 
-It supports three agent modes: single, and sequential.
+It supports multiple agent modes: single, sequential, centralized, decentralized, full_decentralized, debate, hybrid.
 """
 
 import os
@@ -17,6 +17,11 @@ from typing import Dict, Any, List
 
 from maep.language.single import SingleAgent
 from maep.language.sequential import SequentialAgents
+from maep.language.centralized import OrchestratorCentralized
+from maep.language.decentralized import OrchestratorDecentralized
+from maep.language.full_decentralized import OrchestratorFullDecentralized
+from maep.language.debate import DebateMAS
+from maep.language.hybrid import OrchestratorHybrid
 from lmbase.dataset import registry as data_registry
 from config_loader import load_experiment_config, save_config
 
@@ -71,8 +76,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--agent-type",
         type=str,
-        choices=["single", "sequential"],
-        help="Type of agent configuration to use (single/sequential)",
+        choices=["single", "sequential", "centralized", "decentralized", "full_decentralized", "debate", "hybrid"],
+        help="Type of agent configuration to use (single/sequential/centralized/decentralized/full_decentralized/debate/hybrid)",
     )
 
     # Batch experiment mode
@@ -140,6 +145,16 @@ def run_single_experiment(
             agent = SingleAgent(run_config=config)
         elif agent_type == "sequential":
             agent = SequentialAgents(run_config=config)
+        elif agent_type == "centralized":
+            agent = OrchestratorCentralized(run_config=config)
+        elif agent_type == "decentralized":
+            agent = OrchestratorDecentralized(run_config=config)
+        elif agent_type == "full_decentralized":
+            agent = OrchestratorFullDecentralized(run_config=config)
+        elif agent_type == "debate":
+            agent = DebateMAS(run_config=config)
+        elif agent_type == "hybrid":
+            agent = OrchestratorHybrid(run_config=config)
         else:
             raise ValueError(f"Unsupported agent type: {agent_type}")
 

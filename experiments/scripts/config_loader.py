@@ -4,7 +4,7 @@ Configuration loader for MultiAgent-Entropy experiments.
 
 This script provides functionality to:
 1. Load and merge configuration files
-2. Support three agent modes: single, fan, and sequential
+2. Support multiple agent modes: single, sequential, centralized, decentralized, full_decentralized, debate, hybrid
 3. Load agent-specific configurations from agent_specific directory
 4. Merge all configurations into a complete experiment configuration
 
@@ -18,7 +18,7 @@ Usage:
         dataset_config_path='experiments/configs/dataset_specific/gsm8k.yml',
         entropy_config_path='experiments/configs/entropy_configs/standard.yml',
         experiment_name='test_experiment',
-        agent_type='fan'
+        agent_type='centralized'
     )
 
     # Generate configs from batch file
@@ -145,7 +145,7 @@ def load_experiment_config(
         dataset_config_path (str): Path to dataset-specific configuration file.
         entropy_config_path (str): Path to entropy configuration file.
         experiment_name (str): Name of the experiment.
-        agent_type (str): Type of agent configuration to load (single/fan/sequential).
+        agent_type (str): Type of agent configuration to load (single/sequential/centralized/decentralized/full_decentralized/debate/hybrid).
 
     Returns:
         Dict[str, Any]: Complete merged configuration for the experiment.
@@ -170,7 +170,7 @@ def load_experiment_config(
         agent_type = agent_type or base_config.get("agent_type", "single")
 
         # Validate agent type
-        valid_agent_types = ["single", "fan", "sequential"]
+        valid_agent_types = ["single", "sequential", "centralized", "decentralized", "full_decentralized", "debate", "hybrid"]
         if agent_type not in valid_agent_types:
             raise ValueError(
                 f"Invalid agent_type: {agent_type}. Valid types are: {valid_agent_types}"
@@ -288,7 +288,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agent-type",
         type=str,
-        choices=["single", "fan", "sequential"],
+        choices=["single", "sequential", "centralized", "decentralized", "full_decentralized", "debate", "hybrid"],
         default="single",
         help="Agent type to test",
     )
