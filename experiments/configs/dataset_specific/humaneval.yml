@@ -7,6 +7,6 @@ data:
   # The number of samples to be tested, -1 for all
   data_num: 1000
   # The number of samples for one inference
-  batch_size: 2
+  batch_size: 1
 
 task_type: "code"

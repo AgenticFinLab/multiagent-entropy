@@ -3,36 +3,36 @@
 # List of experiments to run
 experiments:
   # Experiment 1: Qwen3-4B with GSM8K and single agent
-  # - name: "qwen3-4b_gsm8k_single_agent"
-  #   base_config: "experiments/configs/base_config.yml"
-  #   model_config: "experiments/configs/model_specific/qwen3-4b.yml"
-  #   dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
-  #   entropy_config: "experiments/configs/entropy_configs/standard.yml"
-  #   agent_type: "single"
+  - name: "qwen3-4b_gsm8k_single_agent"
+    base_config: "experiments/configs/base_config.yml"
+    model_config: "experiments/configs/model_specific/qwen3-4b.yml"
+    dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
+    entropy_config: "experiments/configs/entropy_configs/standard.yml"
+    agent_type: "single"
     
-  # # Experiment 2: Qwen3-4B with GSM8K and sequential agent
-  # - name: "qwen3-4b_gsm8k_sequential_agent"
-  #   base_config: "experiments/configs/base_config.yml"
-  #   model_config: "experiments/configs/model_specific/qwen3-4b.yml"
-  #   dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
-  #   entropy_config: "experiments/configs/entropy_configs/standard.yml"
-  #   agent_type: "sequential"
+  # Experiment 2: Qwen3-4B with GSM8K and sequential agent
+  - name: "qwen3-4b_gsm8k_sequential_agent"
+    base_config: "experiments/configs/base_config.yml"
+    model_config: "experiments/configs/model_specific/qwen3-4b.yml"
+    dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
+    entropy_config: "experiments/configs/entropy_configs/standard.yml"
+    agent_type: "sequential"
     
-  # # Experiment 3: Qwen3-4B with GSM8K and centralized agent
-  # - name: "qwen3-4b_gsm8k_centralized_agent"
-  #   base_config: "experiments/configs/base_config.yml"
-  #   model_config: "experiments/configs/model_specific/qwen3-4b.yml"
-  #   dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
-  #   entropy_config: "experiments/configs/entropy_configs/standard.yml"
-  #   agent_type: "centralized"
+  # Experiment 3: Qwen3-4B with GSM8K and centralized agent
+  - name: "qwen3-4b_gsm8k_centralized_agent"
+    base_config: "experiments/configs/base_config.yml"
+    model_config: "experiments/configs/model_specific/qwen3-4b.yml"
+    dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
+    entropy_config: "experiments/configs/entropy_configs/standard.yml"
+    agent_type: "centralized"
 
-  #   # Experiment 4: Qwen3-4B with GSM8K and debate agent
-  # - name: "qwen3-4b_gsm8k_debate_agent"
-  #   base_config: "experiments/configs/base_config.yml"
-  #   model_config: "experiments/configs/model_specific/qwen3-4b.yml"
-  #   dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
-  #   entropy_config: "experiments/configs/entropy_configs/standard.yml"
-  #   agent_type: "debate"
+    # Experiment 4: Qwen3-4B with GSM8K and debate agent
+  - name: "qwen3-4b_gsm8k_debate_agent"
+    base_config: "experiments/configs/base_config.yml"
+    model_config: "experiments/configs/model_specific/qwen3-4b.yml"
+    dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
+    entropy_config: "experiments/configs/entropy_configs/standard.yml"
+    agent_type: "debate"
     
   # Experiment 5: Qwen3-4B with GSM8K and hybrid agent
   - name: "qwen3-4b_gsm8k_hybrid_agent"
