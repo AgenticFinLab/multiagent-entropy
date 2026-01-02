@@ -1,0 +1,27 @@
+# Debate agent mode configuration
+# Note: Debate mode uses majority voting instead of an orchestrator agent
+
+agents:
+  agent1:
+    lm_name: "${model_specific.lm_name}"
+    inference_config: "${model_specific.inference_config}"
+    entropy_config: "${entropy_configs.entropy_config}"
+    generation_config: "${base_config.generation_config}"
+    sys_message: "examples.uTEST.prompts:DEBATE_AGENT1_SYS"
+    user_message: "examples.uTEST.prompts:DEBATE_AGENT1_USER"
+
+  agent2:
+    lm_name: "${model_specific.lm_name}"
+    inference_config: "${model_specific.inference_config}"
+    entropy_config: "${entropy_configs.entropy_config}"
+    generation_config: "${base_config.generation_config}"
+    sys_message: "examples.uTEST.prompts:DEBATE_AGENT2_SYS"
+    user_message: "examples.uTEST.prompts:DEBATE_AGENT2_USER"
+
+  agent3:
+    lm_name: "${model_specific.lm_name}"
+    inference_config: "${model_specific.inference_config}"
+    entropy_config: "${entropy_configs.entropy_config}"
+    generation_config: "${base_config.generation_config}"
+    sys_message: "examples.uTEST.prompts:DEBATE_AGENT3_SYS"
+    user_message: "examples.uTEST.prompts:DEBATE_AGENT3_USER"

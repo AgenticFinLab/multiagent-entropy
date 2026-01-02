@@ -1,4 +1,4 @@
-# Fan agent mode configuration
+# Full decentralized agent mode configuration
 
 agents:
   MathAgent:
@@ -6,21 +6,29 @@ agents:
     inference_config: "${model_specific.inference_config}"
     entropy_config: "${entropy_configs.entropy_config}"
     generation_config: "${base_config.generation_config}"
-    link_to: SummarizerAgent
+    sys_message: "examples.uTEST.prompts:MATH_SYS"
+    user_message: "examples.uTEST.prompts:MATH_USER"
+
   ScienceAgent:
     lm_name: "${model_specific.lm_name}"
     inference_config: "${model_specific.inference_config}"
     entropy_config: "${entropy_configs.entropy_config}"
     generation_config: "${base_config.generation_config}"
-    link_to: SummarizerAgent
+    sys_message: "examples.uTEST.prompts:SCIENCE_SYS"
+    user_message: "examples.uTEST.prompts:SCIENCE_USER"
+
   CodeAgent:
     lm_name: "${model_specific.lm_name}"
     inference_config: "${model_specific.inference_config}"
     entropy_config: "${entropy_configs.entropy_config}"
     generation_config: "${base_config.generation_config}"
-    link_to: SummarizerAgent
-  SummarizerAgent:
+    sys_message: "examples.uTEST.prompts:CODE_SYS"
+    user_message: "examples.uTEST.prompts:CODE_USER"
+
+  OrchestratorAgent:
     lm_name: "${model_specific.lm_name}"
     inference_config: "${model_specific.inference_config}"
     entropy_config: "${entropy_configs.entropy_config}"
     generation_config: "${base_config.generation_config}"
+    sys_message: "examples.uTEST.prompts:ORCHESTRATOR_SYS"
+    user_message: "examples.uTEST.prompts:ORCHESTRATOR_USER"
