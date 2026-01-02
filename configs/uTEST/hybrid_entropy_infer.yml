@@ -44,8 +44,8 @@ agents:
     entropy_config: *entropy
     generation_config: *gen
 
-    sys_message: "examples.uTEST.prompts:HYBRID_MATH_SYS"
-    user_message: "examples.uTEST.prompts:HYBRID_MATH_USER"
+    sys_message: "examples.uTEST.prompts:MATH_SYS"
+    user_message: "examples.uTEST.prompts:MATH_USER"
 
   ScienceAgent:
     lm_name: *lm_name
@@ -53,8 +53,8 @@ agents:
     entropy_config: *entropy
     generation_config: *gen
 
-    sys_message: "examples.uTEST.prompts:HYBRID_SCIENCE_SYS"
-    user_message: "examples.uTEST.prompts:HYBRID_SCIENCE_USER"
+    sys_message: "examples.uTEST.prompts:SCIENCE_SYS"
+    user_message: "examples.uTEST.prompts:SCIENCE_USER"
 
   CodeAgent:
     lm_name: *lm_name
@@ -62,8 +62,8 @@ agents:
     entropy_config: *entropy
     generation_config: *gen
 
-    sys_message: "examples.uTEST.prompts:HYBRID_CODE_SYS"
-    user_message: "examples.uTEST.prompts:HYBRID_CODE_USER"
+    sys_message: "examples.uTEST.prompts:CODE_SYS"
+    user_message: "examples.uTEST.prompts:CODE_USER"
 
   OrchestratorAgent:
     lm_name: *lm_name
@@ -71,5 +71,5 @@ agents:
     entropy_config: *entropy
     generation_config: *gen
 
-    sys_message: "examples.uTEST.prompts:HYBRID_ORCHESTRATOR_SYS"
-    user_message: "examples.uTEST.prompts:HYBRID_ORCHESTRATOR_USER"
+    sys_message: "examples.uTEST.prompts:ORCHESTRATOR_SYS"
+    user_message: "examples.uTEST.prompts:ORCHESTRATOR_USER"
