@@ -3,6 +3,11 @@ Sequential multi-agent framework built with LangGraph.
 
 Topology:
 Input -> Agent 1 --> Agent 2 --> Agent 3 --> ..... -> Output
+
+For multiple rounds:
+Input -> Agent 1 --> Agent 2 --> Agent 3 --> Agent 1 --> ..... -> Output
+after each round, the history is aggregated and passed to the Agent 1 in next round for further planning.
+LLM calls: r * N (rounds * number of agents)
 """
 
 import time
@@ -31,7 +36,7 @@ class SequentialAgents(BaseAgents):
         # Number of rounds for the sequential pipeline
         self.round = run_config["round"]
         # History aggregation flag
-        self.aggregate_history = run_config.get("aggregate_history", False)
+        self.aggregate_history = run_config.get("aggregate_history", True)
         # History optimization settings
         self.max_history_chars = run_config.get("max_history_chars", 10000)
         self.max_history_rounds = run_config.get("max_history_rounds", 0)

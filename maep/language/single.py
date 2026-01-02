@@ -4,6 +4,10 @@ Basic single-agent built with LangGraph.
 Topology:
 Input -> Agent 1 -> Output
 
+For multiple rounds:
+Input -> Agent 1 -> Agent 1 -> ... -> Output
+Agent 1 will receive the input in the last round.
+LLM calls: r (rounds)
 """
 
 import time
@@ -30,7 +34,7 @@ class SingleAgent(BaseAgents):
         # Number of rounds for the single-agent pipeline
         self.round = run_config["round"]
         # History aggregation flag
-        self.aggregate_history = run_config.get("aggregate_history", False)
+        self.aggregate_history = run_config.get("aggregate_history", True)
         # History optimization settings
         self.max_history_chars = run_config.get("max_history_chars", 10000)
         self.max_history_rounds = run_config.get("max_history_rounds", 0)

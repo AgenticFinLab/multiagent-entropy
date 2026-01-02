@@ -17,6 +17,11 @@ Diagram
           ▼ (r == R)
         Output
 
+Memory:
+- After each round, the Orchestrator aggregates the outputs of all Layer 1 agents and outputs a feedback. In the next round, the feedback is passed to each Layer 1 agent as input.
+
+LLM calls: r * N (rounds * number of agents) + r * 1 (rounds * orchestrator)
+
 Core Idea
 - Two-layer architecture:
   1) Layer 1: Multiple domain-specific agents (Agent1...AgentN) execute in parallel (logically) or sequentially to generate initial solutions.

@@ -3,12 +3,18 @@ Orchestrator-Repeat (two-layer with loop) multi-agent structure with LangGraph.
 
 Topology:
 Loop P times:
-  Agent 1 -> Agent 2 -> ... -> Agent N
-    ^                        |
-    |________________________| (if loop < P)
-                             | (if loop == P)
-                             v
-                        Orchestrator -> Output
+  Agent 1 (Math) -> Agent 2 (Science) -> Agent 3 (Code)
+    ^                                       |
+    |_______________________________________| (if loop < P)
+                                            | (if loop == P)
+                                            v
+                                        Orchestrator -> Output
+
+Memory:
+- Each layer 1 agent only receives the output from the immediately previous agent.
+- At the begin of each round, the Agent 1 will receive the output from the Agent 3 in the last round.
+
+LLM calls: r * N (rounds * number of agents) + 1 (orchestrator)
 
 Corresponding to the MAS (Decentralized Multi-Agent System) [1] with two layers:
 - Layer 1: N sequential agents running in a loop P times.
