@@ -8,3 +8,5 @@ data:
   data_num: 1
   # The number of samples for one inference
   batch_size: 1
+
+task_type: "math"
