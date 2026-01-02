@@ -231,7 +231,7 @@ class SequentialAgents(BaseAgents):
         responses = []
         # Iterate with main_id for saving
         for i, out in enumerate(out_list):
-            main_id = samples[i]["main_id"]
+            main_id = samples["main_id"][i]
             # Save each sample's result individually
             savename = self.get_save_name(cur_name, execution_idx)
             self.store_manager.save(
