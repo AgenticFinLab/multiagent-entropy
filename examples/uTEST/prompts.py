@@ -5,7 +5,7 @@ Centralized prompt definitions for uTEST examples.
 # Task identifiers for different task types
 TASK_IDENTIFIERS = {
     "math": "\\boxed{{}}",
-    "code": "```python\n{{}}\n```",
+    "code": "```python\n```",
     "option": "\\boxed{{}}"
 }
 
