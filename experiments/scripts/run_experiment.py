@@ -76,13 +76,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--agent-type",
         type=str,
-        choices=["single", "sequential", "centralized", "decentralized", "full_decentralized", "debate", "hybrid"],
+        choices=[
+            "single",
+            "sequential",
+            "centralized",
+            "decentralized",
+            "full_decentralized",
+            "debate",
+            "hybrid",
+        ],
         help="Type of agent configuration to use (single/sequential/centralized/decentralized/full_decentralized/debate/hybrid)",
     )
 
     # Batch experiment mode
     parser.add_argument(
         "--batch-config",
+        "-bc",
         type=str,
         help="Path to batch configuration file defining multiple experiments",
     )
@@ -94,7 +103,7 @@ def parse_args() -> argparse.Namespace:
         help="Only prepare configurations without running experiments",
     )
     parser.add_argument(
-        "--save-config", action="store_true", help="Save merged configuration to file"
+        "--save-config", default=True, help="Save merged configuration to file"
     )
 
     args = parser.parse_args()
@@ -254,7 +263,7 @@ def run_single_experiment(
 
 
 def run_batch_experiments(
-    batch_config_path: str, dry_run: bool = False, save_config_flag: bool = False
+    batch_config_path: str, dry_run: bool = False, save_config_flag: bool = True
 ) -> List[Dict[str, Any]]:
     """Run multiple experiments defined in a batch configuration file.
 
