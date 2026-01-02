@@ -27,7 +27,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 from lmbase.inference.base import InferInput, InferOutput
 from maep.generic import AgentState
-from maep.language.centralized_mas import OrchestratorCentralized
+from maep.language.centralized import OrchestratorCentralized
 
 
 class OrchestratorDecentralized(OrchestratorCentralized):
@@ -50,7 +50,7 @@ class OrchestratorDecentralized(OrchestratorCentralized):
 
     def execute_sub_agent(self, state: AgentState, name: str) -> AgentState:
         """
-        Execute a single layer1 agent, incorporating context from the previous round's agents and Orchestrator.
+        Execute a single layer1 agent, incorporating context from the previous agent executions.
         """
         samples = state["init_input"]
         num_samples = len(samples["question"])
@@ -62,66 +62,18 @@ class OrchestratorDecentralized(OrchestratorCentralized):
         for i in range(num_samples):
             question = samples["question"][i]
 
-            # 1. Build context from previous round's Orchestrator and agents
+            # 1. Build context from previous agent's output if available
             prev_context = ""
             if state["agent_results"]:
-                num_layer1 = len(self.layer1_agents)
-                total_executions = len(state["agent_executed"])
-                current_loop_idx = (total_executions - 1) // num_layer1
-                current_agent_idx = self.layer1_agents.index(name)
+                # Get the last execution result
+                last_result = state["agent_results"][-1]
+                # last_result is {agent_name: [responses]}
+                last_agent_name = list(last_result.keys())[0]
+                last_responses = last_result[last_agent_name]
 
-                # First, add Orchestrator feedback from previous round (if exists)
-                if current_loop_idx > 0:
-                    # Find the most recent Orchestrator result
-                    for result_dict in reversed(state["agent_results"]):
-                        if self.orchestrator in result_dict:
-                            orch_responses = result_dict[self.orchestrator]
-                            prev_context = f"\n\nGuidance from {self.orchestrator} (Previous Round):\n{orch_responses[i]}"
-                            break
-
-                # Then, add previous round's agents' outputs
-                if current_loop_idx > 0:
-                    prev_loop_start = (current_loop_idx - 1) * num_layer1
-                    prev_loop_results = state["agent_results"][prev_loop_start:prev_loop_start + num_layer1]
-
-                    context_parts = []
-                    for result_dict in prev_loop_results:
-                        agent_name = list(result_dict.keys())[0]
-                        responses = result_dict[agent_name]
-                        context_parts.append(f"[{agent_name}]:\n{responses[i]}")
-
-                    if context_parts:
-                        prev_context += "\n\nPrevious Round Agent Outputs:\n" + "\n\n".join(context_parts)
-
-                    # Also include current round's previous agents
-                    loop_start_idx = current_loop_idx * num_layer1
-                    loop_results = state["agent_results"][loop_start_idx:loop_start_idx + num_layer1]
-                    relevant_results = loop_results[:current_agent_idx]
-
-                    if relevant_results:
-                        current_round_parts = []
-                        for result_dict in relevant_results:
-                            agent_name = list(result_dict.keys())[0]
-                            responses = result_dict[agent_name]
-                            current_round_parts.append(f"[{agent_name}]:\n{responses[i]}")
-
-                        if current_round_parts:
-                            prev_context += "\n\nCurrent Round Previous Outputs:\n" + "\n\n".join(current_round_parts)
-                else:
-                    # First round: only include previous agents in current round
-                    loop_start_idx = current_loop_idx * num_layer1
-                    loop_results = state["agent_results"][loop_start_idx:loop_start_idx + num_layer1]
-                    relevant_results = loop_results[:current_agent_idx]
-
-                    if relevant_results:
-                        context_parts = []
-                        for result_dict in relevant_results:
-                            agent_name = list(result_dict.keys())[0]
-                            responses = result_dict[agent_name]
-                            context_parts.append(f"[{agent_name}]:\n{responses[i]}")
-
-                        if context_parts:
-                            prev_context += "\n\n" + "\n\n".join(context_parts)
+                prev_context = (
+                    f"\n\nContext from {last_agent_name}:\n{last_responses[i]}"
+                )
 
             # 2. Format Prompt
             system_msg = (
