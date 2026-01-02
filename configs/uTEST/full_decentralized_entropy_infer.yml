@@ -11,6 +11,10 @@ data:
 environment:
   dotenv_path: .env
   
+# Task type for dynamic prompt loading
+# Options: "math", "code", "option"
+task_type: "math"
+  
 lm_name: &lm_name Qwen/Qwen3-0.6B
 lm_type: &lm_type hf
 
