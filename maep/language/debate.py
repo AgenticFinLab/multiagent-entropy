@@ -9,6 +9,7 @@ Loop P times:
                              | (if loop == P)
                              v
                         Majority Voting -> Output
+
 Memory:
 - After the first round, each agent will receive the outputs of all previous agents in all previous rounds.
 - In the final round, orchestrator will receive the outputs of all agents in the current rounds and output the final answer through majority voting.
@@ -103,10 +104,12 @@ class DebateMAS(BaseAgents):
             if state["agent_results"]:
                 num_layer1 = len(self.layer1_agents)
                 total_executions = len(state["agent_executed"])
-                
+
                 if total_executions >= num_layer1:
                     prev_loop_start = total_executions - num_layer1
-                    prev_loop_results = state["agent_results"][prev_loop_start:total_executions]
+                    prev_loop_results = state["agent_results"][
+                        prev_loop_start:total_executions
+                    ]
 
                     context_parts = []
                     for result_dict in prev_loop_results:
@@ -115,7 +118,9 @@ class DebateMAS(BaseAgents):
                         context_parts.append(f"[{agent_name}]:\n{responses[i]}")
 
                     if context_parts:
-                        context = "\n\nPrevious Round Outputs:\n" + "\n\n".join(context_parts)
+                        context = "\n\nPrevious Round Outputs:\n" + "\n\n".join(
+                            context_parts
+                        )
 
             system_msg = (
                 state["agent_system_msgs"][name].replace("{", "{{").replace("}", "}}")
@@ -188,6 +193,7 @@ class DebateMAS(BaseAgents):
                 answer_votes_list.append({})
             else:
                 from collections import Counter
+
                 answer_counts = Counter(all_answers)
                 most_common_answer, count = answer_counts.most_common(1)[0]
                 final_answers.append(most_common_answer)
@@ -198,21 +204,26 @@ class DebateMAS(BaseAgents):
         for i in range(num_samples):
             main_id = samples["main_id"][i]
             savename = self.get_save_name(name, execution_idx)
-            
+
             orchestrator_result = {
                 "final_answer": final_answers[i],
                 "answer_votes": answer_votes_list[i],
                 "latency": latency,
-                "all_agent_answers": [result_dict[list(result_dict.keys())[0]][i] for result_dict in relevant_results]
+                "all_agent_answers": [
+                    result_dict[list(result_dict.keys())[0]][i]
+                    for result_dict in relevant_results
+                ],
             }
-            
+
             self.store_manager.save(
                 savename=f"Result_{main_id}-{savename}_sample_{i}",
                 data=orchestrator_result,
             )
 
         new_results = state["agent_results"] + [{name: final_answers}]
-        new_cost = state["cost"] + [{name: {"latency": latency, "answer_votes": answer_votes_list}}]
+        new_cost = state["cost"] + [
+            {name: {"latency": latency, "answer_votes": answer_votes_list}}
+        ]
         new_executed = state["agent_executed"] + [name]
 
         return {
@@ -247,7 +258,8 @@ class DebateMAS(BaseAgents):
             The extracted answer, or None if no \\boxed{} is found
         """
         import re
-        pattern = r'\\boxed\{([^}]+)\}'
+
+        pattern = r"\\boxed\{([^}]+)\}"
         matches = re.findall(pattern, text)
 
         if matches:

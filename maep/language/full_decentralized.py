@@ -10,15 +10,15 @@ Loop P times:
                                             v
                                         Orchestrator -> Output
 
-Corresponding to the MAS (Decentralized Multi-Agent System) [1] with two layers:
-- Layer 1: N sequential agents running in a loop P times.
-- Layer 2: Orchestrator that aggregates the outputs of all agents after each loop.
-
-LLM calls: r * N (rounds * number of agents) + 1 (orchestrator)
-
 Memory:
 - Each layer 1 agent will receive the output of all previous agents, including the output of the current round and all previous rounds.
 - The Orchestrator agent will receive the outputs of all layer 1 agents in the last round and output the final answer.
+
+LLM calls: r * N (rounds * number of agents) + 1 (orchestrator)
+
+Corresponding to the MAS (Decentralized Multi-Agent System) [1] with two layers:
+- Layer 1: N sequential agents running in a loop P times.
+- Layer 2: Orchestrator that aggregates the outputs of all agents after each loop.
 
 Key Difference from Decentralized MAS:
 - In Decentralized MAS, each agent only receives the output from the immediately previous agent. In Full Decentralized MAS, each agent receives the outputs from ALL previous agents in the current loop.
@@ -90,7 +90,9 @@ class OrchestratorDecentralized(OrchestratorCentralized):
                 # Then, add previous round's agents' outputs
                 if current_loop_idx > 0:
                     prev_loop_start = (current_loop_idx - 1) * num_layer1
-                    prev_loop_results = state["agent_results"][prev_loop_start:prev_loop_start + num_layer1]
+                    prev_loop_results = state["agent_results"][
+                        prev_loop_start : prev_loop_start + num_layer1
+                    ]
 
                     context_parts = []
                     for result_dict in prev_loop_results:
@@ -99,11 +101,16 @@ class OrchestratorDecentralized(OrchestratorCentralized):
                         context_parts.append(f"[{agent_name}]:\n{responses[i]}")
 
                     if context_parts:
-                        prev_context += "\n\nPrevious Round Agent Outputs:\n" + "\n\n".join(context_parts)
+                        prev_context += (
+                            "\n\nPrevious Round Agent Outputs:\n"
+                            + "\n\n".join(context_parts)
+                        )
 
                     # Also include current round's previous agents
                     loop_start_idx = current_loop_idx * num_layer1
-                    loop_results = state["agent_results"][loop_start_idx:loop_start_idx + num_layer1]
+                    loop_results = state["agent_results"][
+                        loop_start_idx : loop_start_idx + num_layer1
+                    ]
                     relevant_results = loop_results[:current_agent_idx]
 
                     if relevant_results:
@@ -111,14 +118,21 @@ class OrchestratorDecentralized(OrchestratorCentralized):
                         for result_dict in relevant_results:
                             agent_name = list(result_dict.keys())[0]
                             responses = result_dict[agent_name]
-                            current_round_parts.append(f"[{agent_name}]:\n{responses[i]}")
+                            current_round_parts.append(
+                                f"[{agent_name}]:\n{responses[i]}"
+                            )
 
                         if current_round_parts:
-                            prev_context += "\n\nCurrent Round Previous Outputs:\n" + "\n\n".join(current_round_parts)
+                            prev_context += (
+                                "\n\nCurrent Round Previous Outputs:\n"
+                                + "\n\n".join(current_round_parts)
+                            )
                 else:
                     # First round: only include previous agents in current round
                     loop_start_idx = current_loop_idx * num_layer1
-                    loop_results = state["agent_results"][loop_start_idx:loop_start_idx + num_layer1]
+                    loop_results = state["agent_results"][
+                        loop_start_idx : loop_start_idx + num_layer1
+                    ]
                     relevant_results = loop_results[:current_agent_idx]
 
                     if relevant_results:
