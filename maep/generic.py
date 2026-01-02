@@ -127,6 +127,12 @@ class BaseAgents(ABC):
         # Configs for all agents
         self.agents_config = self.run_config["agents"]
 
+        # Task type for dynamic prompt loading
+        self.task_type = self.run_config.get("task_type", "math")
+
+        # Validate task_type
+        self._validate_task_type()
+
         # By default, we set only one lm for agents
         # for any agent with a different generation config, we only
         # change the generation config.
@@ -145,12 +151,14 @@ class BaseAgents(ABC):
     def _load_from_module(self, import_path: str) -> Any:
         """
         Load an object (variable, class, function) from a string format "module.path:ObjectName".
+        If the object is a prompt template containing {identifier} placeholder, it will be
+        formatted with the task-specific identifier.
 
         Args:
             import_path: String in format "module.path:ObjectName"
 
         Returns:
-            The loaded object.
+            The loaded object, with identifier placeholder replaced if applicable.
         """
         if ":" not in import_path:
             raise ValueError(
@@ -170,7 +178,30 @@ class BaseAgents(ABC):
         if not hasattr(module, obj_name):
             raise ValueError(f"Object '{obj_name}' not found in module '{module_path}'")
 
-        return getattr(module, obj_name)
+        obj = getattr(module, obj_name)
+
+        # If the object is a string and contains {identifier} placeholder, format it
+        if isinstance(obj, str) and "{identifier}" in obj:
+            # Try to get the identifier from the module if it has get_identifier function
+            if hasattr(module, "get_identifier"):
+                identifier = module.get_identifier(self.task_type)
+                obj = obj.replace("{identifier}", identifier)
+
+        return obj
+
+    def _validate_task_type(self):
+        """
+        Validate the task_type parameter.
+        
+        Raises:
+            ValueError: If task_type is not supported.
+        """
+        supported_task_types = ["math", "code", "option"]
+        if self.task_type not in supported_task_types:
+            raise ValueError(
+                f"Unsupported task_type: {self.task_type}. "
+                f"Must be one of {supported_task_types}"
+            )
 
     def define_agent_models(self):
         """Construct HF inference as the agent LM.
