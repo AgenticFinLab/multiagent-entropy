@@ -11,7 +11,7 @@ Executable test script for Orchestrator Repeat (looping sequential + aggregator)
 import yaml
 import argparse
 from dotenv import load_dotenv
-from maep.language.decentralized_mas import OrchestratorDecentralized
+from maep.language.decentralized import OrchestratorDecentralized
 from lmbase.dataset import registry as data_registry
 
 

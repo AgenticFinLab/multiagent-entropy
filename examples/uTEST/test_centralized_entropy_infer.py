@@ -16,7 +16,7 @@ Note:
 import yaml
 import argparse
 from dotenv import load_dotenv
-from maep.language.centralized_mas import OrchestratorCentralized
+from maep.language.centralized import OrchestratorCentralized
 from lmbase.dataset import registry as data_registry
 
 
