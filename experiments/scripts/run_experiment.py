@@ -15,15 +15,16 @@ import logging
 import argparse
 from typing import Dict, Any, List
 
+from maep.language.debate import DebateMAS
 from maep.language.single import SingleAgent
+from maep.language.hybrid import OrchestratorHybrid
+from lmbase.dataset import registry as data_registry
 from maep.language.sequential import SequentialAgents
+from config_loader import load_experiment_config, save_config
 from maep.language.centralized import OrchestratorCentralized
 from maep.language.decentralized import OrchestratorDecentralized
 from maep.language.full_decentralized import OrchestratorFullDecentralized
-from maep.language.debate import DebateMAS
-from maep.language.hybrid import OrchestratorHybrid
-from lmbase.dataset import registry as data_registry
-from config_loader import load_experiment_config, save_config
+
 
 # Set up logging
 logging.basicConfig(
