@@ -6,7 +6,10 @@ Input -> Agent 1 -> Output
 
 For multiple rounds:
 Input -> Agent 1 -> Agent 1 -> ... -> Output
+
+Memory:
 Agent 1 will receive the input in the last round.
+
 LLM calls: r (rounds)
 """
 
@@ -63,84 +66,80 @@ class SingleAgent(BaseAgents):
     def format_round_history(self, state: AgentState, sample_idx: int) -> str:
         """
         Format the history of all previous rounds for a specific sample.
-        
+
         Args:
             state: Current agent state containing execution history
             sample_idx: Index of the sample to format history for
-            
+
         Returns:
             Formatted string containing all previous round interactions
         """
         if not self.aggregate_history:
             return ""
-        
+
         history_parts = []
-        
+
         # Apply max_history_rounds limit
         start_round = 0
         if self.max_history_rounds > 0:
             total_rounds = len(state["agent_results"])
             start_round = max(0, total_rounds - self.max_history_rounds)
-        
-        for round_idx, agent_result in enumerate(state["agent_results"][start_round:], start=start_round + 1):
+
+        for round_idx, agent_result in enumerate(
+            state["agent_results"][start_round:], start=start_round + 1
+        ):
             agent_name = list(agent_result.keys())[0]
             response = agent_result[agent_name][sample_idx]
-            
-            history_parts.append(
-                f"Round {round_idx} - {agent_name}:\n{response}\n"
-            )
-        
+
+            history_parts.append(f"Round {round_idx} - {agent_name}:\n{response}\n")
+
         if not history_parts:
             return ""
-        
+
         history_text = (
             "### Previous Rounds History ###\n"
             + "\n".join(history_parts)
             + "### End of History ###\n\n"
         )
-        
+
         # Apply max_history_chars limit
         if self.max_history_chars > 0 and len(history_text) > self.max_history_chars:
             # Truncate from the beginning to keep most recent history
             history_text = (
                 "### Previous Rounds History ###\n"
                 + "...[earlier history truncated due to size limit]...\n\n"
-                + history_text[-(self.max_history_chars - 100):]
+                + history_text[-(self.max_history_chars - 100) :]
             )
-        
+
         return history_text
 
     def build_prompt_with_history(
-        self, 
-        base_prompt: str, 
-        question: str, 
-        state: AgentState, 
-        sample_idx: int
+        self, base_prompt: str, question: str, state: AgentState, sample_idx: int
     ) -> str:
         """
         Build the prompt with optional history aggregation.
-        
+
         Args:
             base_prompt: Base prompt template
             question: Current question
             state: Current agent state
             sample_idx: Index of the sample
-            
+
         Returns:
             Complete prompt with history if aggregation is enabled
         """
         if not self.aggregate_history:
             return base_prompt.format(question=question)
-        
+
         history = self.format_round_history(state, sample_idx)
-        
+
         if history:
             return (
                 f"{question}\n\n"
                 f"{history}"
                 f"Please consider the previous attempts above and provide your solution."
             )
-        
+
         return base_prompt.format(question=question)
 
     def execute_agent(self, state: AgentState, agent_name: str) -> AgentState:
@@ -166,7 +165,7 @@ class SingleAgent(BaseAgents):
             system_msg = state["agent_system_msgs"][cur_name]
             user_msg = state["agent_user_msgs"][cur_name]
             system_msg = system_msg.replace("{", "{{").replace("}", "}}")
-            
+
             # Build prompt with optional history aggregation
             formatted_user_msg = self.build_prompt_with_history(
                 user_msg, question, state, i

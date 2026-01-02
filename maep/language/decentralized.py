@@ -12,7 +12,7 @@ Loop P times:
 
 Memory:
 - Each layer 1 agent only receives the output from the immediately previous agent.
-- At the end of each round, the Agent 3 will send the output to the Agent 1 in the next round, if it is not the last round.
+- At the end of each round, the Agent 3 will send the output to the Agent 1 in the next round (if it is not the last round).
 
 LLM calls: r * N (rounds * number of agents) + 1 (orchestrator)
 
