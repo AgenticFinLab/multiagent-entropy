@@ -197,6 +197,13 @@ class OrchestratorHybrid(OrchestratorCentralized):
         # We take the last N results
         relevant_results = state["agent_results"][-num_layer1:]
 
+        # Determine if this is the final round
+        orch_executions = [
+            name for name in state["agent_executed"] if name == self.orchestrator
+        ]
+        num_orch = len(orch_executions)
+        is_final_round = (num_orch == self.repeat_count - 1)
+
         # Prepare inputs
         infer_inputs = []
         for i in range(num_samples):
@@ -212,12 +219,39 @@ class OrchestratorHybrid(OrchestratorCentralized):
             block = "\n".join(parts)
             block = block.replace("\\", "\\\\").replace("{", "{{").replace("}", "}}")
 
-            system_msg = (
-                state["agent_system_msgs"][name].replace("{", "{{").replace("}", "}}")
-            )
-            user_prompt = state["agent_user_msgs"][name].format(
-                question=question, block=block
-            )
+            # Select appropriate system and user messages based on whether this is the final round
+            if is_final_round:
+                # Final round: use ORCHESTRATOR_SYS and ORCHESTRATOR_USER
+                system_msg = (
+                    state["agent_system_msgs"][name].replace("{", "{{").replace("}", "}}")
+                )
+                user_prompt = state["agent_user_msgs"][name].format(
+                    question=question, block=block
+                )
+            else:
+                # Non-final round: use ORCHESTRATOR_FEEDBACK_SYS and ORCHESTRATOR_FEEDBACK_USER
+                feedback_sys_key = f"{name}_FEEDBACK"
+                feedback_user_key = f"{name}_FEEDBACK"
+                
+                if feedback_sys_key in state["agent_system_msgs"]:
+                    system_msg = (
+                        state["agent_system_msgs"][feedback_sys_key].replace("{", "{{").replace("}", "}}")
+                    )
+                else:
+                    # Fallback to regular system message if feedback message not available
+                    system_msg = (
+                        state["agent_system_msgs"][name].replace("{", "{{").replace("}", "}}")
+                    )
+                    
+                if feedback_user_key in state["agent_user_msgs"]:
+                    user_prompt = state["agent_user_msgs"][feedback_user_key].format(
+                        question=question, block=block
+                    )
+                else:
+                    # Fallback to regular user message if feedback message not available
+                    user_prompt = state["agent_user_msgs"][name].format(
+                        question=question, block=block
+                    )
 
             infer_inputs.append(InferInput(system_msg=system_msg, user_msg=user_prompt))
 

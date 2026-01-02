@@ -6,7 +6,7 @@ Input -> Agent 1 --> Agent 2 --> Agent 3 --> ..... -> Output
 
 For multiple rounds:
 Input -> Agent 1 --> Agent 2 --> Agent 3 --> Agent 1 --> ..... -> Output
-after each round, the history is aggregated and passed to the Agent 1 in next round for further planning.
+After each round, the history is aggregated and passed to the Agent 1 in next round for further planning.
 LLM calls: r * N (rounds * number of agents)
 """
 
@@ -53,20 +53,20 @@ class SequentialAgents(BaseAgents):
     def format_round_history(self, state: AgentState, sample_idx: int) -> str:
         """
         Format the history of all previous rounds for a specific sample.
-        
+
         Args:
             state: Current agent state containing execution history
             sample_idx: Index of the sample to format history for
-            
+
         Returns:
             Formatted string containing all previous round interactions
         """
         if not self.aggregate_history:
             return ""
-        
+
         agent_names = list(self.agents_config.keys())
         history_parts = []
-        
+
         # Group executions by rounds
         rounds_completed = 0
         i = 0
@@ -80,7 +80,7 @@ class SequentialAgents(BaseAgents):
                 ):
                     match = False
                     break
-            
+
             if match:
                 rounds_completed += 1
                 # Add this round's history
@@ -88,86 +88,84 @@ class SequentialAgents(BaseAgents):
                 for j, agent_name in enumerate(agent_names):
                     agent_result = state["agent_results"][i + j]
                     response = agent_result[agent_name][sample_idx]
-                    round_history.append(
-                        f"  - {agent_name}: {response}"
-                    )
-                
+                    round_history.append(f"  - {agent_name}: {response}")
+
                 history_parts.append(
                     f"Round {rounds_completed}:\n" + "\n".join(round_history)
                 )
                 i += len(agent_names)
             else:
                 i += 1
-        
+
         if not history_parts:
             return ""
-        
+
         # Apply max_history_rounds limit
         if self.max_history_rounds > 0:
-            history_parts = history_parts[-self.max_history_rounds:]
-        
+            history_parts = history_parts[-self.max_history_rounds :]
+
         history_text = (
             "### Previous Rounds History ###\n"
             + "\n\n".join(history_parts)
             + "\n### End of History ###\n\n"
         )
-        
+
         # Apply max_history_chars limit
         if self.max_history_chars > 0 and len(history_text) > self.max_history_chars:
             # Truncate from the beginning to keep most recent history
             history_text = (
                 "### Previous Rounds History ###\n"
                 + "...[earlier history truncated due to size limit]...\n\n"
-                + history_text[-(self.max_history_chars - 100):]
+                + history_text[-(self.max_history_chars - 100) :]
             )
-        
+
         return history_text
 
     def build_prompt_with_history(
-        self, 
-        base_prompt: str, 
-        question: str, 
-        state: AgentState, 
+        self,
+        base_prompt: str,
+        question: str,
+        state: AgentState,
         sample_idx: int,
-        current_agent_name: str
+        current_agent_name: str,
     ) -> str:
         """
         Build the prompt with optional history aggregation.
-        
+
         Args:
             base_prompt: Base prompt template
             question: Current question
             state: Current agent state
             sample_idx: Index of the sample
             current_agent_name: Name of the current agent being executed
-            
+
         Returns:
             Complete prompt with history if aggregation is enabled
         """
         if not self.aggregate_history:
             return base_prompt.format(question=question)
-        
+
         history = self.format_round_history(state, sample_idx)
-        
+
         if history:
             return (
                 f"{question}\n\n"
                 f"{history}"
                 f"Please consider the previous attempts above and provide your {current_agent_name} output."
             )
-        
+
         return base_prompt.format(question=question)
 
     def _get_agent_prompts(self):
         agent_system_msgs = {}
         agent_user_msgs = {}
-        
+
         for name, config in self.agents_config.items():
             if "sys_message" in config:
                 agent_system_msgs[name] = self._load_from_module(config["sys_message"])
             if "user_message" in config:
                 agent_user_msgs[name] = self._load_from_module(config["user_message"])
-                
+
         return agent_system_msgs, agent_user_msgs
 
     def execute_agent(self, state: AgentState, agent_name: str) -> AgentState:
@@ -201,14 +199,13 @@ class SequentialAgents(BaseAgents):
                     item = (
                         item.replace("\\", "\\\\").replace("{", "{{").replace("}", "}}")
                     )
-                
+
                 # Check if this is the first agent of a new round
                 agent_names = list(self.agents_config.keys())
                 is_first_agent_of_new_round = (
-                    num_executed > 0 and 
-                    num_executed % len(agent_names) == 0
+                    num_executed > 0 and num_executed % len(agent_names) == 0
                 )
-                
+
                 if is_first_agent_of_new_round and self.aggregate_history:
                     # Build prompt with full history for new rounds
                     formatted_user_msg = self.build_prompt_with_history(

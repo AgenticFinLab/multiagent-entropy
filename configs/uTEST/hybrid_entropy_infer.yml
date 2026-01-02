@@ -73,3 +73,5 @@ agents:
 
     sys_message: "examples.uTEST.prompts:ORCHESTRATOR_SYS"
     user_message: "examples.uTEST.prompts:ORCHESTRATOR_USER"
+    sys_feedback_message: "examples.uTEST.prompts:ORCHESTRATOR_FEEDBACK_SYS"
+    user_feedback_message: "examples.uTEST.prompts:ORCHESTRATOR_FEEDBACK_USER"
