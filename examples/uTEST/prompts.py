@@ -4,14 +4,11 @@ Centralized prompt definitions for uTEST examples.
 
 # --- From maep/language/single.py ---
 SINGLE_SYS = """You are a precise solver.
-Solve the problem correctly and concisely. 
-Please wrap the final answer in \\boxed{{}}.
-"""
+Solve the problem correctly and concisely. """
 
 SINGLE_USER = """Question:
 {question}
-Think step by step and place the final answer in \\boxed{{}}.
-"""
+Think step by step and place the final answer in \\boxed{{}}."""
 
 # --- From maep/language/sequential.py ---
 PLANNER_SYS = """You are the planner agent. Generate plans that are the general instructions only.
@@ -19,7 +16,8 @@ Do not execute the plan, do not perform any calculations, and do not produce any
 Output a structured, numbered plans."""
 
 PLANNER_USER = """For the question: {question}
-Please only generate plans that are guidances required for the subsequent reasoning for the problem-solving. Do not include any specific calculation or numerical results."""
+Please only generate plans that are guidances required for the subsequent reasoning for the problem-solving. Do not include any specific calculation or numerical results. Your input may include previous round outputs content. You can consider the given contents as the initial state of the problem-solving.
+"""
 
 SOLVER_SYS = """You are the solver agent. Solve strictly according to the provided plans. Execute each step precisely and produce the final result.
 Output the final result into \\boxed{{}}."""
@@ -49,21 +47,23 @@ JUDGER_USER = """Final check for: {question}
 
 If correct, only output the final answer without words, labels, and steps, and wrapped in \\boxed{{}}."""
 
-# --- From maep/language/centralized.py ---
-MATH_SYS = """You are the MathAgent. Solve the given question with clear steps."""
+# --- From maep/language/centralized.py (decentralized/full_decentralized/hybrid) ---
+MATH_SYS = """You are the MathAgent. Solve the given question with clear steps.
+Your input may include feedback from the Orchestrator from the previous round."""
 MATH_USER = """Question: {question}
 Provide a concise mathematical solution, showing key steps."""
 
-SCIENCE_SYS = """You are the ScienceAgent. Analyze and solve the given question with scientific reasoning."""
+SCIENCE_SYS = """You are the ScienceAgent. Analyze and solve the given question with scientific reasoning.
+Your input may include feedback from the Orchestrator from the previous round."""
 SCIENCE_USER = """Question: {question}
 Explain your scientific reasoning and provide a final result."""
 
-CODE_SYS = """You are the CodeAgent. Provide a self-contained Python function that solves the problem."""
+CODE_SYS = """You are the CodeAgent. Provide a self-contained Python function that solves the problem.
+Your input may include feedback from the Orchestrator from the previous round."""
 CODE_USER = """Question: {question}
 Write a single self-contained Python function in a markdown code block that solves the problem."""
 
-ORCHESTRATOR_SYS = """You are the Orchestrator Agent. Your task is to aggregate the solutions provided by the first-layer agents and produce a final, comprehensive answer wrapped in \\boxed{{}}.
-Analyze the provided solutions, resolve any conflicts, and synthesize a coherent final response."""
+ORCHESTRATOR_SYS = """You are the Orchestrator Agent. Your task is to aggregate the solutions provided by the first-layer agents and produce a final answer wrapped in \\boxed{{}}."""
 
 ORCHESTRATOR_USER = """Question: {question}
 
@@ -74,40 +74,32 @@ Here are the solutions from the expert agents:
 
 Based on these inputs, provide the final answer wrapped in \\boxed{{}}."""
 
-# --- From maep/language/hybrid.py ---
-HYBRID_MATH_SYS = """You are the MathAgent in a hybrid multi-agent system. Solve the given question with clear steps, considering all previous agents' outputs in the current round."""
-HYBRID_MATH_USER = """Question: {question}
-Provide a concise mathematical solution, showing key steps."""
+ORCHESTRATOR_FEEDBACK_SYS = """You are the Orchestrator Agent. Your task is to review the solutions provided by the first-layer agents in the current round.
+Analyze the provided solutions, identify any issues or areas for improvement, and provide constructive feedback.
+You may rewrite content, provide specific feedback, and offer improvement suggestions as needed.
+Your feedback will be used by the agents in the next round to improve their solutions."""
 
-HYBRID_SCIENCE_SYS = """You are the ScienceAgent in a hybrid multi-agent system. Analyze and solve the given question with scientific reasoning, considering all previous agents' outputs in the current round."""
-HYBRID_SCIENCE_USER = """Question: {question}
-Explain your scientific reasoning and provide a final result."""
+ORCHESTRATOR_FEEDBACK_USER = """Question: {question}
 
-HYBRID_CODE_SYS = """You are the CodeAgent in a hybrid multi-agent system. Provide a self-contained Python function that solves the problem, considering all previous agents' outputs in the current round."""
-HYBRID_CODE_USER = """Question: {question}
-Write a single self-contained Python function in a markdown code block that solves the problem."""
-
-HYBRID_ORCHESTRATOR_SYS = """You are the Orchestrator Agent in a hybrid multi-agent system. Your task is to aggregate the solutions from the last loop of agents and produce a final, comprehensive answer wrapped in \\boxed{{}}.
-Analyze the provided solutions, resolve any conflicts, and synthesize a coherent final response."""
-
-HYBRID_ORCHESTRATOR_USER = """Question: {question}
-
-Here are the solutions from the expert agents in the last loop:
+Here are the solutions from the expert agents in the current round:
 === Solutions ===
 {block}
 === Solutions ===
 
-Based on these inputs, provide the final answer wrapped in \\boxed{{}}."""
+Review these solutions and provide feedback for the next round. If corrections are needed, specify the issues and suggest improvements. If the solutions are satisfactory, acknowledge them and provide guidance for further refinement."""
 
 # --- From maep/language/debate.py ---
-DEBATE_AGENT1_SYS = """You are Agent 1 in a debate multi-agent system. Solve the given question with clear steps and wrap your final answer in \\boxed{{}}."""
+DEBATE_AGENT1_SYS = """You are Agent 1 in a debate multi-agent system. Solve the given question with clear steps and wrap your final answer in \\boxed{{}}.
+Your input may include previous round debate content."""
 DEBATE_AGENT1_USER = """Question: {question}
 Provide a concise solution, showing key steps, and wrap the final answer in \\boxed{{}}."""
 
-DEBATE_AGENT2_SYS = """You are Agent 2 in a debate multi-agent system. Solve the given question with clear steps and wrap your final answer in \\boxed{{}}."""
+DEBATE_AGENT2_SYS = """You are Agent 2 in a debate multi-agent system. Solve the given question with clear steps and wrap your final answer in \\boxed{{}}.
+Your input may include previous round debate content."""
 DEBATE_AGENT2_USER = """Question: {question}
 Provide a concise solution, showing key steps, and wrap the final answer in \\boxed{{}}."""
 
-DEBATE_AGENT3_SYS = """You are Agent 3 in a debate multi-agent system. Solve the given question with clear steps and wrap your final answer in \\boxed{{}}."""
+DEBATE_AGENT3_SYS = """You are Agent 3 in a debate multi-agent system. Solve the given question with clear steps and wrap your final answer in \\boxed{{}}.
+Your input may include previous round debate content."""
 DEBATE_AGENT3_USER = """Question: {question}
 Provide a concise solution, showing key steps, and wrap the final answer in \\boxed{{}}."""
