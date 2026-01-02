@@ -5,9 +5,9 @@ data:
   data_name: GSM8K
   data_path: EXPERIMENT/data/GSM8K
   # The number of samples to be tested, -1 for all
-  data_num: 4
+  data_num: 1
   # The number of samples for one inference
-  batch_size: 2
+  batch_size: 1
 
 environment:
   dotenv_path: .env
