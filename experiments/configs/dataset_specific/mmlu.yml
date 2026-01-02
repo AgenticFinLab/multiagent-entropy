@@ -5,8 +5,8 @@ data:
   data_path: experiments/data/MMLU
   split: test
   # The number of samples to be tested, -1 for all
-  data_num: 1
+  data_num: 1000
   # The number of samples for one inference
-  batch_size: 1
+  batch_size: 2
 
 task_type: "option"
