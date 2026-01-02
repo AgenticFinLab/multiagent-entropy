@@ -39,7 +39,7 @@ from maep.generic import AgentState
 from maep.language.centralized import OrchestratorCentralized
 
 
-class OrchestratorDecentralized(OrchestratorCentralized):
+class OrchestratorFullDecentralized(OrchestratorCentralized):
     """
     Full Decentralized Multi-Agent System (Decentralized MAS) with a repeat loop.
 

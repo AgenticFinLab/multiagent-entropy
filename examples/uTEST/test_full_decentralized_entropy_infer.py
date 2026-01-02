@@ -11,12 +11,12 @@ Executable test script for Orchestrator Repeat (looping sequential + aggregator)
 import yaml
 import argparse
 from dotenv import load_dotenv
-from maep.language.full_decentralized import OrchestratorDecentralized
+from maep.language.full_decentralized import OrchestratorFullDecentralized
 from lmbase.dataset import registry as data_registry
 
 
 def main():
-    """A demo to test the OrchestratorDecentralized with a YAML config file."""
+    """A demo to test the OrchestratorFullDecentralized with a YAML config file."""
     load_dotenv()
 
     parser = argparse.ArgumentParser(
@@ -35,7 +35,7 @@ def main():
     with open(config_path, "r", encoding="utf-8") as f:
         run_config = yaml.safe_load(f)
 
-    agent = OrchestratorDecentralized(run_config=run_config)
+    agent = OrchestratorFullDecentralized(run_config=run_config)
 
     data_cfg = run_config["data"]
     dataset = data_registry.get(config=data_cfg, split="train")
