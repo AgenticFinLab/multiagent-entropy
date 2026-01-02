@@ -16,8 +16,12 @@ experiments/
 │   │   └── no_entropy.yml     # No entropy calculation configuration
 │   ├── agent_specific/         # Agent-specific configuration files
 │   │   ├── single_agents.yml   # Single agent configuration
-│   │   ├── fan_agents.yml      # Fan agent configuration (two-layer)
-│   │   └── sequential_agents.yml # Sequential agent configuration
+│   │   ├── sequential_agents.yml # Sequential agent configuration
+│   │   ├── centralized_agents.yml # Centralized agent configuration
+│   │   ├── decentralized_agents.yml # Decentralized agent configuration
+│   │   ├── full_decentralized_agents.yml # Full decentralized agent configuration
+│   │   ├── debate_agents.yml # Debate agent configuration
+│   │   └── hybrid_agents.yml # Hybrid agent configuration
 │   └── model_specific/         # Model-specific configuration files
 │       ├── qwen3-1.7b.yml      # Qwen3-1.7B model configuration
 │       └── qwen3-0.6b.yml     # Qwen3-0.6B model configuration
@@ -42,7 +46,7 @@ The `base_config.yml` file contains common settings shared across all experiment
 - Graph configuration
 - Inference base configuration
 - Generation base configuration
-- Default agent type (single, fan, or sequential)
+- Default agent type (single, sequential, centralized, decentralized, full_decentralized, debate, hybrid)
 
 ### Model-Specific Configuration
 Model-specific configurations (`model_specific/`) define settings for each model, including:
@@ -70,17 +74,41 @@ Agent-specific configurations (`agent_specific/`) define the structure and param
 - **Description**: Single linear agent topology
 - **Agents**: Contains one agent (SingleSolver)
 
-#### Fan Agent Mode (Two-Layer)
-- **Configuration file**: `agent_specific/fan_agents.yml`
-- **Description**: Two-layer fan topology with multiple agents feeding into a summarizer
-- **Agents**: MathAgent, ScienceAgent, CodeAgent, SummarizerAgent
-- **Structure**: Layer 1 (Math/Science/Code) → Layer 2 (Summarizer)
-
 #### Sequential Agent Mode
 - **Configuration file**: `agent_specific/sequential_agents.yml`
 - **Description**: Sequential pipeline topology with agents in a series
 - **Agents**: planner, solver, critic, judger
 - **Structure**: planner → solver → critic → judger
+
+#### Centralized Agent Mode (Two-Layer)
+- **Configuration file**: `agent_specific/centralized_agents.yml`
+- **Description**: Two-layer centralized topology with domain-specific agents and central orchestrator
+- **Agents**: MathAgent, ScienceAgent, CodeAgent, OrchestratorAgent
+- **Structure**: Layer 1 (Math/Science/Code) → Layer 2 (Orchestrator)
+
+#### Decentralized Agent Mode (Loop + Orchestrator)
+- **Configuration file**: `agent_specific/decentralized_agents.yml`
+- **Description**: Sequential agents with loopback mechanism before final orchestration
+- **Agents**: MathAgent, ScienceAgent, CodeAgent, OrchestratorAgent
+- **Structure**: Math → Science → Code → (Loop) → Orchestrator
+
+#### Full Decentralized Agent Mode (Loop + Orchestrator)
+- **Configuration file**: `agent_specific/full_decentralized_agents.yml`
+- **Description**: Sequential agents with loopback mechanism before final orchestration, each agent can communicate with all other agents
+- **Agents**: MathAgent, ScienceAgent, CodeAgent, OrchestratorAgent
+- **Structure**: Math → Science → Code → (Loop) → Orchestrator
+
+#### Debate Agent Mode (Multi-Agent with Voting)
+- **Configuration file**: `agent_specific/debate_agents.yml`
+- **Description**: Multi-agent debate system with majority voting mechanism
+- **Agents**: agent1, agent2, agent3, OrchestratorAgent
+- **Structure**: Parallel debate agents → Orchestrator (majority voting)
+
+#### Hybrid Agent Mode (Enhanced Context Sharing)
+- **Configuration file**: `agent_specific/hybrid_agents.yml`
+- **Description**: Two-layer hybrid topology with enhanced context sharing and feedback
+- **Agents**: MathAgent, ScienceAgent, CodeAgent, OrchestratorAgent
+- **Structure**: Layer 1 (Math/Science/Code with loop) → Layer 2 (Orchestrator with feedback)
 
 ## Running Experiments
 
@@ -99,18 +127,6 @@ python experiments/scripts/run_experiment.py \
   --save-config
 ```
 
-#### Fan Agent Mode
-```bash
-cd /home/yuxuanzhao/multiagent-entropy
-python experiments/scripts/run_experiment.py \
-  --model-config experiments/configs/model_specific/qwen3-0.6b.yml \
-  --dataset-config experiments/configs/dataset_specific/gsm8k.yml \
-  --entropy-config experiments/configs/entropy_configs/standard.yml \
-  --experiment-name qwen3-0.6b_gsm8k_fan \
-  --agent-type fan \
-  --save-config
-```
-
 #### Sequential Agent Mode
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
@@ -120,6 +136,66 @@ python experiments/scripts/run_experiment.py \
   --entropy-config experiments/configs/entropy_configs/standard.yml \
   --experiment-name qwen3-0.6b_gsm8k_sequential \
   --agent-type sequential \
+  --save-config
+```
+
+#### Centralized Agent Mode
+```bash
+cd /home/yuxuanzhao/multiagent-entropy
+python experiments/scripts/run_experiment.py \
+  --model-config experiments/configs/model_specific/qwen3-0.6b.yml \
+  --dataset-config experiments/configs/dataset_specific/gsm8k.yml \
+  --entropy-config experiments/configs/entropy_configs/standard.yml \
+  --experiment-name qwen3-0.6b_gsm8k_centralized \
+  --agent-type centralized \
+  --save-config
+```
+
+#### Decentralized Agent Mode
+```bash
+cd /home/yuxuanzhao/multiagent-entropy
+python experiments/scripts/run_experiment.py \
+  --model-config experiments/configs/model_specific/qwen3-0.6b.yml \
+  --dataset-config experiments/configs/dataset_specific/gsm8k.yml \
+  --entropy-config experiments/configs/entropy_configs/standard.yml \
+  --experiment-name qwen3-0.6b_gsm8k_decentralized \
+  --agent-type decentralized \
+  --save-config
+```
+
+#### Full Decentralized Agent Mode
+```bash
+cd /home/yuxuanzhao/multiagent-entropy
+python experiments/scripts/run_experiment.py \
+  --model-config experiments/configs/model_specific/qwen3-0.6b.yml \
+  --dataset-config experiments/configs/dataset_specific/gsm8k.yml \
+  --entropy-config experiments/configs/entropy_configs/standard.yml \
+  --experiment-name qwen3-0.6b_gsm8k_full_decentralized \
+  --agent-type full_decentralized \
+  --save-config
+```
+
+#### Debate Agent Mode
+```bash
+cd /home/yuxuanzhao/multiagent-entropy
+python experiments/scripts/run_experiment.py \
+  --model-config experiments/configs/model_specific/qwen3-0.6b.yml \
+  --dataset-config experiments/configs/dataset_specific/gsm8k.yml \
+  --entropy-config experiments/configs/entropy_configs/standard.yml \
+  --experiment-name qwen3-0.6b_gsm8k_debate \
+  --agent-type debate \
+  --save-config
+```
+
+#### Hybrid Agent Mode
+```bash
+cd /home/yuxuanzhao/multiagent-entropy
+python experiments/scripts/run_experiment.py \
+  --model-config experiments/configs/model_specific/qwen3-0.6b.yml \
+  --dataset-config experiments/configs/dataset_specific/gsm8k.yml \
+  --entropy-config experiments/configs/entropy_configs/standard.yml \
+  --experiment-name qwen3-0.6b_gsm8k_hybrid \
+  --agent-type hybrid \
   --save-config
 ```
 
@@ -140,7 +216,7 @@ python experiments/scripts/run_experiment.py \
 - `-d, --dataset-config`: Path to dataset-specific configuration file (required for single experiment)
 - `-e, --entropy-config`: Path to entropy configuration file (required for single experiment)
 - `-n, --experiment-name`: Name of the experiment (required for single experiment)
-- `--agent-type`: Type of agent configuration to use (single, fan, sequential)
+- `--agent-type`: Type of agent configuration to use (single, sequential, centralized, decentralized, full_decentralized, debate, hybrid)
 - `--batch-config`: Path to batch configuration file (for batch experiments)
 - `--dry-run`: Only prepare configurations without running experiments
 - `--save-config`: Save merged configuration to file (saved in experiments/configs/experiment_configs/ directory)
