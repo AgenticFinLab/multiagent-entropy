@@ -2,13 +2,49 @@
 Centralized prompt definitions for uTEST examples.
 """
 
+# Task identifiers for different task types
+TASK_IDENTIFIERS = {
+    "math": "\\boxed{{}}",
+    "code": "```python\n{}\n```",
+    "option": "\\boxed{{}}"
+}
+
+def get_identifier(task_type: str) -> str:
+    """
+    Get the identifier for a given task type.
+    
+    Args:
+        task_type: One of 'math', 'code', or 'option'
+        
+    Returns:
+        The corresponding identifier string
+        
+    Raises:
+        ValueError: If task_type is not supported
+    """
+    if task_type not in TASK_IDENTIFIERS:
+        raise ValueError(f"Unsupported task_type: {task_type}. Must be one of {list(TASK_IDENTIFIERS.keys())}")
+    return TASK_IDENTIFIERS[task_type]
+
+def validate_task_type(task_type: str) -> bool:
+    """
+    Validate that the task_type is supported.
+    
+    Args:
+        task_type: The task type to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    return task_type in TASK_IDENTIFIERS
+
 # --- From maep/language/single.py ---
 SINGLE_SYS = """You are a precise solver.
 Solve the problem correctly and concisely. """
 
 SINGLE_USER = """Question:
 {question}
-Think step by step and place the final answer in \\boxed{{}}."""
+Think step by step and place the final answer in {identifier}."""
 
 # --- From maep/language/sequential.py ---
 PLANNER_SYS = """You are the planner agent. Generate plans that are the general instructions only.
@@ -20,7 +56,7 @@ Please only generate plans that are guidances required for the subsequent reason
 """
 
 SOLVER_SYS = """You are the solver agent. Solve strictly according to the provided plans. Execute each step precisely and produce the final result.
-Output the final result into \\boxed{{}}."""
+Output the final result into {identifier}."""
 
 SOLVER_USER = """Question: {question}
 ### Plans ###
@@ -45,7 +81,7 @@ JUDGER_USER = """Final check for: {question}
 {block}
 ### Solution ###
 
-If correct, only output the final answer without words, labels, and steps, and wrapped in \\boxed{{}}."""
+If correct, only output the final answer without words, labels, and steps, and wrapped in {identifier}."""
 
 # --- From maep/language/centralized.py (decentralized/full_decentralized/hybrid) ---
 MATH_SYS = """You are the MathAgent. Solve the given question with clear steps.
@@ -63,7 +99,7 @@ Your input may include feedback from the Orchestrator from the previous round.""
 CODE_USER = """Question: {question}
 Write a single self-contained Python function in a markdown code block that solves the problem."""
 
-ORCHESTRATOR_SYS = """You are the Orchestrator Agent. Your task is to aggregate the solutions provided by the first-layer agents and produce a final answer wrapped in \\boxed{{}}."""
+ORCHESTRATOR_SYS = """You are the Orchestrator Agent. Your task is to aggregate the solutions provided by the first-layer agents and produce a final answer wrapped in {identifier}."""
 
 ORCHESTRATOR_USER = """Question: {question}
 
@@ -72,7 +108,7 @@ Here are the solutions from the expert agents:
 {block}
 === Solutions ===
 
-Based on these inputs, provide the final answer wrapped in \\boxed{{}}."""
+Based on these inputs, provide the final answer wrapped in {identifier}."""
 
 ORCHESTRATOR_FEEDBACK_SYS = """You are the Orchestrator Agent. Your task is to review the solutions provided by the first-layer agents in the current round.
 Analyze the provided solutions, identify any issues or areas for improvement, and provide constructive feedback.
@@ -89,17 +125,17 @@ Here are the solutions from the expert agents in the current round:
 Review these solutions and provide feedback for the next round. If corrections are needed, specify the issues and suggest improvements. If the solutions are satisfactory, acknowledge them and provide guidance for further refinement."""
 
 # --- From maep/language/debate.py ---
-DEBATE_AGENT1_SYS = """You are Agent 1 in a debate multi-agent system. Solve the given question with clear steps and wrap your final answer in \\boxed{{}}.
+DEBATE_AGENT1_SYS = """You are Agent 1 in a debate multi-agent system. Solve the given question with clear steps and wrap your final answer in {identifier}.
 Your input may include previous round debate content."""
 DEBATE_AGENT1_USER = """Question: {question}
-Provide a concise solution, showing key steps, and wrap the final answer in \\boxed{{}}."""
+Provide a concise solution, showing key steps, and wrap the final answer in {identifier}."""
 
-DEBATE_AGENT2_SYS = """You are Agent 2 in a debate multi-agent system. Solve the given question with clear steps and wrap your final answer in \\boxed{{}}.
+DEBATE_AGENT2_SYS = """You are Agent 2 in a debate multi-agent system. Solve the given question with clear steps and wrap your final answer in {identifier}.
 Your input may include previous round debate content."""
 DEBATE_AGENT2_USER = """Question: {question}
-Provide a concise solution, showing key steps, and wrap the final answer in \\boxed{{}}."""
+Provide a concise solution, showing key steps, and wrap the final answer in {identifier}."""
 
-DEBATE_AGENT3_SYS = """You are Agent 3 in a debate multi-agent system. Solve the given question with clear steps and wrap your final answer in \\boxed{{}}.
+DEBATE_AGENT3_SYS = """You are Agent 3 in a debate multi-agent system. Solve the given question with clear steps and wrap your final answer in {identifier}.
 Your input may include previous round debate content."""
 DEBATE_AGENT3_USER = """Question: {question}
-Provide a concise solution, showing key steps, and wrap the final answer in \\boxed{{}}."""
+Provide a concise solution, showing key steps, and wrap the final answer in {identifier}."""
