@@ -26,7 +26,7 @@ def main():
         "-c",
         "--config",
         type=str,
-        default="configs/uTEST/decentralized_mas_entropy_infer.yml",
+        default="configs/uTEST/decentralized_entropy_infer.yml",
         help="Path to YAML config file",
     )
     args = parser.parse_args()

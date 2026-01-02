@@ -31,7 +31,7 @@ def main():
         "-c",
         "--config",
         type=str,
-        default="configs/uTEST/orchestrator_coop_entropy_infer.yml",
+        default="configs/uTEST/centralized_entropy_infer.yml",
         help="Path to YAML config file",
     )
     args = parser.parse_args()
