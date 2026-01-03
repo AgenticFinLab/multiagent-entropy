@@ -158,11 +158,35 @@ class BaseEvaluator(ABC):
                 combined_data = json.load(f)
                 data["combined_results"] = combined_data
 
-        result_block_path = os.path.join(traces_dir, "Result_block_0.json")
-        if os.path.exists(result_block_path):
-            with open(result_block_path, "r", encoding="utf-8") as f:
-                result_data = json.load(f)
-                data["result_data"] = result_data
+        result_info_path = os.path.join(traces_dir, "Result-store-information.json")
+        if os.path.exists(result_info_path):
+            with open(result_info_path, "r", encoding="utf-8") as f:
+                result_info = json.load(f)
+                data["result_info"] = result_info
+
+                merged_result_data = {}
+                total_count = 0
+
+                for block_name, block_info in result_info.items():
+                    block_path = os.path.join(traces_dir, block_name)
+                    if os.path.exists(block_path):
+                        with open(block_path, "r", encoding="utf-8") as bf:
+                            block_data = json.load(bf)
+                            merged_result_data.update(block_data)
+                            total_count += block_info.get("count", 0)
+                            logger.info(f"Loaded {block_info.get('count', 0)} items from {block_name}")
+                    else:
+                        logger.warning(f"Block file not found: {block_path}")
+
+                data["result_data"] = merged_result_data
+                logger.info(f"Total loaded {total_count} items from {len(result_info)} blocks")
+        else:
+            result_block_path = os.path.join(traces_dir, "Result_block_0.json")
+            if os.path.exists(result_block_path):
+                with open(result_block_path, "r", encoding="utf-8") as f:
+                    result_data = json.load(f)
+                    data["result_data"] = result_data
+                    logger.info(f"Loaded single block Result_block_0.json")
 
         return data
 

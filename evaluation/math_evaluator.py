@@ -36,6 +36,25 @@ class MathEvaluator(BaseEvaluator):
         text = text.strip()
         return len(text) == 1 and text.isupper() and text.isalpha()
 
+    def has_valid_boxed_format(self, response: str) -> bool:
+        """
+        Check if the response contains a valid \\boxed{} format.
+
+        Args:
+            response: The model's response text
+
+        Returns:
+            True if response contains a valid \\boxed{} format, False otherwise
+        """
+        pattern = r"\\boxed\{([^}]*)\}"
+        matches = re.findall(pattern, response)
+        
+        if matches:
+            last_match = matches[-1].strip()
+            return len(last_match) > 0
+        
+        return False
+
     def extract_answer(self, response: str) -> str:
         """
         Extract the final answer from the model response.
@@ -152,6 +171,7 @@ class MathEvaluator(BaseEvaluator):
         """
         predicted_answer = self.extract_answer(response)
         is_correct = self.compare_answers(predicted_answer, ground_truth)
+        has_valid_format = self.has_valid_boxed_format(response)
 
         try:
             pred_num = self.normalize_number(predicted_answer)
@@ -168,6 +188,64 @@ class MathEvaluator(BaseEvaluator):
             "predicted": predicted_answer,
             "ground_truth": ground_truth,
             "is_correct": is_correct,
+            "has_valid_format": has_valid_format,
             "absolute_error": absolute_error,
             "relative_error": relative_error,
         }
+
+    def evaluate_batch(
+        self,
+        responses: List[str],
+        ground_truths: List[str],
+        sample_ids: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Evaluate a batch of math samples.
+
+        Args:
+            responses: List of model responses
+            ground_truths: List of ground truth answers
+            sample_ids: Optional list of sample IDs
+
+        Returns:
+            Dictionary containing batch evaluation results
+        """
+        if len(responses) != len(ground_truths):
+            raise ValueError(
+                f"Number of responses ({len(responses)}) "
+                f"does not match number of ground truths ({len(ground_truths)})"
+            )
+
+        if sample_ids is not None and len(sample_ids) != len(responses):
+            raise ValueError(
+                f"Number of sample_ids ({len(sample_ids)}) "
+                f"does not match number of responses ({len(responses)})"
+            )
+
+        results = []
+        correct_count = 0
+        valid_format_count = 0
+
+        for i, (response, ground_truth) in enumerate(zip(responses, ground_truths)):
+            result = self.evaluate_sample(response, ground_truth)
+            if sample_ids is not None and i < len(sample_ids):
+                result["sample_id"] = sample_ids[i]
+            results.append(result)
+            if result["is_correct"]:
+                correct_count += 1
+            if result["has_valid_format"]:
+                valid_format_count += 1
+
+        accuracy = correct_count / len(responses) if responses else 0.0
+        format_validity_rate = valid_format_count / len(responses) if responses else 0.0
+
+        return {
+            "task_type": self.task_type,
+            "total_samples": len(responses),
+            "correct_samples": correct_count,
+            "accuracy": accuracy,
+            "valid_format_samples": valid_format_count,
+            "format_validity_rate": format_validity_rate,
+            "sample_results": results,
+        }
+

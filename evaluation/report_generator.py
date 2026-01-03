@@ -71,6 +71,13 @@ class ReportGenerator:
             )
             report_lines.append("")
 
+        if "format_validity_rate" in accuracy_results:
+            report_lines.append(f"Format Validity Rate: {accuracy_results['format_validity_rate']:.4f}")
+            report_lines.append(
+                f"Valid Format Samples: {accuracy_results.get('valid_format_samples', 0)}"
+            )
+            report_lines.append("")
+
         if "statistics" in entropy_results:
             report_lines.append("-" * 80)
             report_lines.append("2. ENTROPY ANALYSIS")
@@ -303,6 +310,18 @@ class ReportGenerator:
         <div class="metric">
             <div class="metric-label">Total Samples</div>
             <div class="metric-value">{accuracy_results.get('total_samples', 0)}</div>
+        </div>
+"""
+
+        if "format_validity_rate" in accuracy_results:
+            html += f"""
+        <div class="metric">
+            <div class="metric-label">Format Validity Rate</div>
+            <div class="metric-value">{accuracy_results['format_validity_rate']:.4f}</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Valid Format Samples</div>
+            <div class="metric-value">{accuracy_results.get('valid_format_samples', 0)}</div>
         </div>
 """
 

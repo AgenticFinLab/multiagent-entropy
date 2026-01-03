@@ -22,6 +22,7 @@ from evaluation.option_evaluator import OptionEvaluator
 from evaluation.entropy_analyzer import EntropyAnalyzer
 from evaluation.report_generator import ReportGenerator
 
+os.makedirs("evaluation/logs", exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -213,6 +214,12 @@ def evaluate_single_experiment(
             f"Accuracy: {accuracy_results.get('accuracy', 0):.4f} "
             f"({accuracy_results.get('correct_samples', 0)}/{accuracy_results.get('total_samples', 0)})"
         )
+
+        if "format_validity_rate" in accuracy_results:
+            logger.info(
+                f"Format Validity Rate: {accuracy_results.get('format_validity_rate', 0):.4f} "
+                f"({accuracy_results.get('valid_format_samples', 0)}/{accuracy_results.get('total_samples', 0)})"
+            )
 
     except Exception as e:
         logger.error(f"Error during accuracy evaluation: {e}")
