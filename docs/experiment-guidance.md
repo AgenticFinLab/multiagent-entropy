@@ -119,84 +119,92 @@ To run a single experiment, use the `run_experiment.py` script with the followin
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --model-config experiments/configs/model_specific/qwen3-0.6b.yml \
-  --dataset-config experiments/configs/dataset_specific/gsm8k.yml \
-  --entropy-config experiments/configs/entropy_configs/standard.yml \
-  --experiment-name qwen3-0.6b_gsm8k_single \
-  --agent-type single \
-  --save-config
+  --experiment-name qwen3-4b_gsm8k_single_agent \
+  --base_config "experiments/configs/base_config.yml" \
+  --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
+  --dataset-config "experiments/configs/dataset_specific/gsm8k.yml" \
+  --entropy-config "experiments/configs/entropy_configs/standard.yml" \
+  --infer-config "experiments/configs/infer_configs/cuda0.yml" \
+  --agent-type "single"
 ```
 
 #### Sequential Agent Mode
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --model-config experiments/configs/model_specific/qwen3-0.6b.yml \
-  --dataset-config experiments/configs/dataset_specific/gsm8k.yml \
-  --entropy-config experiments/configs/entropy_configs/standard.yml \
-  --experiment-name qwen3-0.6b_gsm8k_sequential \
-  --agent-type sequential \
-  --save-config
+  --experiment-name "qwen3-4b_gsm8k_sequential_agent" \
+  --base-config "experiments/configs/base_config.yml" \
+  --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
+  --dataset-config "experiments/configs/dataset_specific/gsm8k.yml" \
+  --entropy-config "experiments/configs/entropy_configs/standard.yml" \
+  --infer-config "experiments/configs/infer_configs/cuda0.yml" \
+  --agent-type "sequential"
 ```
 
 #### Centralized Agent Mode
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --model-config experiments/configs/model_specific/qwen3-0.6b.yml \
-  --dataset-config experiments/configs/dataset_specific/gsm8k.yml \
-  --entropy-config experiments/configs/entropy_configs/standard.yml \
-  --experiment-name qwen3-0.6b_gsm8k_centralized \
-  --agent-type centralized \
-  --save-config
+  --experiment-name "qwen3-4b_gsm8k_centralized_agent" \
+  --base-config "experiments/configs/base_config.yml" \
+  --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
+  --dataset-config "experiments/configs/dataset_specific/gsm8k.yml" \
+  --entropy-config "experiments/configs/entropy_configs/standard.yml" \
+  --infer-config "experiments/configs/infer_configs/cuda1.yml" \
+  --agent-type "centralized"
 ```
 
 #### Decentralized Agent Mode
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --model-config experiments/configs/model_specific/qwen3-0.6b.yml \
-  --dataset-config experiments/configs/dataset_specific/gsm8k.yml \
-  --entropy-config experiments/configs/entropy_configs/standard.yml \
-  --experiment-name qwen3-0.6b_gsm8k_decentralized \
-  --agent-type decentralized \
-  --save-config
+  --experiment-name "qwen3-4b_gsm8k_decentralized_agent" \
+  --base-config "experiments/configs/base_config.yml" \
+  --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
+  --dataset-config "experiments/configs/dataset_specific/gsm8k.yml" \
+  --entropy-config "experiments/configs/entropy_configs/standard.yml" \
+  --infer-config "experiments/configs/infer_configs/cuda0.yml" \
+  --agent-type "decentralized"
 ```
 
 #### Full Decentralized Agent Mode
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --model-config experiments/configs/model_specific/qwen3-0.6b.yml \
-  --dataset-config experiments/configs/dataset_specific/gsm8k.yml \
-  --entropy-config experiments/configs/entropy_configs/standard.yml \
-  --experiment-name qwen3-0.6b_gsm8k_full_decentralized \
-  --agent-type full_decentralized \
-  --save-config
+  --experiment-name "qwen3-4b_gsm8k_full_decentralized_agent" \
+  --base-config "experiments/configs/base_config.yml" \
+  --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
+  --dataset-config "experiments/configs/dataset_specific/gsm8k.yml" \
+  --entropy-config "experiments/configs/entropy_configs/standard.yml" \
+  --infer-config "experiments/configs/infer_configs/cuda1.yml" \
+  --agent-type "full_decentralized"
 ```
 
 #### Debate Agent Mode
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --model-config experiments/configs/model_specific/qwen3-0.6b.yml \
-  --dataset-config experiments/configs/dataset_specific/gsm8k.yml \
-  --entropy-config experiments/configs/entropy_configs/standard.yml \
-  --experiment-name qwen3-0.6b_gsm8k_debate \
-  --agent-type debate \
-  --save-config
+  --experiment-name "qwen3-4b_gsm8k_debate_agent" \
+  --base-config "experiments/configs/base_config.yml" \
+  --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
+  --dataset-config "experiments/configs/dataset_specific/gsm8k.yml" \
+  --entropy-config "experiments/configs/entropy_configs/standard.yml" \
+  --infer-config "experiments/configs/infer_configs/cuda2.yml" \
+  --agent-type "debate"
 ```
 
 #### Hybrid Agent Mode
 ```bash
+conda activate maep
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --model-config experiments/configs/model_specific/qwen3-0.6b.yml \
-  --dataset-config experiments/configs/dataset_specific/gsm8k.yml \
-  --entropy-config experiments/configs/entropy_configs/standard.yml \
-  --experiment-name qwen3-0.6b_gsm8k_hybrid \
-  --agent-type hybrid \
-  --save-config
+  --experiment-name "qwen3-4b_gsm8k_hybrid_agent" \
+  --base-config "experiments/configs/base_config.yml" \
+  --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
+  --dataset-config "experiments/configs/dataset_specific/gsm8k.yml" \
+  --entropy-config "experiments/configs/entropy_configs/standard.yml" \
+  --infer-config "experiments/configs/infer_configs/cuda3.yml" \
+  --agent-type "hybrid"
 ```
 
 ### Batch Experiments
@@ -206,7 +214,6 @@ To run multiple experiments in batch mode, create a batch configuration file lik
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
   --batch-config experiments/configs/batch_example.yml \
-  --save-config
 ```
 
 ### Command-Line Options
@@ -215,11 +222,11 @@ python experiments/scripts/run_experiment.py \
 - `-m, --model-config`: Path to model-specific configuration file (required for single experiment)
 - `-d, --dataset-config`: Path to dataset-specific configuration file (required for single experiment)
 - `-e, --entropy-config`: Path to entropy configuration file (required for single experiment)
+- `-i, --infer-config`: Path to inference configuration file (required for single experiment)
 - `-n, --experiment-name`: Name of the experiment (required for single experiment)
 - `--agent-type`: Type of agent configuration to use (single, sequential, centralized, decentralized, full_decentralized, debate, hybrid)
 - `--batch-config`: Path to batch configuration file (for batch experiments)
 - `--dry-run`: Only prepare configurations without running experiments
-- `--save-config`: Save merged configuration to file (saved in experiments/configs/experiment_configs/ directory)
 
 ## Results Management
 
@@ -278,6 +285,10 @@ python experiments/scripts/result_aggregator.py \
 ### Adding a New Entropy Configuration
 1. Create a new YAML file in `experiments/configs/entropy_configs/`
 2. Define entropy calculation settings (calculate_entropy, entropy_type, etc.)
+
+### Adding a New Inference Configuration
+1. Create a new YAML file in `experiments/configs/infer_configs/`
+2. Define inference settings (device, max_new_tokens, temperature, etc.)
 
 ## Best Practices
 
