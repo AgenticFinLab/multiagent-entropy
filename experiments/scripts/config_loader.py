@@ -104,6 +104,7 @@ def resolve_agent_placeholders(
     model_config: Dict[str, Any],
     base_config: Dict[str, Any],
     entropy_config: Dict[str, Any],
+    infer_config: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
     """Resolve placeholders in agent configuration template with actual values.
 
@@ -112,6 +113,7 @@ def resolve_agent_placeholders(
         model_config (Dict[str, Any]): Model configuration
         base_config (Dict[str, Any]): Base configuration
         entropy_config (Dict[str, Any]): Entropy configuration
+        infer_config (Dict[str, Any]): Inference configuration (optional, overrides base_config)
 
     Returns:
         Dict[str, Any]: Resolved agent configuration
@@ -120,9 +122,15 @@ def resolve_agent_placeholders(
 
     # Replace placeholders with actual values
     resolved_agent["lm_name"] = model_config["lm_name"]
-    resolved_agent["inference_config"] = model_config.get(
-        "inference_config", base_config["inference_config"]
-    )
+    
+    # Determine inference_config priority: infer_config > model_config > base_config
+    if infer_config and "inference_config" in infer_config:
+        resolved_agent["inference_config"] = infer_config["inference_config"]
+    elif "inference_config" in model_config:
+        resolved_agent["inference_config"] = model_config["inference_config"]
+    else:
+        resolved_agent["inference_config"] = base_config["inference_config"]
+    
     resolved_agent["entropy_config"] = entropy_config["entropy_config"]
     resolved_agent["generation_config"] = base_config["generation_config"]
 
@@ -136,6 +144,7 @@ def load_experiment_config(
     entropy_config_path: str,
     experiment_name: str,
     agent_type: str = None,
+    infer_config_path: str = None,
 ) -> Dict[str, Any]:
     """Loads and merges all configuration files for an experiment.
 
@@ -146,6 +155,7 @@ def load_experiment_config(
         entropy_config_path (str): Path to entropy configuration file.
         experiment_name (str): Name of the experiment.
         agent_type (str): Type of agent configuration to load (single/sequential/centralized/decentralized/full_decentralized/debate/hybrid).
+        infer_config_path (str): Path to inference configuration file (CUDA device settings). Optional.
 
     Returns:
         Dict[str, Any]: Complete merged configuration for the experiment.
@@ -157,13 +167,22 @@ def load_experiment_config(
         dataset_config = load_config(dataset_config_path)
         entropy_config = load_config(entropy_config_path)
 
+        # Load inference config if provided (optional)
+        infer_config = None
+        if infer_config_path:
+            infer_config = load_config(infer_config_path)
+            logger.info(f"Loaded inference config from: {infer_config_path}")
+
         # Get dataset name for path creation
         dataset_name = dataset_config['data']['data_name'].lower()
         
-        # Create experiment-specific config with timestamp
+        # Create experiment-specific config with timestamp and process ID to avoid conflicts
+        import os as os_module
         timestamp = time.strftime("%Y%m%d_%H%M%S")
+        timestamp_ms = int(time.time() * 1000) % 1000
+        pid = os_module.getpid()
         experiment_config = {
-            "save_folder": f"experiments/results/raw/{dataset_name}/{experiment_name}_{timestamp}"
+            "save_folder": f"experiments/results/raw/{dataset_name}/{experiment_name}_{timestamp}_{timestamp_ms}_{pid}"
         }
 
         # Get agent type - prioritize passed parameter, then base config, then default to single
@@ -190,10 +209,11 @@ def load_experiment_config(
                 model_config=model_config,
                 base_config=base_config,
                 entropy_config=entropy_config,
+                infer_config=infer_config,
             )
             agents_config["agents"][agent_name] = resolved_agent
 
-        # Merge all configs
+        # Merge all configs (infer_config should be after base_config to override inference settings)
         all_configs = [
             base_config,
             model_config,
@@ -202,6 +222,10 @@ def load_experiment_config(
             experiment_config,
             agents_config,
         ]
+        
+        # Add infer_config if provided (it will override base_config's inference_config)
+        if infer_config:
+            all_configs.insert(1, infer_config)
 
         merged_config = merge_configs(all_configs)
 
@@ -241,6 +265,7 @@ def generate_batch_configs(batch_config_path: str) -> Dict[str, Any]:
             dataset_config_path = experiment["dataset_config"]
             entropy_config_path = experiment["entropy_config"]
             agent_type = experiment.get("agent_type")
+            infer_config_path = experiment.get("infer_config")
 
             # Load and merge configurations
             experiment_config = load_experiment_config(
@@ -248,6 +273,7 @@ def generate_batch_configs(batch_config_path: str) -> Dict[str, Any]:
                 model_config_path=model_config_path,
                 dataset_config_path=dataset_config_path,
                 entropy_config_path=entropy_config_path,
+                infer_config_path=infer_config_path,
                 experiment_name=name,
                 agent_type=agent_type,
             )

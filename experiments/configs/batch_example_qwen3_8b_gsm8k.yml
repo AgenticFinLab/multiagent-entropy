@@ -2,67 +2,67 @@
 
 # List of experiments to run
 experiments:
-  # Experiment 1: Qwen3-4B with GSM8K and single agent
-  # - name: "qwen3-4b_gsm8k_single_agent"
-  #   base_config: "experiments/configs/base_config.yml"
-  #   model_config: "experiments/configs/model_specific/qwen3-4b.yml"
-  #   dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
-  #   entropy_config: "experiments/configs/entropy_configs/standard.yml"
-  #   infer_config: "experiments/configs/infer_configs/cuda0.yml"
-  #   agent_type: "single"
-    
-  # Experiment 2: Qwen3-4B with GSM8K and sequential agent
-  - name: "qwen3-4b_gsm8k_sequential_agent"
+  # Experiment 1: Qwen3-8B with GSM8K and single agent
+  - name: "qwen3-8b_gsm8k_single_agent"
     base_config: "experiments/configs/base_config.yml"
-    model_config: "experiments/configs/model_specific/qwen3-4b.yml"
+    model_config: "experiments/configs/model_specific/qwen3-8b.yml"
     dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
     entropy_config: "experiments/configs/entropy_configs/standard.yml"
     infer_config: "experiments/configs/infer_configs/cuda0.yml"
-    agent_type: "sequential"
+    agent_type: "single"
     
-  # Experiment 3: Qwen3-4B with GSM8K and centralized agent
-  - name: "qwen3-4b_gsm8k_centralized_agent"
+  # Experiment 2: Qwen3-8B with GSM8K and sequential agent
+  - name: "qwen3-8b_gsm8k_sequential_agent"
     base_config: "experiments/configs/base_config.yml"
-    model_config: "experiments/configs/model_specific/qwen3-4b.yml"
+    model_config: "experiments/configs/model_specific/qwen3-8b.yml"
     dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
     entropy_config: "experiments/configs/entropy_configs/standard.yml"
     infer_config: "experiments/configs/infer_configs/cuda1.yml"
-    agent_type: "centralized"
-
-    # Experiment 4: Qwen3-4B with GSM8K and debate agent
-  - name: "qwen3-4b_gsm8k_debate_agent"
+    agent_type: "sequential"
+    
+  # Experiment 3: Qwen3-8B with GSM8K and centralized agent
+  - name: "qwen3-8b_gsm8k_centralized_agent"
     base_config: "experiments/configs/base_config.yml"
-    model_config: "experiments/configs/model_specific/qwen3-4b.yml"
+    model_config: "experiments/configs/model_specific/qwen3-8b.yml"
     dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
     entropy_config: "experiments/configs/entropy_configs/standard.yml"
     infer_config: "experiments/configs/infer_configs/cuda2.yml"
-    agent_type: "debate"
-    
-  # Experiment 5: Qwen3-4B with GSM8K and hybrid agent
-  - name: "qwen3-4b_gsm8k_hybrid_agent"
+    agent_type: "centralized"
+
+    # Experiment 4: Qwen3-8B with GSM8K and debate agent
+  - name: "qwen3-8b_gsm8k_debate_agent"
     base_config: "experiments/configs/base_config.yml"
-    model_config: "experiments/configs/model_specific/qwen3-4b.yml"
+    model_config: "experiments/configs/model_specific/qwen3-8b.yml"
     dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
     entropy_config: "experiments/configs/entropy_configs/standard.yml"
     infer_config: "experiments/configs/infer_configs/cuda3.yml"
+    agent_type: "debate"
+    
+  # Experiment 5: Qwen3-8B with GSM8K and hybrid agent
+  - name: "qwen3-8b_gsm8k_hybrid_agent"
+    base_config: "experiments/configs/base_config.yml"
+    model_config: "experiments/configs/model_specific/qwen3-8b.yml"
+    dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
+    entropy_config: "experiments/configs/entropy_configs/standard.yml"
+    infer_config: "experiments/configs/infer_configs/cuda0.yml"
     agent_type: "hybrid"
     
-  # # Experiment 6: Qwen3-4B with GSM8K and decentralized agent
-  # - name: "qwen3-4b_gsm8k_decentralized_agent"
+  # # Experiment 6: Qwen3-8B with GSM8K and decentralized agent
+  # - name: "qwen3-8b_gsm8k_decentralized_agent"
   #   base_config: "experiments/configs/base_config.yml"
-  #   model_config: "experiments/configs/model_specific/qwen3-4b.yml"
-  #   dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
-  #   entropy_config: "experiments/configs/entropy_configs/standard.yml"
-  #   infer_config: "experiments/configs/infer_configs/cuda0.yml"
-  #   agent_type: "decentralized"
-    
-  # # Experiment 7: Qwen3-4B with GSM8K and full_decentralized agent
-  # - name: "qwen3-4b_gsm8k_full_decentralized_agent"
-  #   base_config: "experiments/configs/base_config.yml"
-  #   model_config: "experiments/configs/model_specific/qwen3-4b.yml"
+  #   model_config: "experiments/configs/model_specific/qwen3-8b.yml"
   #   dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
   #   entropy_config: "experiments/configs/entropy_configs/standard.yml"
   #   infer_config: "experiments/configs/infer_configs/cuda1.yml"
+  #   agent_type: "decentralized"
+    
+  # # Experiment 7: Qwen3-8B with GSM8K and full_decentralized agent
+  # - name: "qwen3-8b_gsm8k_full_decentralized_agent"
+  #   base_config: "experiments/configs/base_config.yml"
+  #   model_config: "experiments/configs/model_specific/qwen3-8b.yml"
+  #   dataset_config: "experiments/configs/dataset_specific/gsm8k.yml"
+  #   entropy_config: "experiments/configs/entropy_configs/standard.yml"
+  #   infer_config: "experiments/configs/infer_configs/cuda2.yml"
   #   agent_type: "full_decentralized"
 
 # You can add more experiments with different combinations of models, datasets, and entropy settings

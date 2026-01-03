@@ -30,14 +30,6 @@ environment:
 graph_config:
   recursion_limit: 150
 
-# Inference base configuration
-inference_config:
-  # Options: "cuda" (NVIDIA), "mps" (Mac), "cpu"
-  device: "cuda"
-  # Options: "float16", "bfloat16", "float32" (use float32 for CPU/MPS stability if needed)
-  torch_dtype: "float16"
-  device_map: "auto"
-
 # Generation base configuration
 generation_config:
   max_new_tokens: 2000

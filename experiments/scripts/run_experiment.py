@@ -72,6 +72,9 @@ def parse_args() -> argparse.Namespace:
         "-e", "--entropy-config", type=str, help="Path to entropy configuration file"
     )
     parser.add_argument(
+        "-i", "--infer-config", type=str, help="Path to inference configuration file (CUDA device settings)"
+    )
+    parser.add_argument(
         "-n", "--experiment-name", type=str, help="Name of the experiment"
     )
     parser.add_argument(
@@ -120,6 +123,14 @@ def parse_args() -> argparse.Namespace:
             parser.error("--entropy-config is required when not using --batch-config")
         if not args.experiment_name:
             parser.error("--experiment-name is required when not using --batch-config")
+        # Note: --infer-config is optional, defaults to None
+    else:
+        # When using batch-config, experiment-name is optional
+        # If provided, run only that specific experiment
+        if args.experiment_name:
+            logger.info(f"Running specific experiment from batch: {args.experiment_name}")
+        else:
+            logger.info("Running all experiments from batch configuration")
 
     return args
 
@@ -264,7 +275,8 @@ def run_single_experiment(
 
 
 def run_batch_experiments(
-    batch_config_path: str, dry_run: bool = False, save_config_flag: bool = True
+    batch_config_path: str, dry_run: bool = False, save_config_flag: bool = True,
+    experiment_name: str = None
 ) -> List[Dict[str, Any]]:
     """Run multiple experiments defined in a batch configuration file.
 
@@ -272,6 +284,7 @@ def run_batch_experiments(
         batch_config_path (str): Path to batch configuration file
         dry_run (bool): If True, only prepare but don't run experiments
         save_config_flag (bool): If True, save merged configurations to files
+        experiment_name (str): If provided, run only this specific experiment
 
     Returns:
         List[Dict[str, Any]]: List of experiment results or statuses
@@ -282,7 +295,16 @@ def run_batch_experiments(
         batch_config = yaml.safe_load(f)
 
     experiments = batch_config.get("experiments", [])
-    logger.info(f"Found {len(experiments)} experiments in batch configuration")
+    
+    # Filter experiments if experiment_name is provided
+    if experiment_name:
+        experiments = [exp for exp in experiments if exp.get("name") == experiment_name]
+        if not experiments:
+            logger.error(f"Experiment '{experiment_name}' not found in batch configuration")
+            return []
+        logger.info(f"Running single experiment from batch: {experiment_name}")
+    
+    logger.info(f"Found {len(experiments)} experiments to run")
 
     results = []
     for exp_idx, exp in enumerate(experiments):
@@ -298,13 +320,17 @@ def run_batch_experiments(
             model_config_path=exp["model_config"],
             dataset_config_path=exp["dataset_config"],
             entropy_config_path=exp["entropy_config"],
+            infer_config_path=exp.get("infer_config"),
             experiment_name=exp["name"],
             agent_type=exp.get("agent_type"),
         )
 
         # Save merged configuration if requested
         if save_config_flag:
-            config_save_path = f"experiments/configs_exp/{exp['name']}_{time.strftime('%Y%m%d_%H%M%S')}.yml"
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            timestamp_ms = int(time.time() * 1000) % 1000
+            pid = os.getpid()
+            config_save_path = f"experiments/configs_exp/{exp['name']}_{timestamp}_{timestamp_ms}_{pid}.yml"
             save_config(merged_config, config_save_path)
             logger.info(f"Saved merged configuration to: {config_save_path}")
 
@@ -359,6 +385,7 @@ def main():
             model_config_path=args.model_config,
             dataset_config_path=args.dataset_config,
             entropy_config_path=args.entropy_config,
+            infer_config_path=args.infer_config,
             experiment_name=args.experiment_name,
             agent_type=args.agent_type,
         )
