@@ -6,36 +6,36 @@ This directory contains the organized structure for running large-scale experime
 
 ```
 experiments/
-├── configs/                    # Configuration files for experiments
-│   ├── base_config.yml         # Base configuration with common settings
-│   ├── batch_example.yml       # Example batch configuration file
-│   ├── dataset_specific/       # Dataset-specific configuration files
-│   │   └── gsm8k.yml          # GSM8K dataset configuration
-│   ├── entropy_configs/        # Entropy calculation configuration files
-│   │   ├── standard.yml       # Standard entropy configuration
-│   │   └── no_entropy.yml     # No entropy calculation configuration
-│   ├── agent_specific/         # Agent-specific configuration files
-│   │   ├── single_agents.yml   # Single agent configuration
-│   │   ├── sequential_agents.yml # Sequential agent configuration
-│   │   ├── centralized_agents.yml # Centralized agent configuration
-│   │   ├── decentralized_agents.yml # Decentralized agent configuration
-│   │   ├── full_decentralized_agents.yml # Full decentralized agent configuration
-│   │   ├── debate_agents.yml # Debate agent configuration
-│   │   └── hybrid_agents.yml # Hybrid agent configuration
-│   └── model_specific/         # Model-specific configuration files
-│       ├── qwen3-1.7b.yml      # Qwen3-1.7B model configuration
-│       └── qwen3-0.6b.yml     # Qwen3-0.6B model configuration
-├── configs_exp/                    # Generated experiment configuration files
-├── logs/                       # Log files from experiments
-├── results/                    # Experiment results
-│   ├── aggregated/            # Aggregated results across experiments
-│   │   └── {dataset_name}/    # Results organized by dataset
-│   └── raw/                   # Raw results from individual experiments
-│       └── {dataset_name}/    # Results organized by dataset
-└── scripts/                    # Utility scripts
-    ├── config_loader.py       # Configuration loading and merging utilities
-    ├── result_aggregator.py   # Result aggregation and visualization utilities
-    └── run_experiment.py      # Experiment runner script
+├── configs/                                # Configuration files for experiments
+│   ├── base_config.yml                     # Base configuration with common settings
+│   ├── batch_example.yml                   # Example batch configuration file
+│   ├── dataset_specific/                   # Dataset-specific configuration files
+│   │   └── gsm8k.yml                       # GSM8K dataset configuration
+│   ├── entropy_configs/                    # Entropy calculation configuration files
+│   │   ├── standard.yml                    # Standard entropy configuration
+│   │   └── no_entropy.yml                  # No entropy calculation configuration
+│   ├── agent_specific/                     # Agent-specific configuration files
+│   │   ├── single_agents.yml               # Single agent configuration
+│   │   ├── sequential_agents.yml           # Sequential agent configuration
+│   │   ├── centralized_agents.yml          # Centralized agent configuration
+│   │   ├── decentralized_agents.yml        # Decentralized agent configuration
+│   │   ├── full_decentralized_agents.yml   # Full decentralized agent configuration
+│   │   ├── debate_agents.yml               # Debate agent configuration
+│   │   └── hybrid_agents.yml               # Hybrid agent configuration
+│   └── model_specific/                     # Model-specific configuration files
+│       ├── qwen3-1.7b.yml                  # Qwen3-1.7B model configuration
+│       └── qwen3-0.6b.yml                  # Qwen3-0.6B model configuration
+├── configs_exp/                            # Generated experiment configuration files
+├── logs/                                   # Log files from experiments
+├── results/                                # Experiment results
+│   ├── aggregated/                         # Aggregated results across experiments
+│   │   └── {dataset_name}/                 # Results organized by dataset
+│   └── raw/                                # Raw results from individual experiments
+│       └── {dataset_name}/                 # Results organized by dataset
+└── scripts/                                # Utility scripts
+    ├── config_loader.py                    # Configuration loading and merging utilities
+    ├── result_aggregator.py                # Result aggregation and visualization utilities
+    └── run_experiment.py                   # Experiment runner script
 ```
 
 ## Configuration System
