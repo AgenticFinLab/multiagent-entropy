@@ -120,7 +120,7 @@ To run a single experiment, use the `run_experiment.py` script with the followin
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
   --experiment-name qwen3-4b_gsm8k_single_agent \
-  --base_config "experiments/configs/base_config.yml" \
+  --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
   --dataset-config "experiments/configs/dataset_specific/gsm8k.yml" \
   --entropy-config "experiments/configs/entropy_configs/standard.yml" \
