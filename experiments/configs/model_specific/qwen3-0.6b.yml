@@ -1,8 +1,3 @@
 # Model-specific configuration for Qwen3-0.6B
 
 lm_name: Qwen/Qwen3-0.6B
-
-# Model-specific inference settings
-inference_config:
-  torch_dtype: "float16"
-  device_map: "auto"
