@@ -6,15 +6,13 @@ including visualization, correlation analysis, and comparison between agents.
 """
 
 import os
-import json
 import logging
 from typing import Dict, List, Any, Tuple, Optional
-from pathlib import Path
 
 import numpy as np
-import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
+import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, spearmanr
 
 
@@ -52,7 +50,12 @@ class EntropyAnalyzer:
             logger.warning(f"No entropy files found in: {tensors_dir}")
             return {}
 
-        entropy_data = {"agents": {}, "samples": {}, "rounds": {}, "agent_sequences": {}}
+        entropy_data = {
+            "agents": {},
+            "samples": {},
+            "rounds": {},
+            "agent_sequences": {},
+        }
 
         for entropy_file in entropy_files:
             file_info = self._parse_entropy_filename(entropy_file)
@@ -65,6 +68,7 @@ class EntropyAnalyzer:
 
             try:
                 import torch
+
                 entropy_tensor = torch.load(entropy_file)
                 entropy_values = entropy_tensor.cpu().numpy().tolist()
 
@@ -80,7 +84,9 @@ class EntropyAnalyzer:
                 if agent_sequence not in entropy_data["samples"][sample_id][agent_name]:
                     entropy_data["samples"][sample_id][agent_name][agent_sequence] = []
 
-                entropy_data["samples"][sample_id][agent_name][agent_sequence].extend(entropy_values)
+                entropy_data["samples"][sample_id][agent_name][agent_sequence].extend(
+                    entropy_values
+                )
                 entropy_data["agents"][agent_name].extend(entropy_values)
 
                 if agent_sequence not in entropy_data["agent_sequences"]:
@@ -128,7 +134,7 @@ class EntropyAnalyzer:
         if not filename.endswith("_extras_entropy.pt"):
             return None
 
-        filename = filename[:-len("_extras_entropy.pt")]
+        filename = filename[: -len("_extras_entropy.pt")]
 
         parts = filename.split("_")
         if len(parts) < 4:
@@ -152,7 +158,7 @@ class EntropyAnalyzer:
 
         main_id = dash_parts[0]
         agent_name = "-".join(dash_parts[1:-1])
-        
+
         try:
             agent_sequence = int(dash_parts[-1])
         except ValueError:
@@ -163,7 +169,7 @@ class EntropyAnalyzer:
             "agent_name": agent_name,
             "sample_num": sample_num,
             "main_id": main_id,
-            "agent_sequence": agent_sequence
+            "agent_sequence": agent_sequence,
         }
 
     def _extract_entropy_values(self, output: Dict[str, Any]) -> List[float]:
@@ -262,7 +268,9 @@ class EntropyAnalyzer:
 
         return step_statistics
 
-    def calculate_round_statistics(self, agents_per_round: int = 4) -> Dict[str, Dict[int, Dict[str, float]]]:
+    def calculate_round_statistics(
+        self, agents_per_round: int = 4
+    ) -> Dict[str, Dict[int, Dict[str, float]]]:
         """
         Calculate entropy statistics for each agent at each round.
 
@@ -368,7 +376,9 @@ class EntropyAnalyzer:
             logger.warning("No step statistics available for visualization")
             return
 
-        fig, axes = plt.subplots(len(step_statistics), 1, figsize=figsize, squeeze=False)
+        fig, axes = plt.subplots(
+            len(step_statistics), 1, figsize=figsize, squeeze=False
+        )
         fig.suptitle("Entropy Change Curves by Agent and Agent Sequence", fontsize=16)
 
         for idx, (agent_name, sequences) in enumerate(sorted(step_statistics.items())):
@@ -378,12 +388,21 @@ class EntropyAnalyzer:
             means = [sequences[seq]["mean"] for seq in sorted_sequences]
             stds = [sequences[seq]["std"] for seq in sorted_sequences]
 
-            ax.errorbar(sorted_sequences, means, yerr=stds, 
-                       marker='o', capsize=5, capthick=2, linewidth=2)
-            ax.fill_between(sorted_sequences, 
-                           np.array(means) - np.array(stds),
-                           np.array(means) + np.array(stds),
-                           alpha=0.2)
+            ax.errorbar(
+                sorted_sequences,
+                means,
+                yerr=stds,
+                marker="o",
+                capsize=5,
+                capthick=2,
+                linewidth=2,
+            )
+            ax.fill_between(
+                sorted_sequences,
+                np.array(means) - np.array(stds),
+                np.array(means) + np.array(stds),
+                alpha=0.2,
+            )
 
             ax.set_xlabel("Agent Sequence")
             ax.set_ylabel("Entropy")
@@ -397,7 +416,10 @@ class EntropyAnalyzer:
         logger.info(f"Step entropy curves visualization saved to: {save_path}")
 
     def visualize_round_entropy_curves(
-        self, save_path: str, agents_per_round: int = 4, figsize: Tuple[int, int] = (14, 8)
+        self,
+        save_path: str,
+        agents_per_round: int = 4,
+        figsize: Tuple[int, int] = (14, 8),
     ) -> None:
         """
         Visualize entropy change curves for each agent at each round.
@@ -415,7 +437,9 @@ class EntropyAnalyzer:
             logger.warning("No round statistics available for visualization")
             return
 
-        fig, axes = plt.subplots(len(round_statistics), 1, figsize=figsize, squeeze=False)
+        fig, axes = plt.subplots(
+            len(round_statistics), 1, figsize=figsize, squeeze=False
+        )
         fig.suptitle("Entropy Change Curves by Agent and Round", fontsize=16)
 
         for idx, (agent_name, rounds) in enumerate(sorted(round_statistics.items())):
@@ -425,12 +449,21 @@ class EntropyAnalyzer:
             means = [rounds[round_num]["mean"] for round_num in sorted_rounds]
             stds = [rounds[round_num]["std"] for round_num in sorted_rounds]
 
-            ax.errorbar(sorted_rounds, means, yerr=stds, 
-                       marker='o', capsize=5, capthick=2, linewidth=2)
-            ax.fill_between(sorted_rounds, 
-                           np.array(means) - np.array(stds),
-                           np.array(means) + np.array(stds),
-                           alpha=0.2)
+            ax.errorbar(
+                sorted_rounds,
+                means,
+                yerr=stds,
+                marker="o",
+                capsize=5,
+                capthick=2,
+                linewidth=2,
+            )
+            ax.fill_between(
+                sorted_rounds,
+                np.array(means) - np.array(stds),
+                np.array(means) + np.array(stds),
+                alpha=0.2,
+            )
 
             ax.set_xlabel("Round")
             ax.set_ylabel("Entropy")
@@ -479,26 +512,48 @@ class EntropyAnalyzer:
 
                 if sequence in step_statistics[agent_name]:
                     stats_data = step_statistics[agent_name][sequence]
-                    
+
                     samples = self.entropy_data.get("samples", {})
                     sequence_entropies = []
                     for sample_data in samples.values():
-                        if agent_name in sample_data and sequence in sample_data[agent_name]:
+                        if (
+                            agent_name in sample_data
+                            and sequence in sample_data[agent_name]
+                        ):
                             sequence_entropies.extend(sample_data[agent_name][sequence])
 
                     if sequence_entropies:
-                        ax.hist(sequence_entropies, bins=20, alpha=0.7, edgecolor="black")
-                        ax.axvline(stats_data["mean"], color="red", linestyle="--", 
-                                  linewidth=2, label=f'Mean: {stats_data["mean"]:.4f}')
+                        ax.hist(
+                            sequence_entropies, bins=20, alpha=0.7, edgecolor="black"
+                        )
+                        ax.axvline(
+                            stats_data["mean"],
+                            color="red",
+                            linestyle="--",
+                            linewidth=2,
+                            label=f'Mean: {stats_data["mean"]:.4f}',
+                        )
                         ax.set_xlabel("Entropy")
                         ax.set_ylabel("Frequency")
                         ax.legend(fontsize=8)
                     else:
-                        ax.text(0.5, 0.5, "No data", ha="center", va="center", 
-                               transform=ax.transAxes)
+                        ax.text(
+                            0.5,
+                            0.5,
+                            "No data",
+                            ha="center",
+                            va="center",
+                            transform=ax.transAxes,
+                        )
                 else:
-                    ax.text(0.5, 0.5, "No data", ha="center", va="center", 
-                           transform=ax.transAxes)
+                    ax.text(
+                        0.5,
+                        0.5,
+                        "No data",
+                        ha="center",
+                        va="center",
+                        transform=ax.transAxes,
+                    )
 
                 if agent_idx == n_agents - 1:
                     ax.set_xlabel(f"Sequence {sequence}")
@@ -542,7 +597,13 @@ class EntropyAnalyzer:
 
             if agent_entropies:
                 x_values = list(range(len(agent_entropies)))
-                plt.plot(x_values, agent_entropies, label=agent_name, marker="o", markersize=3)
+                plt.plot(
+                    x_values,
+                    agent_entropies,
+                    label=agent_name,
+                    marker="o",
+                    markersize=3,
+                )
 
         plt.xlabel("Entropy Index")
         plt.ylabel("Entropy")
@@ -653,7 +714,10 @@ class EntropyAnalyzer:
         }
 
     def visualize_entropy_accuracy_correlation(
-        self, accuracy_data: Dict[str, Any], save_path: str, figsize: Tuple[int, int] = (10, 8)
+        self,
+        accuracy_data: Dict[str, Any],
+        save_path: str,
+        figsize: Tuple[int, int] = (10, 8),
     ) -> None:
         """
         Visualize correlation between entropy and accuracy.

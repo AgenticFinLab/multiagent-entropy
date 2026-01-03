@@ -6,6 +6,7 @@ This module provides evaluation functionality for multiple-choice (option) tasks
 
 import re
 from typing import Dict, Any, Optional
+
 from .base_evaluator import BaseEvaluator
 
 
@@ -14,7 +15,7 @@ class OptionEvaluator(BaseEvaluator):
 
     def __init__(self, data_dir: Optional[str] = None):
         """Initialize the option evaluator.
-        
+
         Args:
             data_dir: Directory containing dataset files (default: experiments/data)
         """
@@ -145,9 +146,7 @@ class OptionEvaluator(BaseEvaluator):
             "is_correct": is_correct,
         }
 
-    def evaluate_confidence(
-        self, response: str, correct_option: str
-    ) -> Dict[str, Any]:
+    def evaluate_confidence(self, response: str, correct_option: str) -> Dict[str, Any]:
         """
         Evaluate confidence in the predicted answer.
 

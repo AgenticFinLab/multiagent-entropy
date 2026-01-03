@@ -8,14 +8,13 @@ and comprehensive entropy analysis.
 """
 
 import os
-import sys
 import json
 import yaml
-import argparse
 import logging
-import numpy as np
+import argparse
 from typing import Dict, List, Any, Optional
-from pathlib import Path
+
+import numpy as np
 
 from evaluation.math_evaluator import MathEvaluator
 from evaluation.code_evaluator import CodeEvaluator
@@ -250,8 +249,12 @@ def evaluate_single_experiment(
                 )
 
                 logger.info(f"Entropy analysis completed for {len(statistics)} agents")
-                logger.info(f"Step statistics calculated for {len(step_statistics)} agents")
-                logger.info(f"Sample statistics calculated for {len(sample_statistics)} samples")
+                logger.info(
+                    f"Step statistics calculated for {len(step_statistics)} agents"
+                )
+                logger.info(
+                    f"Sample statistics calculated for {len(sample_statistics)} samples"
+                )
 
         except Exception as e:
             logger.error(f"Error during entropy analysis: {e}")
@@ -260,7 +263,11 @@ def evaluate_single_experiment(
     report_generator = ReportGenerator(output_dir)
 
     try:
-        if generate_visualizations and analyze_entropy and "statistics" in entropy_results:
+        if (
+            generate_visualizations
+            and analyze_entropy
+            and "statistics" in entropy_results
+        ):
             entropy_analyzer = EntropyAnalyzer(experiment_dir)
             entropy_analyzer.load_entropy_data()
 
@@ -312,13 +319,13 @@ def evaluate_multiple_experiments(
     all_results = []
 
     if experiment_names:
-        experiment_dirs = [
-            os.path.join(input_dir, name) for name in experiment_names
-        ]
+        experiment_dirs = [os.path.join(input_dir, name) for name in experiment_names]
         experiment_dirs = [d for d in experiment_dirs if os.path.isdir(d)]
     else:
         experiment_dirs = [
-            d for d in os.listdir(input_dir) if os.path.isdir(os.path.join(input_dir, d))
+            d
+            for d in os.listdir(input_dir)
+            if os.path.isdir(os.path.join(input_dir, d))
         ]
         experiment_dirs = [os.path.join(input_dir, d) for d in experiment_dirs]
 
@@ -359,7 +366,9 @@ def evaluate_multiple_experiments(
         try:
             report_generator = ReportGenerator(output_dir)
 
-            comparison_plot_path = os.path.join(output_dir, "experiments_comparison.png")
+            comparison_plot_path = os.path.join(
+                output_dir, "experiments_comparison.png"
+            )
             report_generator.generate_comparison_plot(all_results, comparison_plot_path)
 
             summary_table_path = os.path.join(output_dir, "experiments_summary.csv")

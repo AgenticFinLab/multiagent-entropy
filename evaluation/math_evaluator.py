@@ -6,16 +6,18 @@ This module provides evaluation functionality for math tasks.
 
 import re
 from typing import Dict, Any, Optional
-from .base_evaluator import BaseEvaluator
 
 from math_verify import parse, verify
+
+from .base_evaluator import BaseEvaluator
+
 
 class MathEvaluator(BaseEvaluator):
     """Evaluator for math tasks."""
 
     def __init__(self, data_dir: Optional[str] = None):
         """Initialize the math evaluator.
-        
+
         Args:
             data_dir: Directory containing dataset files (default: experiments/data)
         """

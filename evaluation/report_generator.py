@@ -6,15 +6,12 @@ with tables and visualizations.
 """
 
 import os
-import json
 import logging
-from typing import Dict, List, Any, Optional
 from datetime import datetime
-from pathlib import Path
+from typing import Dict, List, Any, Optional
 
-import matplotlib.pyplot as plt
-import seaborn as sns
 import pandas as pd
+import matplotlib.pyplot as plt
 
 
 logger = logging.getLogger(__name__)
@@ -54,7 +51,9 @@ class ReportGenerator:
         report_lines.append("=" * 80)
         report_lines.append(f"EVALUATION REPORT: {experiment_name}")
         report_lines.append("=" * 80)
-        report_lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        report_lines.append(
+            f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        )
         report_lines.append("")
 
         report_lines.append("-" * 80)
@@ -132,7 +131,9 @@ class ReportGenerator:
                 report_lines.append("")
 
             if len(sample_statistics) > 5:
-                report_lines.append(f"... and {len(sample_statistics) - 5} more samples")
+                report_lines.append(
+                    f"... and {len(sample_statistics) - 5} more samples"
+                )
                 report_lines.append("")
 
         if "correlation" in entropy_results:
@@ -152,7 +153,10 @@ class ReportGenerator:
             )
             report_lines.append("")
 
-        if "comparison" in entropy_results and "pairwise_comparisons" in entropy_results["comparison"]:
+        if (
+            "comparison" in entropy_results
+            and "pairwise_comparisons" in entropy_results["comparison"]
+        ):
             report_lines.append("-" * 80)
             report_lines.append("6. AGENT COMPARISON")
             report_lines.append("-" * 80)
@@ -161,7 +165,9 @@ class ReportGenerator:
             pairwise = entropy_results["comparison"]["pairwise_comparisons"]
             for comparison_name, stats in pairwise.items():
                 report_lines.append(f"Comparison: {comparison_name}")
-                report_lines.append(f"  T-test: t={stats['t_statistic']:.4f}, p={stats['t_p_value']:.4f}")
+                report_lines.append(
+                    f"  T-test: t={stats['t_statistic']:.4f}, p={stats['t_p_value']:.4f}"
+                )
                 report_lines.append(
                     f"  KS-test: statistic={stats['ks_statistic']:.4f}, p={stats['ks_p_value']:.4f}"
                 )
@@ -583,12 +589,16 @@ class ReportGenerator:
             entropy_analyzer.visualize_step_entropy_curves(step_curves_path)
             image_paths["Step Entropy Curves"] = step_curves_path
 
-            step_distribution_path = os.path.join(viz_dir, "step_entropy_distribution.png")
+            step_distribution_path = os.path.join(
+                viz_dir, "step_entropy_distribution.png"
+            )
             entropy_analyzer.visualize_step_entropy_distribution(step_distribution_path)
             image_paths["Step Entropy Distribution"] = step_distribution_path
 
             if "correlation" in entropy_results:
-                correlation_path = os.path.join(viz_dir, "entropy_accuracy_correlation.png")
+                correlation_path = os.path.join(
+                    viz_dir, "entropy_accuracy_correlation.png"
+                )
                 entropy_analyzer.visualize_entropy_accuracy_correlation(
                     accuracy_results, correlation_path
                 )
