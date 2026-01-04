@@ -14,12 +14,20 @@ class DataLoader:
         self.data_path = self.base_path / "experiments" / "data"
 
     def load_ground_truth(self, dataset: str) -> Dict[str, Any]:
-        dataset_map = {"gsm8k": "GSM8K", "humaneval": "HumanEval", "mmlu": "MMLU"}
+        dataset_map = {
+            "gsm8k": "GSM8K",
+            "humaneval": "HumanEval",
+            "mmlu": "MMLU",
+            "aime2024": "AIME2024",
+        }
         dataset_folder = dataset_map.get(dataset.lower(), dataset)
-        data_file = self.data_path / dataset_folder / "train-all-samples.json"
+        dataset_path = self.data_path / dataset_folder
+        data_files = list(dataset_path.glob("*-all-samples.json"))
 
-        if not data_file.exists():
-            raise FileNotFoundError(f"Ground truth file not found: {data_file}")
+        if not data_files:
+            raise FileNotFoundError(f"Ground truth file not found in: {dataset_path}")
+
+        data_file = data_files[0]
 
         with open(data_file, "r", encoding="utf-8") as f:
             data = json.load(f)

@@ -13,7 +13,7 @@ def main():
     parser.add_argument(
         "--dataset",
         type=str,
-        choices=["gsm8k", "humaneval", "mmlu"],
+        choices=["gsm8k", "humaneval", "mmlu", "aime2024"],
         default="gsm8k",
         help="Dataset to analyze",
     )
@@ -152,7 +152,7 @@ def main():
                 / "evaluation"
                 / "results"
                 / args.dataset
-                / "all_metrics_summary.csv"
+                / "last_agent_stats.csv"
             )
             analyzer.save_last_agent_stats_to_csv(
                 args.dataset, str(csv_output_path), args.task_type

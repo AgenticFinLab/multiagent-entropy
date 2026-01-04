@@ -15,8 +15,8 @@ class ExperimentAnalyzer:
         self, dataset: str, experiment_name: str, task_type: str = "math"
     ) -> Dict[str, Any]:
         config = self.data_loader.load_experiment_config(experiment_name)
-        agent_architecture = config.get("agent_type", "unknown")
-        num_rounds = config.get("round", 1)
+        agent_architecture = config["agent_type"]
+        num_rounds = config["round"]
 
         ground_truths = self.data_loader.load_ground_truth(dataset)
         all_results = self.data_loader.load_all_results(dataset, experiment_name)
