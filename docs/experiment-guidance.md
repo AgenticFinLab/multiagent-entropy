@@ -8,9 +8,13 @@ This directory contains the organized structure for running large-scale experime
 experiments/
 ├── configs/                                # Configuration files for experiments
 │   ├── base_config.yml                     # Base configuration with common settings
-│   ├── batch_example.yml                   # Example batch configuration file
+│   ├── batch_example_qwen3_4b_gsm8k.yml    # Example batch configuration file
+│   ├── batch_example_qwen3_8b_gsm8k.yml    # Example batch configuration file
 │   ├── dataset_specific/                   # Dataset-specific configuration files
-│   │   └── gsm8k.yml                       # GSM8K dataset configuration
+│   │   ├── gsm8k.yml                       # GSM8K dataset configuration
+│   │   ├── aime2024.yml                    # AIME2024 dataset configuration
+│   │   ├── mmlu.yml                        # MMLU dataset configuration
+│   │   └── humaneval.yml                   # HumanEval dataset configuration
 │   ├── entropy_configs/                    # Entropy calculation configuration files
 │   │   ├── standard.yml                    # Standard entropy configuration
 │   │   └── no_entropy.yml                  # No entropy calculation configuration
@@ -22,9 +26,17 @@ experiments/
 │   │   ├── full_decentralized_agents.yml   # Full decentralized agent configuration
 │   │   ├── debate_agents.yml               # Debate agent configuration
 │   │   └── hybrid_agents.yml               # Hybrid agent configuration
+│   ├── infer_configs/                      # Inference configuration files
+│   │   ├── cuda0.yml                       # CUDA device 0 configuration
+│   │   ├── cuda1.yml                       # CUDA device 1 configuration
+│   │   ├── cuda2.yml                       # CUDA device 2 configuration
+│   │   ├── cuda3.yml                       # CUDA device 3 configuration
+│   │   └── cuda_auto.yml                   # CUDA auto device mapping configuration
 │   └── model_specific/                     # Model-specific configuration files
+│       ├── qwen3-0.6b.yml                  # Qwen3-0.6B model configuration
 │       ├── qwen3-1.7b.yml                  # Qwen3-1.7B model configuration
-│       └── qwen3-0.6b.yml                  # Qwen3-0.6B model configuration
+│       ├── qwen3-4b.yml                    # Qwen3-4B model configuration
+│       └── qwen3-8b.yml                    # Qwen3-8B model configuration
 ├── configs_exp/                            # Generated experiment configuration files
 ├── logs/                                   # Log files from experiments
 ├── results/                                # Experiment results
@@ -42,16 +54,22 @@ experiments/
 
 ### Base Configuration
 The `base_config.yml` file contains common settings shared across all experiments, such as:
-- Environment settings
-- Graph configuration
-- Inference base configuration
-- Generation base configuration
-- Default agent type (single, sequential, centralized, decentralized, full_decentralized, debate, hybrid)
+- Environment settings (dotenv_path)
+- Graph configuration (recursion_limit)
+- Generation base configuration (max_new_tokens, do_sample, temperature, top_p)
+- Agent round settings (round, aggregate_history, max_history_chars, max_history_rounds)
+- Save folder configuration
 
 ### Model-Specific Configuration
 Model-specific configurations (`model_specific/`) define settings for each model, including:
 - Model name/path
 - Model-specific inference settings (device type, precision, etc.)
+
+### Inference Configuration
+Inference configurations (`infer_configs/`) define device and precision settings for model inference, including:
+- Device type: "cuda" (NVIDIA), "mps" (Mac), or "cpu"
+- Device mapping: "auto" to distribute model across all available GPUs, or null to load on specified device only
+- Torch data type: "float16", "bfloat16", or "float32" (use float32 for CPU/MPS stability if needed)
 
 ### Dataset-Specific Configuration
 Dataset-specific configurations (`dataset_specific/`) define settings for each dataset, including:
@@ -101,8 +119,9 @@ Agent-specific configurations (`agent_specific/`) define the structure and param
 #### Debate Agent Mode (Multi-Agent with Voting)
 - **Configuration file**: `agent_specific/debate_agents.yml`
 - **Description**: Multi-agent debate system with majority voting mechanism
-- **Agents**: agent1, agent2, agent3, OrchestratorAgent
-- **Structure**: Parallel debate agents → Orchestrator (majority voting)
+- **Agents**: agent1, agent2, agent3 (no orchestrator agent - uses majority voting instead)
+- **Structure**: Sequential agents in loop → Majority voting → Output
+- **Note**: Unlike other agent modes, Debate mode uses majority voting instead of an orchestrator agent. The orchestrator does NOT use LLM inference; it extracts answers wrapped in \\boxed{} from each agent's response and selects the most frequent one as the final result.
 
 #### Hybrid Agent Mode (Enhanced Context Sharing)
 - **Configuration file**: `agent_specific/hybrid_agents.yml`
@@ -208,12 +227,12 @@ python experiments/scripts/run_experiment.py \
 ```
 
 ### Batch Experiments
-To run multiple experiments in batch mode, create a batch configuration file like `batch_example.yml` and use:
+To run multiple experiments in batch mode, create a batch configuration file like `batch_example_qwen3_4b_gsm8k.yml` and use:
 
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --batch-config experiments/configs/batch_example.yml \
+  --batch-config experiments/configs/batch_example_qwen3_4b_gsm8k.yml
 ```
 
 ### Command-Line Options
@@ -222,11 +241,12 @@ python experiments/scripts/run_experiment.py \
 - `-m, --model-config`: Path to model-specific configuration file (required for single experiment)
 - `-d, --dataset-config`: Path to dataset-specific configuration file (required for single experiment)
 - `-e, --entropy-config`: Path to entropy configuration file (required for single experiment)
-- `-i, --infer-config`: Path to inference configuration file (required for single experiment)
+- `-i, --infer-config`: Path to inference configuration file (default: experiments/configs/infer_configs/cuda_auto.yml)
 - `-n, --experiment-name`: Name of the experiment (required for single experiment)
 - `--agent-type`: Type of agent configuration to use (single, sequential, centralized, decentralized, full_decentralized, debate, hybrid)
 - `--batch-config`: Path to batch configuration file (for batch experiments)
 - `--dry-run`: Only prepare configurations without running experiments
+- `--save-config`: Save merged configuration to file (default: True)
 
 ## Results Management
 
@@ -267,9 +287,9 @@ python experiments/scripts/result_aggregator.py \
 
 - `-i, --input-dir`: Directory containing raw experiment results (default: experiments/results/raw)
 - `-o, --output-dir`: Directory to save aggregated results (default: experiments/results/aggregated)
-- `--format`: Output format for aggregated results (csv, json, or all)
+- `--format`: Output format for aggregated results (csv, json, or all; default: all)
 - `--visualize`: Generate visualizations of the results
-- `--metrics`: Metrics to extract and visualize (default: accuracy entropy_mean)
+- `--metrics`: Metrics to extract and visualize (default: accuracy entropy_mean round)
 - `--experiment-names`: Specific experiment names to process (default: all experiments)
 
 ## Adding New Configurations
@@ -297,6 +317,24 @@ python experiments/scripts/result_aggregator.py \
 3. **Logging**: Check `experiments/logs/experiment_runner.log` for detailed experiment logs
 4. **Dry Runs**: Use `--dry-run` to validate configurations before running expensive experiments
 5. **Batch Processing**: Use batch mode for running multiple experiments efficiently
+
+## Special Notes and Limitations
+
+### Inference Configuration Notes
+- **Device Selection**: The `device_map: "auto"` option distributes the model across all available GPUs automatically, which is useful for large models. Set `device_map: null` to force the model to load on the specified device only.
+- **Precision Settings**: Use `torch_dtype: "float32"` for CPU or MPS (Mac) devices to ensure stability. For NVIDIA GPUs, `float16` or `bfloat16` is recommended for better performance.
+- **Optional infer_config**: The `infer_config` parameter is optional in batch configuration files. If not provided, `experiments/configs/infer_configs/cuda_auto.yml` will be used by default.
+
+### Agent Mode Specific Notes
+- **Debate Mode**: Unlike other agent modes, Debate mode uses majority voting instead of an orchestrator agent. The orchestrator does NOT use LLM inference; it extracts answers wrapped in \\boxed{} from each agent's response and selects the most frequent one as the final result.
+- **History Aggregation**: When `aggregate_history: true`, all previous round interactions, outputs, and context are aggregated into the next round's prompt. Use `max_history_chars` and `max_history_rounds` to limit the history size and manage memory usage.
+
+### Environment Configuration
+- **dotenv_path**: The base configuration specifies `dotenv_path: .env` for loading environment variables. Ensure a `.env` file exists in the project root directory with necessary API keys and configuration values.
+
+### Result Storage
+- **Raw Results**: Individual batch results are saved as `Batch_{N}_State.json` files, and combined results are saved as `Combined_FinalState.json`.
+- **Aggregated Results**: Batch experiment summaries are saved with timestamps (e.g., `batch_results_20250104_123456.yml`), and single experiment results are saved as `{experiment_name}_results_{timestamp}.yml`.
 
 ## Example Workflow
 
