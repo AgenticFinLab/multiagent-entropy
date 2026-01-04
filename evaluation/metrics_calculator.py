@@ -31,7 +31,10 @@ class MetricsCalculator:
         pattern = r"\\boxed\{([^}]*)\}"
         matches = re.findall(pattern, text)
         if matches:
-            return matches[-1]
+            if matches[-1].startswith("{"):
+                return matches[-1][1:]
+            else:
+                return matches[-1]
 
         pattern = r"(?:the\s+correct\s+answer\s+is|answer\s*[:=]\s*|final\s+answer\s*[:=]\s*)\s*(\d+(?:\.\d+)?)"
         matches = re.findall(pattern, text, re.IGNORECASE)
