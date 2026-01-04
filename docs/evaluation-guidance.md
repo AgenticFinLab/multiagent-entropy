@@ -27,17 +27,17 @@ python -m evaluation.evaluator --dataset gsm8k --task-type math
 
 #### Available Arguments
 
-| Argument | Type | Default | Description |
-|----------|------|---------|-------------|
-| `--dataset` | str | gsm8k | Dataset to analyze (gsm8k, humaneval, mmlu) |
-| `--task-type` | str | math | Task type (math, code, option) |
-| `--experiment` | str | None | Specific experiment to analyze |
-| `--output` | str | None | Output file path |
-| `--compare` | flag | False | Compare experiments by architecture |
-| `--save-csv` | bool | True | Save summary to CSV |
-| `--analyze-entropy` | bool | True | Perform entropy analysis |
-| `--entropy-compare` | bool | True | Compare entropy across architectures |
-| `--save-entropy-json` | bool | True | Save entropy results to JSON |
+| Argument              | Type | Default | Description                                 |
+| --------------------- | ---- | ------- | ------------------------------------------- |
+| `--dataset`           | str  | gsm8k   | Dataset to analyze (gsm8k, humaneval, mmlu) |
+| `--task-type`         | str  | math    | Task type (math, code, option)              |
+| `--experiment`        | str  | None    | Specific experiment to analyze              |
+| `--output`            | str  | None    | Output file path                            |
+| `--compare`           | flag | False   | Compare experiments by architecture         |
+| `--save-csv`          | bool | True    | Save summary to CSV                         |
+| `--analyze-entropy`   | bool | True    | Perform entropy analysis                    |
+| `--entropy-compare`   | bool | True    | Compare entropy across architectures        |
+| `--save-entropy-json` | bool | True    | Save entropy results to JSON                |
 
 #### Examples
 
