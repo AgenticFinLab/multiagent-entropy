@@ -1,0 +1,3 @@
+# Model-specific configuration for Llama-3.2-3B-Instruct
+
+lm_name: meta-llama/Llama-3.2-3B-Instruct
