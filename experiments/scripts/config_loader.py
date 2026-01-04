@@ -105,6 +105,7 @@ def resolve_agent_placeholders(
     base_config: Dict[str, Any],
     entropy_config: Dict[str, Any],
     infer_config: Dict[str, Any] = None,
+    dataset_config: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
     """Resolve placeholders in agent configuration template with actual values.
 
@@ -114,6 +115,7 @@ def resolve_agent_placeholders(
         base_config (Dict[str, Any]): Base configuration
         entropy_config (Dict[str, Any]): Entropy configuration
         infer_config (Dict[str, Any]): Inference configuration (optional, overrides base_config)
+        dataset_config (Dict[str, Any]): Dataset-specific configuration (optional, overrides base_config)
 
     Returns:
         Dict[str, Any]: Resolved agent configuration
@@ -128,11 +130,27 @@ def resolve_agent_placeholders(
         resolved_agent["inference_config"] = infer_config["inference_config"]
     elif "inference_config" in model_config:
         resolved_agent["inference_config"] = model_config["inference_config"]
-    else:
+    elif "inference_config" in base_config:
         resolved_agent["inference_config"] = base_config["inference_config"]
+    else:
+        # Provide default inference_config if not found in any config
+        resolved_agent["inference_config"] = {
+            "device": "cuda",
+            "torch_dtype": "float16",
+            "device_map": "auto"
+        }
     
     resolved_agent["entropy_config"] = entropy_config["entropy_config"]
-    resolved_agent["generation_config"] = base_config["generation_config"]
+    
+    # Determine generation_config priority: dataset_config > base_config
+    # If dataset_config has generation_config, merge it with base_config to ensure all fields are present
+    if dataset_config and "generation_config" in dataset_config:
+        resolved_agent["generation_config"] = merge_dicts(
+            base_config["generation_config"],
+            dataset_config["generation_config"]
+        )
+    else:
+        resolved_agent["generation_config"] = base_config["generation_config"]
 
     return resolved_agent
 
@@ -210,6 +228,7 @@ def load_experiment_config(
                 base_config=base_config,
                 entropy_config=entropy_config,
                 infer_config=infer_config,
+                dataset_config=dataset_config,
             )
             agents_config["agents"][agent_name] = resolved_agent
 

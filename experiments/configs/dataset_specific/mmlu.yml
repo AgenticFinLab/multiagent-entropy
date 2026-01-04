@@ -1,4 +1,4 @@
-# Dataset-specific configuration for GSM8K
+# Dataset-specific configuration for MMLU
 
 data:
   data_name: MMLU
@@ -10,3 +10,8 @@ data:
   batch_size: 1
 
 task_type: "option"
+
+# Generation configuration (overrides base_config.yml)
+# MMLU is multiple-choice, requires shorter responses
+generation_config:
+  max_new_tokens: 2000

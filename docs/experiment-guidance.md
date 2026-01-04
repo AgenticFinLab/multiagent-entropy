@@ -78,6 +78,63 @@ Dataset-specific configurations (`dataset_specific/`) define settings for each d
 - Number of samples to process
 - Batch size
 
+### Configuration Priority and Override Mechanism
+The configuration system supports a hierarchical priority mechanism that allows dataset-specific configurations to override base configuration settings. This enables flexible customization for different datasets while maintaining a common baseline.
+
+#### Priority Order (Highest to Lowest)
+1. **Dataset-specific configuration** (`dataset_specific/*.yml`)
+2. **Base configuration** (`base_config.yml`)
+
+#### Generation Configuration Override
+The `generation_config` section supports parameter-level overrides. When a dataset-specific configuration defines `generation_config`, it is merged with the base configuration using the following rules:
+
+- **Override**: Parameters defined in the dataset-specific configuration replace those in the base configuration
+- **Inheritance**: Parameters not defined in the dataset-specific configuration are inherited from the base configuration
+- **Supported parameters**: `max_new_tokens`, `do_sample`, `temperature`, `top_p`
+
+#### Example: max_new_tokens Override
+
+**Base Configuration** (`base_config.yml`):
+```yaml
+generation_config:
+  max_new_tokens: 2000
+  do_sample: true
+  temperature: 0.6
+  top_p: 0.95
+```
+
+**Dataset-Specific Configuration** (`dataset_specific/aime2024.yml`):
+```yaml
+generation_config:
+  max_new_tokens: 3000
+```
+
+**Result**: When running experiments with AIME2024 dataset:
+- `max_new_tokens`: 3000 (overridden from dataset config)
+- `do_sample`: true (inherited from base config)
+- `temperature`: 0.6 (inherited from base config)
+- `top_p`: 0.95 (inherited from base config)
+
+#### Current Dataset-Specific max_new_tokens Values
+
+| Dataset | max_new_tokens | Rationale |
+|---------|----------------|-----------|
+| AIME2024 | 3000 | Requires longer reasoning chains for complex math problems |
+| GSM8K | 1500 | Moderate reasoning requirements for grade school math |
+| MMLU | 100 | Multiple-choice format requires short responses |
+| HumanEval | 800 | Code generation with moderate length requirements |
+
+#### Implementation Details
+The override mechanism is implemented in `experiments/scripts/config_loader.py` in the `resolve_agent_placeholders()` function. The function:
+1. Checks if `dataset_config` contains a `generation_config` section
+2. If present, merges it with `base_config["generation_config"]` using `merge_dicts()`
+3. The merged configuration ensures all required parameters are present while respecting dataset-specific overrides
+
+This design ensures that:
+- New datasets can easily customize generation parameters without modifying the base configuration
+- Missing parameters in dataset-specific configurations are safely inherited from the base configuration
+- The system remains flexible and maintainable as new datasets are added
+
 ### Entropy Configuration
 Entropy configurations (`entropy_configs/`) define settings for entropy calculation, including:
 - Whether to calculate entropy
@@ -301,6 +358,12 @@ python experiments/scripts/result_aggregator.py \
 ### Adding a New Dataset
 1. Create a new YAML file in `experiments/configs/dataset_specific/`
 2. Define dataset-specific settings (data_name, data_path, data_num, batch_size)
+3. Optionally add `generation_config` section to override base generation parameters:
+   ```yaml
+   generation_config:
+     max_new_tokens: 2000  # Override default max_new_tokens
+     # Other generation parameters (do_sample, temperature, top_p) will be inherited from base_config.yml
+   ```
 
 ### Adding a New Entropy Configuration
 1. Create a new YAML file in `experiments/configs/entropy_configs/`

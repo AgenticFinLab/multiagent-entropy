@@ -1,4 +1,4 @@
-# Dataset-specific configuration for GSM8K
+# Dataset-specific configuration for HumanEval
 
 data:
   data_name: HumanEval
@@ -10,3 +10,8 @@ data:
   batch_size: 1
 
 task_type: "code"
+
+# Generation configuration (overrides base_config.yml)
+# HumanEval requires code generation with moderate length
+generation_config:
+  max_new_tokens: 2000
