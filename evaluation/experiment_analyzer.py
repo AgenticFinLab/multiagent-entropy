@@ -1,3 +1,9 @@
+"""Experiment analyzer for multi-agent system evaluation.
+
+This module provides functionality to analyze experiment results,
+calculate metrics, and compare different agent architectures.
+"""
+
 from collections import defaultdict
 from typing import Dict, List, Any, Optional
 
@@ -7,13 +13,34 @@ from metrics_calculator import MetricsCalculator
 
 
 class ExperimentAnalyzer:
+    """Analyzer for multi-agent experiment results.
+
+    Provides methods to analyze individual experiments, compare
+    architectures, and generate summary statistics.
+    """
+
     def __init__(self, base_path: str):
+        """Initialize the experiment analyzer.
+
+        Args:
+            base_path: Base path to the project directory.
+        """
         self.data_loader = DataLoader(base_path)
         self.metrics_calculator = MetricsCalculator()
 
     def analyze_experiment(
         self, dataset: str, experiment_name: str, task_type: str = "math"
     ) -> Dict[str, Any]:
+        """Analyze a single experiment.
+
+        Args:
+            dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            experiment_name: Name of the experiment to analyze.
+            task_type: Type of task (e.g., "math", "code", "option").
+
+        Returns:
+            Dictionary containing experiment metrics and analysis results.
+        """
         config = self.data_loader.load_experiment_config(experiment_name)
         agent_architecture = config["agent_type"]
         num_rounds = config["round"]
@@ -70,6 +97,19 @@ class ExperimentAnalyzer:
         dataset: str,
         experiment_name: str,
     ) -> Dict[str, Any]:
+        """Analyze metrics for a single sample.
+
+        Args:
+            main_id: Main sample identifier.
+            sample_results: List of results for this sample.
+            ground_truth: Ground truth data for this sample.
+            agent_architecture: Type of agent architecture.
+            dataset: Dataset name.
+            experiment_name: Experiment name.
+
+        Returns:
+            Dictionary containing sample-level metrics.
+        """
         sample_metrics = {
             "main_id": main_id,
             "ground_truth": ground_truth["groundtruth"] if ground_truth else None,
@@ -132,6 +172,15 @@ class ExperimentAnalyzer:
     def _calculate_summary(
         self, samples: Dict[str, Any], agent_architecture: str
     ) -> Dict[str, Any]:
+        """Calculate summary statistics across all samples.
+
+        Args:
+            samples: Dictionary of sample metrics.
+            agent_architecture: Type of agent architecture.
+
+        Returns:
+            Dictionary containing summary statistics.
+        """
         summary = {
             "total_samples": len(samples),
             "last_agent_stats": {},
@@ -176,6 +225,14 @@ class ExperimentAnalyzer:
         return summary
 
     def _get_final_agent_keys(self, agent_architecture: str) -> List[str]:
+        """Get the keys for the final agent in each architecture.
+
+        Args:
+            agent_architecture: Type of agent architecture.
+
+        Returns:
+            List of agent keys for the final agent.
+        """
         if agent_architecture == "single":
             return ["SingleSolver_round_1", "SingleSolver_round_2"]
         elif agent_architecture == "sequential":
@@ -192,6 +249,15 @@ class ExperimentAnalyzer:
     def analyze_all_experiments(
         self, dataset: str, task_type: str = "math"
     ) -> Dict[str, Any]:
+        """Analyze all experiments for a given dataset.
+
+        Args:
+            dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            task_type: Type of task (e.g., "math", "code", "option").
+
+        Returns:
+            Dictionary containing metrics for all experiments.
+        """
         experiments = self.data_loader.get_experiments_by_dataset(dataset)
 
         all_metrics = {"dataset": dataset, "task_type": task_type, "experiments": {}}
@@ -207,11 +273,26 @@ class ExperimentAnalyzer:
         return all_metrics
 
     def save_results(self, metrics: Dict[str, Any], output_path: str):
+        """Save analysis results to JSON file.
+
+        Args:
+            metrics: Dictionary containing analysis metrics.
+            output_path: Path to save the results.
+        """
         save_json(metrics, output_path)
 
     def compare_experiments(
         self, dataset: str, task_type: str = "math"
     ) -> Dict[str, Any]:
+        """Compare experiments across different architectures.
+
+        Args:
+            dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            task_type: Type of task (e.g., "math", "code", "option").
+
+        Returns:
+            Dictionary containing comparison results across architectures.
+        """
         all_metrics = self.analyze_all_experiments(dataset, task_type)
 
         comparison = {"dataset": dataset, "task_type": task_type, "architectures": {}}
@@ -245,6 +326,13 @@ class ExperimentAnalyzer:
     def save_last_agent_stats_to_csv(
         self, dataset: str, output_path: str, task_type: str = "math"
     ):
+        """Save last agent statistics to CSV file.
+
+        Args:
+            dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            output_path: Path to save the CSV file.
+            task_type: Type of task (e.g., "math", "code", "option").
+        """
         all_metrics = self.analyze_all_experiments(dataset, task_type)
 
         rows = []

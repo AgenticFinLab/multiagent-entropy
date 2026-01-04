@@ -1,3 +1,10 @@
+"""Entropy analyzer for multi-agent system experiments.
+
+This module provides functionality to analyze entropy statistics
+from experiment results, including macro and micro level analysis,
+and comparison across different agent architectures.
+"""
+
 import csv
 from pathlib import Path
 from typing import Dict, List, Any
@@ -11,11 +18,36 @@ from utils import save_csv, save_json
 
 
 class EntropyAnalyzer:
+    """Analyzer for entropy statistics in multi-agent experiments.
+
+    Provides methods to analyze entropy at multiple levels:
+    - Experiment level: Overall entropy statistics
+    - Round level: Entropy per round
+    - Agent level: Entropy per agent type
+    - Sample level: Entropy per sample
+    - Sequence level: Entropy per execution sequence
+    - Token position level: Entropy distribution across token positions
+    """
+
     def __init__(self, base_path: str):
+        """Initialize the entropy analyzer with base path.
+
+        Args:
+            base_path: Base path to the project directory.
+        """
         self.data_loader = DataLoader(base_path)
         self.base_path = Path(base_path)
 
     def analyze_all_experiments_entropy(self, dataset: str) -> Dict[str, Any]:
+        """Analyze entropy for all experiments in a dataset.
+
+        Args:
+            dataset: Dataset name (e.g., "gsm8k", "humaneval").
+
+        Returns:
+            Dictionary containing entropy analysis results for all experiments,
+            organized by architecture and experiment name.
+        """
         experiments = self.data_loader.get_experiments_by_dataset(dataset)
 
         all_results = {
@@ -44,6 +76,15 @@ class EntropyAnalyzer:
     def analyze_experiment_entropy(
         self, dataset: str, experiment_name: str
     ) -> Dict[str, Any]:
+        """Analyze entropy for a single experiment.
+
+        Args:
+            dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            experiment_name: Name of the experiment.
+
+        Returns:
+            Dictionary containing macro and micro level entropy statistics.
+        """
         config = self.data_loader.load_experiment_config(experiment_name)
         agent_architecture = config.get("agent_type", "unknown")
         num_rounds = config.get("round", 1)
@@ -72,6 +113,16 @@ class EntropyAnalyzer:
     def _collect_entropy_data(
         self, dataset: str, experiment_name: str, info: Dict[str, Any]
     ) -> Dict[str, List[Dict[str, Any]]]:
+        """Collect entropy tensors for all results in an experiment.
+
+        Args:
+            dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            experiment_name: Name of the experiment.
+            info: Result store information.
+
+        Returns:
+            Dictionary mapping sequence IDs to entropy data.
+        """
         entropy_data = defaultdict(list)
 
         for block_name, block_info in info.items():
@@ -107,6 +158,16 @@ class EntropyAnalyzer:
         agent_architecture: str,
         num_rounds: int,
     ) -> Dict[str, Any]:
+        """Calculate macro-level entropy statistics.
+
+        Args:
+            entropy_data: Dictionary of entropy data by sequence.
+            agent_architecture: Type of agent architecture.
+            num_rounds: Number of rounds in the experiment.
+
+        Returns:
+            Dictionary containing experiment, round, and agent level statistics.
+        """
         macro_stats = {
             "experiment_level": {},
             "round_level": defaultdict(lambda: {"total_entropy": 0.0, "count": 0}),
@@ -192,6 +253,14 @@ class EntropyAnalyzer:
     def _calculate_micro_statistics(
         self, entropy_data: Dict[str, List[Dict[str, Any]]]
     ) -> Dict[str, Any]:
+        """Calculate micro-level entropy statistics.
+
+        Args:
+            entropy_data: Dictionary of entropy data by sequence.
+
+        Returns:
+            Dictionary containing sample, sequence, and token position level statistics.
+        """
         micro_stats = {
             "sample_level": defaultdict(
                 lambda: {
@@ -437,6 +506,16 @@ class EntropyAnalyzer:
         agent_architecture: str,
         num_rounds: int,
     ) -> int:
+        """Get the round number for an entropy result.
+
+        Args:
+            entropy_info: Dictionary containing entropy information.
+            agent_architecture: Type of agent architecture.
+            num_rounds: Total number of rounds.
+
+        Returns:
+            Round number for the entropy result.
+        """
         execution_order = entropy_info["execution_order"]
         agent_type = entropy_info["agent_type"]
 
@@ -451,6 +530,14 @@ class EntropyAnalyzer:
             return (execution_order - 1) // 4 + 1
 
     def compare_architectures_entropy(self, dataset: str) -> Dict[str, Any]:
+        """Compare entropy statistics across different architectures.
+
+        Args:
+            dataset: Dataset name (e.g., "gsm8k", "humaneval").
+
+        Returns:
+            Dictionary containing architecture comparison results.
+        """
         all_results = self.analyze_all_experiments_entropy(dataset)
 
         comparison = {
@@ -503,6 +590,14 @@ class EntropyAnalyzer:
     def _analyze_entropy_distribution(
         self, all_results: Dict[str, Any]
     ) -> Dict[str, Any]:
+        """Analyze entropy distribution across architectures.
+
+        Args:
+            all_results: Dictionary containing all experiment results.
+
+        Returns:
+            Dictionary containing distribution analysis results.
+        """
         distribution = {"architecture_comparison": {}}
 
         for exp_name, results in all_results["experiments"].items():
@@ -538,6 +633,12 @@ class EntropyAnalyzer:
         return distribution
 
     def save_macro_statistics_to_csv(self, dataset: str, output_path: str):
+        """Save macro-level entropy statistics to CSV file.
+
+        Args:
+            dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            output_path: Path to output CSV file.
+        """
         all_results = self.analyze_all_experiments_entropy(dataset)
 
         rows = []
@@ -590,6 +691,12 @@ class EntropyAnalyzer:
         print(f"Macro statistics saved to: {output_path}")
 
     def save_micro_statistics_to_csv(self, dataset: str, output_path: str):
+        """Save micro-level entropy statistics to CSV file.
+
+        Args:
+            dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            output_path: Path to output CSV file.
+        """
         all_results = self.analyze_all_experiments_entropy(dataset)
 
         rows = []
@@ -644,6 +751,12 @@ class EntropyAnalyzer:
         print(f"Micro statistics saved to: {output_path}")
 
     def save_token_position_statistics_to_csv(self, dataset: str, output_path: str):
+        """Save token position level entropy statistics to CSV file.
+
+        Args:
+            dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            output_path: Path to output CSV file.
+        """
         all_results = self.analyze_all_experiments_entropy(dataset)
 
         rows = []
@@ -688,6 +801,12 @@ class EntropyAnalyzer:
         print(f"Token position statistics saved to: {output_path}")
 
     def save_all_entropy_statistics_to_csv(self, dataset: str, output_dir: str):
+        """Save all entropy statistics to CSV files.
+
+        Args:
+            dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            output_dir: Directory to save CSV files.
+        """
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
@@ -751,5 +870,11 @@ class EntropyAnalyzer:
         print(f"\nAll entropy statistics saved to: {output_dir}")
 
     def save_results_json(self, results: Dict[str, Any], output_path: str):
+        """Save entropy analysis results to JSON file.
+
+        Args:
+            results: Dictionary containing entropy analysis results.
+            output_path: Path to output JSON file.
+        """
         save_json(results, output_path)
         print(f"Results saved to: {output_path}")

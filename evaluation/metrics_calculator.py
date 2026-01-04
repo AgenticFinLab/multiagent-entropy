@@ -1,3 +1,9 @@
+"""Metrics calculator for evaluating multi-agent system performance.
+
+This module provides utilities for calculating various metrics including
+accuracy, time cost, and entropy from experiment results.
+"""
+
 import re
 import torch
 from typing import Dict, Any, List, Optional
@@ -6,8 +12,22 @@ from math_verify import parse, verify
 
 
 class MetricsCalculator:
+    """Calculator for various evaluation metrics.
+
+    Provides static methods to extract answers, verify correctness,
+    and calculate performance metrics from experiment results.
+    """
+
     @staticmethod
     def extract_boxed_answer(text: str) -> Optional[str]:
+        """Extract answer from boxed format in text.
+
+        Args:
+            text: Input text containing potential boxed answer.
+
+        Returns:
+            Extracted answer string or None if not found.
+        """
         pattern = r"\\boxed\{([^}]*)\}"
         matches = re.findall(pattern, text)
         if matches:
@@ -22,10 +42,26 @@ class MetricsCalculator:
 
     @staticmethod
     def has_valid_format(text: str) -> bool:
+        """Check if text contains valid boxed answer format.
+
+        Args:
+            text: Input text to check.
+
+        Returns:
+            True if valid format found, False otherwise.
+        """
         return MetricsCalculator.extract_boxed_answer(text) is not None
 
     @staticmethod
     def extract_code_answer(text: str) -> Optional[str]:
+        """Extract Python code block from text.
+
+        Args:
+            text: Input text containing potential code block.
+
+        Returns:
+            Extracted code string or None if not found.
+        """
         pattern = r"```python\s*(.*?)\s*```"
         matches = re.findall(pattern, text, re.DOTALL)
         if matches:
@@ -34,17 +70,42 @@ class MetricsCalculator:
 
     @staticmethod
     def normalize_answer(answer: str) -> str:
+        """Normalize answer string by stripping and collapsing whitespace.
+
+        Args:
+            answer: Raw answer string.
+
+        Returns:
+            Normalized answer string.
+        """
         answer = answer.strip()
         answer = re.sub(r"\s+", " ", answer)
         return answer
 
     @staticmethod
     def is_single_uppercase_letter(text: str) -> bool:
+        """Check if text is a single uppercase letter.
+
+        Args:
+            text: Text to check.
+
+        Returns:
+            True if single uppercase letter, False otherwise.
+        """
         text = text.strip()
         return len(text) == 1 and text.isupper()
 
     @staticmethod
     def is_answer_correct(predicted: Optional[str], ground_truth: str) -> bool:
+        """Check if predicted answer matches ground truth.
+
+        Args:
+            predicted: Predicted answer string.
+            ground_truth: Ground truth answer string.
+
+        Returns:
+            True if answers match, False otherwise.
+        """
         if predicted is None:
             return False
 
@@ -68,12 +129,28 @@ class MetricsCalculator:
 
     @staticmethod
     def calculate_time_cost(result: Dict[str, Any]) -> float:
+        """Extract time cost from result dictionary.
+
+        Args:
+            result: Result dictionary containing cost information.
+
+        Returns:
+            Time cost value or 0.0 if not found.
+        """
         if "cost" in result and "time" in result["cost"]:
             return result["cost"]["time"]
         return 0.0
 
     @staticmethod
     def calculate_average_entropy(entropy_tensor: torch.Tensor) -> float:
+        """Calculate average entropy from tensor.
+
+        Args:
+            entropy_tensor: Tensor containing entropy values.
+
+        Returns:
+            Average entropy value or 0.0 if tensor is None.
+        """
         if entropy_tensor is None:
             return 0.0
 
@@ -91,6 +168,19 @@ class MetricsCalculator:
         use_final_answer: bool = False,
         key_suffix: Optional[str] = None,
     ) -> Dict[str, float]:
+        """Calculate agent accuracy base implementation.
+
+        Args:
+            results: Dictionary of experiment results.
+            ground_truths: Dictionary of ground truth answers.
+            sample_ids: List of sample IDs to analyze.
+            agent_filter: Optional list of agent types to filter.
+            use_final_answer: Whether to use final answer field.
+            key_suffix: Optional suffix for result keys.
+
+        Returns:
+            Dictionary mapping agent keys to accuracy values.
+        """
         accuracies = {}
 
         for sample_id in sample_ids:
@@ -129,6 +219,16 @@ class MetricsCalculator:
     def get_agent_accuracy_for_single(
         results: Dict[str, Any], ground_truths: Dict[str, Any], sample_ids: List[str]
     ) -> Dict[str, float]:
+        """Calculate accuracy for single agent architecture.
+
+        Args:
+            results: Dictionary of experiment results.
+            ground_truths: Dictionary of ground truth answers.
+            sample_ids: List of sample IDs to analyze.
+
+        Returns:
+            Dictionary mapping agent keys to accuracy values.
+        """
         return MetricsCalculator._calculate_agent_accuracy_base(
             results, ground_truths, sample_ids
         )
@@ -137,6 +237,16 @@ class MetricsCalculator:
     def get_agent_accuracy_for_sequential(
         results: Dict[str, Any], ground_truths: Dict[str, Any], sample_ids: List[str]
     ) -> Dict[str, float]:
+        """Calculate accuracy for sequential agent architecture.
+
+        Args:
+            results: Dictionary of experiment results.
+            ground_truths: Dictionary of ground truth answers.
+            sample_ids: List of sample IDs to analyze.
+
+        Returns:
+            Dictionary mapping agent keys to accuracy values.
+        """
         return MetricsCalculator._calculate_agent_accuracy_base(
             results, ground_truths, sample_ids, agent_filter=["judger"]
         )
@@ -145,6 +255,16 @@ class MetricsCalculator:
     def get_agent_accuracy_for_centralized(
         results: Dict[str, Any], ground_truths: Dict[str, Any], sample_ids: List[str]
     ) -> Dict[str, float]:
+        """Calculate accuracy for centralized agent architecture.
+
+        Args:
+            results: Dictionary of experiment results.
+            ground_truths: Dictionary of ground truth answers.
+            sample_ids: List of sample IDs to analyze.
+
+        Returns:
+            Dictionary mapping agent keys to accuracy values.
+        """
         return MetricsCalculator._calculate_agent_accuracy_base(
             results, ground_truths, sample_ids, agent_filter=["OrchestratorAgent"]
         )
@@ -153,6 +273,16 @@ class MetricsCalculator:
     def get_agent_accuracy_for_debate(
         results: Dict[str, Any], ground_truths: Dict[str, Any], sample_ids: List[str]
     ) -> Dict[str, float]:
+        """Calculate accuracy for debate agent architecture.
+
+        Args:
+            results: Dictionary of experiment results.
+            ground_truths: Dictionary of ground truth answers.
+            sample_ids: List of sample IDs to analyze.
+
+        Returns:
+            Dictionary mapping agent keys to accuracy values.
+        """
         return MetricsCalculator._calculate_agent_accuracy_base(
             results,
             ground_truths,
@@ -166,6 +296,16 @@ class MetricsCalculator:
     def get_agent_accuracy_for_hybrid(
         results: Dict[str, Any], ground_truths: Dict[str, Any], sample_ids: List[str]
     ) -> Dict[str, float]:
+        """Calculate accuracy for hybrid agent architecture.
+
+        Args:
+            results: Dictionary of experiment results.
+            ground_truths: Dictionary of ground truth answers.
+            sample_ids: List of sample IDs to analyze.
+
+        Returns:
+            Dictionary mapping agent keys to accuracy values.
+        """
         return MetricsCalculator._calculate_agent_accuracy_base(
             results, ground_truths, sample_ids, agent_filter=["OrchestratorAgent"]
         )
@@ -177,6 +317,17 @@ class MetricsCalculator:
         ground_truths: Dict[str, Any],
         sample_ids: List[str],
     ) -> Dict[str, float]:
+        """Calculate agent accuracy based on architecture type.
+
+        Args:
+            agent_architecture: Type of agent architecture.
+            results: Dictionary of experiment results.
+            ground_truths: Dictionary of ground truth answers.
+            sample_ids: List of sample IDs to analyze.
+
+        Returns:
+            Dictionary mapping agent keys to accuracy values.
+        """
         architecture_map = {
             "single": MetricsCalculator.get_agent_accuracy_for_single,
             "sequential": MetricsCalculator.get_agent_accuracy_for_sequential,

@@ -1,3 +1,9 @@
+"""Main evaluation script for multi-agent system experiments.
+
+This module provides a command-line interface for analyzing experiment results,
+comparing architectures, and generating evaluation reports.
+"""
+
 import json
 import argparse
 from pathlib import Path
@@ -7,6 +13,11 @@ from experiment_analyzer import ExperimentAnalyzer
 
 
 def main():
+    """Main entry point for the evaluation script.
+
+    Parses command-line arguments and performs experiment analysis
+    based on the provided options.
+    """
     parser = argparse.ArgumentParser(
         description="Analyze multi-agent experiment results"
     )
