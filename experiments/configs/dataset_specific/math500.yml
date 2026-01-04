@@ -1,9 +1,9 @@
-# Dataset-specific configuration for AIME2024
+# Dataset-specific configuration for Math500
 
 data:
-  data_name: AIME2024
-  data_path: experiments/data/AIME2024
-  split: train
+  data_name: Math500
+  data_path: experiments/data/Math500
+  split: test
   # The number of samples to be tested, -1 for all
   data_num: -1
   # The number of samples for one inference
@@ -12,6 +12,6 @@ data:
 task_type: "math"
 
 # Generation configuration (overrides base_config.yml)
-# AIME2024 problems require longer reasoning chains
+# Math500 problems require longer reasoning chains
 generation_config:
   max_new_tokens: 4000
