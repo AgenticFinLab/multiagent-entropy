@@ -1,3 +1,4 @@
+import csv
 import json
 from pathlib import Path
 from collections import defaultdict
@@ -242,3 +243,50 @@ class ExperimentAnalyzer:
             )
 
         return comparison
+
+    def save_last_agent_stats_to_csv(
+        self, dataset: str, output_path: str, task_type: str = "math"
+    ):
+        all_metrics = self.analyze_all_experiments(dataset, task_type)
+
+        rows = []
+        for exp_name, metrics in all_metrics["experiments"].items():
+            if "error" in metrics:
+                continue
+
+            last_agent_stats = metrics["summary"]["last_agent_stats"]
+            rows.append(
+                {
+                    "experiment_name": exp_name,
+                    "agent_architecture": metrics["agent_architecture"],
+                    "num_rounds": metrics["num_rounds"],
+                    "num_samples": metrics["num_samples"],
+                    "count": last_agent_stats["count"],
+                    "correct": last_agent_stats["correct"],
+                    "accuracy": last_agent_stats["accuracy"],
+                    "format_compliance_rate": last_agent_stats["format_compliance_rate"],
+                    "average_time": last_agent_stats["average_time"],
+                    "average_entropy": last_agent_stats["average_entropy"],
+                }
+            )
+
+        output_file = Path(output_path)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+
+        fieldnames = [
+            "experiment_name",
+            "agent_architecture",
+            "num_rounds",
+            "num_samples",
+            "count",
+            "correct",
+            "accuracy",
+            "format_compliance_rate",
+            "average_time",
+            "average_entropy",
+        ]
+
+        with open(output_file, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)

@@ -215,6 +215,4 @@ experiments/logs/
 experiments/configs_exp/
 
 # Evaluation results
-evaluation/example_results/
-evaluation/results/
-evaluation/logs/
+evaluation/results

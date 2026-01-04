@@ -9,12 +9,6 @@ def main():
         description="Analyze multi-agent experiment results"
     )
     parser.add_argument(
-        "--base-path",
-        type=str,
-        default="/home/yuxuanzhao/multiagent-entropy",
-        help="Base path to the multiagent-entropy directory",
-    )
-    parser.add_argument(
         "--dataset",
         type=str,
         choices=["gsm8k", "humaneval", "mmlu"],
@@ -41,12 +35,20 @@ def main():
         help="Output file path (if not provided, save to evaluation/results/)",
     )
     parser.add_argument(
-        "--compare", action="store_true", help="Compare experiments by architecture"
+        "--compare",
+        action="store_true",
+        help="Compare experiments by architecture",
+    )
+    parser.add_argument(
+        "--save-csv",
+        default=True,
+        help="Save last_agent_stats summary to CSV file",
     )
 
     args = parser.parse_args()
 
-    analyzer = ExperimentAnalyzer(args.base_path)
+    base_path = str(Path.cwd())
+    analyzer = ExperimentAnalyzer(base_path)
 
     if args.experiment:
         print(f"Analyzing experiment: {args.experiment}")
@@ -57,7 +59,7 @@ def main():
         if args.output:
             output_path = args.output
         else:
-            output_dir = Path(args.base_path) / "evaluation" / "results" / args.dataset
+            output_dir = Path(base_path) / "evaluation" / "results" / args.dataset
             output_dir.mkdir(parents=True, exist_ok=True)
             output_path = output_dir / f"{args.experiment}_metrics.json"
 
@@ -72,7 +74,7 @@ def main():
                 output_path = args.output
             else:
                 output_dir = (
-                    Path(args.base_path) / "evaluation" / "results" / args.dataset
+                    Path(base_path) / "evaluation" / "results" / args.dataset
                 )
                 output_dir.mkdir(parents=True, exist_ok=True)
                 output_path = output_dir / "comparison.json"
@@ -92,13 +94,26 @@ def main():
                 output_path = args.output
             else:
                 output_dir = (
-                    Path(args.base_path) / "evaluation" / "results" / args.dataset
+                    Path(base_path) / "evaluation" / "results" / args.dataset
                 )
                 output_dir.mkdir(parents=True, exist_ok=True)
                 output_path = output_dir / "all_metrics.json"
 
             analyzer.save_results(all_metrics, output_path)
             print(f"All metrics saved to: {output_path}")
+
+        if args.save_csv:
+            csv_output_path = (
+                Path(base_path)
+                / "evaluation"
+                / "results"
+                / args.dataset
+                / "all_metrics_summary.csv"
+            )
+            analyzer.save_last_agent_stats_to_csv(
+                args.dataset, str(csv_output_path), args.task_type
+            )
+            print(f"CSV summary saved to: {csv_output_path}")
 
 
 if __name__ == "__main__":
