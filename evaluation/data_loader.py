@@ -60,7 +60,7 @@ class DataLoader:
         with open(data_file, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        return {item["main_id"]: item for item in data}
+        return {str(item["main_id"]): item for item in data}
 
     def load_experiment_config(self, experiment_name: str) -> Dict[str, Any]:
         """Load experiment configuration from YAML file.
