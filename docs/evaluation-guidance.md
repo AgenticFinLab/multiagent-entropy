@@ -85,7 +85,7 @@ python -m evaluation.evaluator --dataset humaneval --output results/custom.json
 - **architecture_comparison**: Architecture comparison data
 
 **Micro Statistics:**
-- **sequence_level**: Sequence-level entropy statistics including:
+- **sequence_level**: Sequence-level entropy statistics with composite keys in the format `{main_id}-{agent_type}-{execution_order}`. Each key uniquely identifies a specific sequence and contains:
   - total_entropy: Sum of all entropy values for the sequence
   - max_entropy: Maximum entropy value
   - mean_entropy: Mean entropy value
@@ -99,6 +99,33 @@ python -m evaluation.evaluator --dataset humaneval --output results/custom.json
   - sample_count: Number of samples
   - average_entropy_per_token: Average entropy per token
   - average_tokens_per_sample: Average number of tokens per sample
+
+  Example structure for single agent architecture:
+  ```json
+  "sequence_level": {
+    "ID1-SingleSolver-1": {
+      "total_entropy": 123.45,
+      "max_entropy": 1.123,
+      "mean_entropy": 0.062,
+      "variance_entropy": 0.031,
+      "median_entropy": 0.0,
+      "q1_entropy": 0.0,
+      "q3_entropy": 0.012,
+      "std_entropy": 0.176,
+      "min_entropy": 0.0,
+      "token_count": 2000,
+      "sample_count": 4,
+      "average_entropy_per_token": 0.062,
+      "average_tokens_per_sample": 500
+    },
+    "ID1-SingleSolver-2": {
+      ...
+    },
+    ...
+  }
+  ```
+
+  The total number of sequence entries follows the formula: 100 (samples) × number of agents in the architecture × number of rounds.
 - **token_position_level**: Token position analysis including:
   - mean: Mean entropy at each token position
   - std: Standard deviation at each token position
@@ -198,7 +225,7 @@ The entropy analysis generates JSON files with the following structure:
       },
       "micro_statistics": {
         "sequence_level": {
-          "sample_id_1": {
+          "ID1-MathAgent-1": {
             "total_entropy": 123.45,
             "max_entropy": 1.123,
             "mean_entropy": 0.062,
@@ -212,6 +239,9 @@ The entropy analysis generates JSON files with the following structure:
             "sample_count": 4,
             "average_entropy_per_token": 0.062,
             "average_tokens_per_sample": 500
+          },
+          "ID1-MathAgent-2": {
+            ...
           },
           ...
         },
@@ -262,7 +292,7 @@ The entropy analysis generates JSON files with the following structure:
 - experiment_name, agent_architecture, num_rounds, num_samples, total_results, total_entropy, average_entropy, level, round_number, count
 
 **micro_statistics.csv**:
-- experiment_name, agent_architecture, sequence_id, total_entropy, max_entropy, mean_entropy, variance_entropy, median_entropy, q1_entropy, q3_entropy, std_entropy, min_entropy, token_count, sample_count, average_entropy_per_token, average_tokens_per_sample
+- experiment_name, agent_architecture, sequence_id (format: {main_id}-{agent_type}-{execution_order}), total_entropy, max_entropy, mean_entropy, variance_entropy, median_entropy, q1_entropy, q3_entropy, std_entropy, min_entropy, token_count, sample_count, average_entropy_per_token, average_tokens_per_sample
 
 **token_position_statistics.csv**:
 - experiment_name, agent_architecture, token_position, mean_entropy, std_entropy, median_entropy, min_entropy, max_entropy, q1_entropy, q3_entropy, count
