@@ -10,6 +10,7 @@ from pathlib import Path
 
 from entropy_analyzer import EntropyAnalyzer
 from experiment_analyzer import ExperimentAnalyzer
+from results_aggregator import ResultsAggregator
 
 
 def main():
@@ -71,6 +72,11 @@ def main():
         "--save-entropy-json",
         default=True,
         help="Save detailed entropy results to JSON file",
+    )
+    parser.add_argument(
+        "--aggregate",
+        default=True,
+        help="Aggregate results from metrics files",
     )
 
     args = parser.parse_args()
@@ -206,6 +212,11 @@ def main():
                 with open(json_output_path, "w", encoding="utf-8") as f:
                     json.dump(entropy_results, f, indent=2, ensure_ascii=False)
                 print(f"Entropy JSON saved to: {json_output_path}")
+
+    if args.aggregate:
+        print(f"\nAggregating results for dataset: {args.dataset}")
+        aggregator = ResultsAggregator(base_path, args.dataset)
+        aggregator.run_aggregation()
 
 
 if __name__ == "__main__":
