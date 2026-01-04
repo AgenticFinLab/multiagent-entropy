@@ -119,10 +119,10 @@ To run a single experiment, use the `run_experiment.py` script with the followin
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --experiment-name qwen3-4b_mmlu_single_agent \
+  --experiment-name qwen3-4b_aime2024_single_agent \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
-  --dataset-config "experiments/configs/dataset_specific/mmlu.yml" \
+  --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
   --entropy-config "experiments/configs/entropy_configs/standard.yml" \
   --infer-config "experiments/configs/infer_configs/cuda0.yml" \
   --agent-type "single"
@@ -132,10 +132,10 @@ python experiments/scripts/run_experiment.py \
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --experiment-name "qwen3-4b_mmlu_sequential_agent" \
+  --experiment-name "qwen3-4b_aime2024_sequential_agent" \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
-  --dataset-config "experiments/configs/dataset_specific/mmlu.yml" \
+  --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
   --entropy-config "experiments/configs/entropy_configs/standard.yml" \
   --infer-config "experiments/configs/infer_configs/cuda0.yml" \
   --agent-type "sequential"
@@ -145,10 +145,10 @@ python experiments/scripts/run_experiment.py \
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --experiment-name "qwen3-4b_mmlu_centralized_agent" \
+  --experiment-name "qwen3-4b_aime2024_centralized_agent" \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
-  --dataset-config "experiments/configs/dataset_specific/mmlu.yml" \
+  --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
   --entropy-config "experiments/configs/entropy_configs/standard.yml" \
   --infer-config "experiments/configs/infer_configs/cuda1.yml" \
   --agent-type "centralized"
@@ -158,10 +158,10 @@ python experiments/scripts/run_experiment.py \
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --experiment-name "qwen3-4b_mmlu_decentralized_agent" \
+  --experiment-name "qwen3-4b_aime2024_decentralized_agent" \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
-  --dataset-config "experiments/configs/dataset_specific/mmlu.yml" \
+  --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
   --entropy-config "experiments/configs/entropy_configs/standard.yml" \
   --infer-config "experiments/configs/infer_configs/cuda0.yml" \
   --agent-type "decentralized"
@@ -171,10 +171,10 @@ python experiments/scripts/run_experiment.py \
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --experiment-name "qwen3-4b_mmlu_full_decentralized_agent" \
+  --experiment-name "qwen3-4b_aime2024_full_decentralized_agent" \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
-  --dataset-config "experiments/configs/dataset_specific/mmlu.yml" \
+  --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
   --entropy-config "experiments/configs/entropy_configs/standard.yml" \
   --infer-config "experiments/configs/infer_configs/cuda1.yml" \
   --agent-type "full_decentralized"
@@ -184,10 +184,10 @@ python experiments/scripts/run_experiment.py \
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --experiment-name "qwen3-4b_mmlu_debate_agent" \
+  --experiment-name "qwen3-4b_aime2024_debate_agent" \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
-  --dataset-config "experiments/configs/dataset_specific/mmlu.yml" \
+  --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
   --entropy-config "experiments/configs/entropy_configs/standard.yml" \
   --infer-config "experiments/configs/infer_configs/cuda2.yml" \
   --agent-type "debate"
@@ -198,10 +198,10 @@ python experiments/scripts/run_experiment.py \
 conda activate maep
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --experiment-name "qwen3-4b_mmlu_hybrid_agent" \
+  --experiment-name "qwen3-4b_aime2024_hybrid_agent" \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
-  --dataset-config "experiments/configs/dataset_specific/mmlu.yml" \
+  --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
   --entropy-config "experiments/configs/entropy_configs/standard.yml" \
   --infer-config "experiments/configs/infer_configs/cuda3.yml" \
   --agent-type "hybrid"
