@@ -408,7 +408,8 @@ def main():
 
         # Save merged configuration if requested
         if args.save_config:
-            config_save_path = f"experiments/configs_exp/{args.experiment_name}_{time.strftime('%Y%m%d_%H%M%S')}.yml"
+            dataset_name = merged_config["data"]["data_name"].lower()
+            config_save_path = f"experiments/configs_exp/{dataset_name}/{args.experiment_name}_{time.strftime('%Y%m%d_%H%M%S')}.yml"
             save_config(merged_config, config_save_path)
             logger.info(f"Saved merged configuration to: {config_save_path}")
 
