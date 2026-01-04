@@ -124,7 +124,7 @@ python experiments/scripts/run_experiment.py \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
   --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
   --entropy-config "experiments/configs/entropy_configs/standard.yml" \
-  --infer-config "experiments/configs/infer_configs/cuda0.yml" \
+  --infer-config "experiments/configs/infer_configs/cuda2.yml" \
   --agent-type "single"
 ```
 
