@@ -114,9 +114,8 @@ python -m evaluation.evaluator --dataset humaneval --output results/custom.json
       "std_entropy": 0.176,
       "min_entropy": 0.0,
       "token_count": 2000,
-      "sample_count": 4,
+      "sample_count": 1,
       "average_entropy_per_token": 0.062,
-      "average_tokens_per_sample": 500
     },
     "ID1-SingleSolver-2": {
       ...
@@ -236,9 +235,8 @@ The entropy analysis generates JSON files with the following structure:
             "std_entropy": 0.176,
             "min_entropy": 0.0,
             "token_count": 2000,
-            "sample_count": 4,
+            "sample_count": 1,
             "average_entropy_per_token": 0.062,
-            "average_tokens_per_sample": 500
           },
           "ID1-MathAgent-2": {
             ...
@@ -318,7 +316,7 @@ entropy_results = entropy_analyzer.analyze_experiment_entropy("gsm8k", "single_g
 
 ### Data Loading
 
-The [DataLoader](file:///home/yuxuanzhao/multiagent-entropy/evaluation/data_loader.py) class handles:
+The [DataLoader](../evaluation/data_loader.py) class handles:
 
 - Ground truth data from `experiments/data/{dataset}/train-all-samples.json`
 - Experiment configs from `experiments/configs_exp/{experiment}.yml`
