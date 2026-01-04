@@ -69,13 +69,23 @@ def parse_args() -> argparse.Namespace:
         help="Path to dataset-specific configuration file",
     )
     parser.add_argument(
-        "-e", "--entropy-config", type=str, help="Path to entropy configuration file"
+        "-e", 
+        "--entropy-config", 
+        type=str, 
+        help="Path to entropy configuration file",
     )
     parser.add_argument(
-        "-i", "--infer-config", type=str, help="Path to inference configuration file (CUDA device settings)"
+        "-i", 
+        "--infer-config", 
+        type=str, 
+        default="experiments/configs/infer_configs/cuda_auto.yml",
+        help="Path to inference configuration file (CUDA device settings)",
     )
     parser.add_argument(
-        "-n", "--experiment-name", type=str, help="Name of the experiment"
+        "-n", 
+        "--experiment-name", 
+        type=str, 
+        help="Name of the experiment",
     )
     parser.add_argument(
         "--agent-type",
