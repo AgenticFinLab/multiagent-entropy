@@ -1,10 +1,8 @@
-import csv
-import json
-from pathlib import Path
 from collections import defaultdict
 from typing import Dict, List, Any, Optional
 
 from data_loader import DataLoader
+from utils import save_csv, save_json
 from metrics_calculator import MetricsCalculator
 
 
@@ -209,11 +207,7 @@ class ExperimentAnalyzer:
         return all_metrics
 
     def save_results(self, metrics: Dict[str, Any], output_path: str):
-        output_file = Path(output_path)
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(metrics, f, indent=2, ensure_ascii=False)
+        save_json(metrics, output_path)
 
     def compare_experiments(
         self, dataset: str, task_type: str = "math"
@@ -237,8 +231,12 @@ class ExperimentAnalyzer:
                     "format_compliance_rate": metrics["summary"]["last_agent_stats"][
                         "format_compliance_rate"
                     ],
-                    "average_time_cost": metrics["summary"]["last_agent_stats"]["average_time"],
-                    "average_entropy": metrics["summary"]["last_agent_stats"]["average_entropy"],
+                    "average_time_cost": metrics["summary"]["last_agent_stats"][
+                        "average_time"
+                    ],
+                    "average_entropy": metrics["summary"]["last_agent_stats"][
+                        "average_entropy"
+                    ],
                 }
             )
 
@@ -264,14 +262,13 @@ class ExperimentAnalyzer:
                     "count": last_agent_stats["count"],
                     "correct": last_agent_stats["correct"],
                     "accuracy": last_agent_stats["accuracy"],
-                    "format_compliance_rate": last_agent_stats["format_compliance_rate"],
+                    "format_compliance_rate": last_agent_stats[
+                        "format_compliance_rate"
+                    ],
                     "average_time": last_agent_stats["average_time"],
                     "average_entropy": last_agent_stats["average_entropy"],
                 }
             )
-
-        output_file = Path(output_path)
-        output_file.parent.mkdir(parents=True, exist_ok=True)
 
         fieldnames = [
             "experiment_name",
@@ -286,7 +283,4 @@ class ExperimentAnalyzer:
             "average_entropy",
         ]
 
-        with open(output_file, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(rows)
+        save_csv(rows, output_path, fieldnames)

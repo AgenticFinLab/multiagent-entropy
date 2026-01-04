@@ -1,5 +1,12 @@
 from .data_loader import DataLoader
+from .entropy_analyzer import EntropyAnalyzer
 from .metrics_calculator import MetricsCalculator
-from .analyzer import ExperimentAnalyzer
+from .experiment_analyzer import ExperimentAnalyzer
 
-__all__ = ["DataLoader", "MetricsCalculator", "ExperimentAnalyzer"]
+
+__all__ = [
+    "DataLoader",
+    "MetricsCalculator",
+    "ExperimentAnalyzer",
+    "EntropyAnalyzer",
+]

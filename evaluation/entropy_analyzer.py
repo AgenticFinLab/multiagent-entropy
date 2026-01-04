@@ -1,23 +1,21 @@
 import csv
-import json
 from pathlib import Path
+from typing import Dict, List, Any
 from collections import defaultdict
-from typing import Dict, List, Any, Optional, Tuple
 
 import torch
 import numpy as np
 
 from data_loader import DataLoader
+from utils import save_csv, save_json
 
 
-class EntropyStatisticsAnalyzer:
+class EntropyAnalyzer:
     def __init__(self, base_path: str):
         self.data_loader = DataLoader(base_path)
         self.base_path = Path(base_path)
 
-    def analyze_all_experiments_entropy(
-        self, dataset: str
-    ) -> Dict[str, Any]:
+    def analyze_all_experiments_entropy(self, dataset: str) -> Dict[str, Any]:
         experiments = self.data_loader.get_experiments_by_dataset(dataset)
 
         all_results = {
@@ -210,9 +208,7 @@ class EntropyStatisticsAnalyzer:
                 stats["all_entropies"].append(entropy_array)
 
                 for pos, entropy_val in enumerate(entropy_array):
-                    micro_stats["token_position_level"][pos].append(
-                        float(entropy_val)
-                    )
+                    micro_stats["token_position_level"][pos].append(float(entropy_val))
 
         for agent_type, stats in micro_stats["agent_level"].items():
             if stats["sample_count"] > 0:
@@ -244,9 +240,7 @@ class EntropyStatisticsAnalyzer:
                 "count": len(entropies),
             }
 
-        micro_stats["token_position_level"] = dict(
-            micro_stats["token_position_level"]
-        )
+        micro_stats["token_position_level"] = dict(micro_stats["token_position_level"])
 
         return micro_stats
 
@@ -269,9 +263,7 @@ class EntropyStatisticsAnalyzer:
         else:
             return (execution_order - 1) // 4 + 1
 
-    def compare_architectures_entropy(
-        self, dataset: str
-    ) -> Dict[str, Any]:
+    def compare_architectures_entropy(self, dataset: str) -> Dict[str, Any]:
         all_results = self.analyze_all_experiments_entropy(dataset)
 
         comparison = {
@@ -295,9 +287,9 @@ class EntropyStatisticsAnalyzer:
                     "total_entropy": results["macro_statistics"]["experiment_level"][
                         "total_entropy"
                     ],
-                    "average_entropy": results["macro_statistics"][
-                        "experiment_level"
-                    ]["average_entropy"],
+                    "average_entropy": results["macro_statistics"]["experiment_level"][
+                        "average_entropy"
+                    ],
                     "num_samples": results["macro_statistics"]["experiment_level"][
                         "total_samples"
                     ],
@@ -358,9 +350,7 @@ class EntropyStatisticsAnalyzer:
 
         return distribution
 
-    def save_macro_statistics_to_csv(
-        self, dataset: str, output_path: str
-    ):
+    def save_macro_statistics_to_csv(self, dataset: str, output_path: str):
         all_results = self.analyze_all_experiments_entropy(dataset)
 
         rows = []
@@ -396,9 +386,6 @@ class EntropyStatisticsAnalyzer:
                     }
                 )
 
-        output_file = Path(output_path)
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-
         fieldnames = [
             "experiment_name",
             "agent_architecture",
@@ -412,16 +399,10 @@ class EntropyStatisticsAnalyzer:
             "count",
         ]
 
-        with open(output_file, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(rows)
+        save_csv(rows, output_path, fieldnames)
+        print(f"Macro statistics saved to: {output_path}")
 
-        print(f"Macro statistics saved to: {output_file}")
-
-    def save_micro_statistics_to_csv(
-        self, dataset: str, output_path: str
-    ):
+    def save_micro_statistics_to_csv(self, dataset: str, output_path: str):
         all_results = self.analyze_all_experiments_entropy(dataset)
 
         rows = []
@@ -453,9 +434,6 @@ class EntropyStatisticsAnalyzer:
                     }
                 )
 
-        output_file = Path(output_path)
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-
         fieldnames = [
             "experiment_name",
             "agent_architecture",
@@ -475,16 +453,10 @@ class EntropyStatisticsAnalyzer:
             "overall_max",
         ]
 
-        with open(output_file, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(rows)
+        save_csv(rows, output_path, fieldnames)
+        print(f"Micro statistics saved to: {output_path}")
 
-        print(f"Micro statistics saved to: {output_file}")
-
-    def save_token_position_statistics_to_csv(
-        self, dataset: str, output_path: str
-    ):
+    def save_token_position_statistics_to_csv(self, dataset: str, output_path: str):
         all_results = self.analyze_all_experiments_entropy(dataset)
 
         rows = []
@@ -507,9 +479,6 @@ class EntropyStatisticsAnalyzer:
                     }
                 )
 
-        output_file = Path(output_path)
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-
         fieldnames = [
             "experiment_name",
             "agent_architecture",
@@ -520,16 +489,10 @@ class EntropyStatisticsAnalyzer:
             "count",
         ]
 
-        with open(output_file, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(rows)
+        save_csv(rows, output_path, fieldnames)
+        print(f"Token position statistics saved to: {output_path}")
 
-        print(f"Token position statistics saved to: {output_file}")
-
-    def save_all_entropy_statistics_to_csv(
-        self, dataset: str, output_dir: str
-    ):
+    def save_all_entropy_statistics_to_csv(self, dataset: str, output_dir: str):
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
@@ -593,10 +556,5 @@ class EntropyStatisticsAnalyzer:
         print(f"\nAll entropy statistics saved to: {output_dir}")
 
     def save_results_json(self, results: Dict[str, Any], output_path: str):
-        output_file = Path(output_path)
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(results, f, indent=2, ensure_ascii=False)
-
-        print(f"Results saved to: {output_file}")
+        save_json(results, output_path)
+        print(f"Results saved to: {output_path}")

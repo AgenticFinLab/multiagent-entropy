@@ -83,8 +83,13 @@ class MetricsCalculator:
         return 0.0
 
     @staticmethod
-    def get_agent_accuracy_for_single(
-        results: Dict[str, Any], ground_truths: Dict[str, Any], sample_ids: List[str]
+    def _calculate_agent_accuracy_base(
+        results: Dict[str, Any],
+        ground_truths: Dict[str, Any],
+        sample_ids: List[str],
+        agent_filter: Optional[List[str]] = None,
+        use_final_answer: bool = False,
+        key_suffix: Optional[str] = None,
     ) -> Dict[str, float]:
         accuracies = {}
 
@@ -101,157 +106,69 @@ class MetricsCalculator:
             if not ground_truth:
                 continue
 
-            predicted = MetricsCalculator.extract_boxed_answer(
-                result.get("response", "")
-            )
+            if use_final_answer and "final_answer" in result:
+                predicted = result["final_answer"]
+            else:
+                predicted = MetricsCalculator.extract_boxed_answer(
+                    result.get("response", "")
+                )
+
             is_correct = MetricsCalculator.is_answer_correct(
                 predicted, ground_truth["groundtruth"]
             )
 
-            key = f"{main_id}_{agent_type}"
-            if key not in accuracies:
-                accuracies[key] = []
-            accuracies[key].append(is_correct)
+            if agent_filter is None or agent_type in agent_filter:
+                key = f"{main_id}_{key_suffix if key_suffix else agent_type}"
+                if key not in accuracies:
+                    accuracies[key] = []
+                accuracies[key].append(is_correct)
 
         return {k: sum(v) / len(v) if v else 0.0 for k, v in accuracies.items()}
+
+    @staticmethod
+    def get_agent_accuracy_for_single(
+        results: Dict[str, Any], ground_truths: Dict[str, Any], sample_ids: List[str]
+    ) -> Dict[str, float]:
+        return MetricsCalculator._calculate_agent_accuracy_base(
+            results, ground_truths, sample_ids
+        )
 
     @staticmethod
     def get_agent_accuracy_for_sequential(
         results: Dict[str, Any], ground_truths: Dict[str, Any], sample_ids: List[str]
     ) -> Dict[str, float]:
-        accuracies = {}
-
-        for sample_id in sample_ids:
-            result = results.get(sample_id)
-            if not result:
-                continue
-
-            parsed_id = sample_id.replace("Result_", "").split("-")
-            main_id = parsed_id[0]
-            agent_type = parsed_id[1]
-
-            ground_truth = ground_truths.get(main_id)
-            if not ground_truth:
-                continue
-
-            predicted = MetricsCalculator.extract_boxed_answer(
-                result.get("response", "")
-            )
-            is_correct = MetricsCalculator.is_answer_correct(
-                predicted, ground_truth["groundtruth"]
-            )
-
-            if agent_type == "judger":
-                key = f"{main_id}_judger"
-                if key not in accuracies:
-                    accuracies[key] = []
-                accuracies[key].append(is_correct)
-
-        return {k: sum(v) / len(v) if v else 0.0 for k, v in accuracies.items()}
+        return MetricsCalculator._calculate_agent_accuracy_base(
+            results, ground_truths, sample_ids, agent_filter=["judger"]
+        )
 
     @staticmethod
     def get_agent_accuracy_for_centralized(
         results: Dict[str, Any], ground_truths: Dict[str, Any], sample_ids: List[str]
     ) -> Dict[str, float]:
-        accuracies = {}
-
-        for sample_id in sample_ids:
-            result = results.get(sample_id)
-            if not result:
-                continue
-
-            parsed_id = sample_id.replace("Result_", "").split("-")
-            main_id = parsed_id[0]
-            agent_type = parsed_id[1]
-
-            ground_truth = ground_truths.get(main_id)
-            if not ground_truth:
-                continue
-
-            predicted = MetricsCalculator.extract_boxed_answer(
-                result.get("response", "")
-            )
-            is_correct = MetricsCalculator.is_answer_correct(
-                predicted, ground_truth["groundtruth"]
-            )
-
-            if agent_type == "OrchestratorAgent":
-                key = f"{main_id}_OrchestratorAgent"
-                if key not in accuracies:
-                    accuracies[key] = []
-                accuracies[key].append(is_correct)
-
-        return {k: sum(v) / len(v) if v else 0.0 for k, v in accuracies.items()}
+        return MetricsCalculator._calculate_agent_accuracy_base(
+            results, ground_truths, sample_ids, agent_filter=["OrchestratorAgent"]
+        )
 
     @staticmethod
     def get_agent_accuracy_for_debate(
         results: Dict[str, Any], ground_truths: Dict[str, Any], sample_ids: List[str]
     ) -> Dict[str, float]:
-        accuracies = {}
-
-        for sample_id in sample_ids:
-            result = results.get(sample_id)
-            if not result:
-                continue
-
-            parsed_id = sample_id.replace("Result_", "").split("-")
-            main_id = parsed_id[0]
-            agent_type = parsed_id[1]
-
-            ground_truth = ground_truths.get(main_id)
-            if not ground_truth:
-                continue
-
-            if "final_answer" in result:
-                predicted = result["final_answer"]
-            else:
-                predicted = ""
-
-            is_correct = MetricsCalculator.is_answer_correct(
-                predicted, ground_truth["groundtruth"]
-            )
-
-            if agent_type == "OrchestratorAgent" or "final_answer" in result:
-                key = f"{main_id}_final"
-                if key not in accuracies:
-                    accuracies[key] = []
-                accuracies[key].append(is_correct)
-
-        return {k: sum(v) / len(v) if v else 0.0 for k, v in accuracies.items()}
+        return MetricsCalculator._calculate_agent_accuracy_base(
+            results,
+            ground_truths,
+            sample_ids,
+            agent_filter=["OrchestratorAgent"],
+            use_final_answer=True,
+            key_suffix="final",
+        )
 
     @staticmethod
     def get_agent_accuracy_for_hybrid(
         results: Dict[str, Any], ground_truths: Dict[str, Any], sample_ids: List[str]
     ) -> Dict[str, float]:
-        accuracies = {}
-
-        for sample_id in sample_ids:
-            result = results.get(sample_id)
-            if not result:
-                continue
-
-            parsed_id = sample_id.replace("Result_", "").split("-")
-            main_id = parsed_id[0]
-            agent_type = parsed_id[1]
-
-            ground_truth = ground_truths.get(main_id)
-            if not ground_truth:
-                continue
-
-            predicted = MetricsCalculator.extract_boxed_answer(
-                result.get("response", "")
-            )
-            is_correct = MetricsCalculator.is_answer_correct(
-                predicted, ground_truth["groundtruth"]
-            )
-
-            if agent_type == "OrchestratorAgent":
-                key = f"{main_id}_OrchestratorAgent"
-                if key not in accuracies:
-                    accuracies[key] = []
-                accuracies[key].append(is_correct)
-
-        return {k: sum(v) / len(v) if v else 0.0 for k, v in accuracies.items()}
+        return MetricsCalculator._calculate_agent_accuracy_base(
+            results, ground_truths, sample_ids, agent_filter=["OrchestratorAgent"]
+        )
 
     @staticmethod
     def calculate_agent_accuracy(

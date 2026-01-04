@@ -1,9 +1,9 @@
-import argparse
 import json
+import argparse
 from pathlib import Path
 
-from analyzer import ExperimentAnalyzer
-from entropy_statistics import EntropyStatisticsAnalyzer
+from entropy_analyzer import EntropyAnalyzer
+from experiment_analyzer import ExperimentAnalyzer
 
 
 def main():
@@ -48,17 +48,17 @@ def main():
     )
     parser.add_argument(
         "--analyze-entropy",
-        action="store_true",
+        default=True,
         help="Perform entropy statistical analysis",
     )
     parser.add_argument(
         "--entropy-compare",
-        action="store_true",
+        default=True,
         help="Compare entropy statistics across architectures",
     )
     parser.add_argument(
         "--save-entropy-json",
-        action="store_true",
+        default=True,
         help="Save detailed entropy results to JSON file",
     )
 
@@ -69,7 +69,7 @@ def main():
     entropy_analyzer = None
 
     if args.analyze_entropy or args.entropy_compare:
-        entropy_analyzer = EntropyStatisticsAnalyzer(base_path)
+        entropy_analyzer = EntropyAnalyzer(base_path)
 
     if args.experiment:
         print(f"Analyzing experiment: {args.experiment}")
@@ -99,14 +99,20 @@ def main():
             entropy_output_dir.mkdir(parents=True, exist_ok=True)
 
             if args.save_entropy_json:
-                json_output_path = entropy_output_dir / f"{args.experiment}_entropy.json"
+                json_output_path = (
+                    entropy_output_dir / f"{args.experiment}_entropy.json"
+                )
                 with open(json_output_path, "w", encoding="utf-8") as f:
                     json.dump(entropy_results, f, indent=2, ensure_ascii=False)
                 print(f"Entropy JSON saved to: {json_output_path}")
 
             print(f"Architecture: {entropy_results['agent_architecture']}")
-            print(f"Total entropy: {entropy_results['macro_statistics']['experiment_level']['total_entropy']:.4f}")
-            print(f"Average entropy: {entropy_results['macro_statistics']['experiment_level']['average_entropy']:.4f}")
+            print(
+                f"Total entropy: {entropy_results['macro_statistics']['experiment_level']['total_entropy']:.4f}"
+            )
+            print(
+                f"Average entropy: {entropy_results['macro_statistics']['experiment_level']['average_entropy']:.4f}"
+            )
     else:
         if args.compare:
             print(f"Comparing all experiments for dataset: {args.dataset}")
@@ -115,9 +121,7 @@ def main():
             if args.output:
                 output_path = args.output
             else:
-                output_dir = (
-                    Path(base_path) / "evaluation" / "results" / args.dataset
-                )
+                output_dir = Path(base_path) / "evaluation" / "results" / args.dataset
                 output_dir.mkdir(parents=True, exist_ok=True)
                 output_path = output_dir / "comparison.json"
 
@@ -135,9 +139,7 @@ def main():
             if args.output:
                 output_path = args.output
             else:
-                output_dir = (
-                    Path(base_path) / "evaluation" / "results" / args.dataset
-                )
+                output_dir = Path(base_path) / "evaluation" / "results" / args.dataset
                 output_dir.mkdir(parents=True, exist_ok=True)
                 output_path = output_dir / "all_metrics.json"
 
@@ -175,7 +177,9 @@ def main():
 
             if args.entropy_compare:
                 print("\nComparing entropy statistics across architectures...")
-                comparison = entropy_analyzer.compare_architectures_entropy(args.dataset)
+                comparison = entropy_analyzer.compare_architectures_entropy(
+                    args.dataset
+                )
 
                 print(f"\nArchitecture Comparison:")
                 for arch, trends in comparison["trends"].items():
