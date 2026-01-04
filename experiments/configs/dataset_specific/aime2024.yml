@@ -1,0 +1,12 @@
+# Dataset-specific configuration for AIME2024
+
+data:
+  data_name: AIME2024
+  data_path: experiments/data/AIME2024
+  split: test
+  # The number of samples to be tested, -1 for all
+  data_num: 100
+  # The number of samples for one inference
+  batch_size: 1
+
+task_type: "math"
