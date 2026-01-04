@@ -322,3 +322,54 @@ The [DataLoader](../evaluation/data_loader.py) class handles:
 - Experiment configs from `experiments/configs_exp/{experiment}.yml`
 - Results from `experiments/results/raw/{dataset}/{experiment}/traces/`
 - Entropy tensors from `traces/tensors/{result_id}_extras_entropy.pt`
+
+### Results Aggregator
+
+The results aggregator provides functionality to aggregate statistical results from the evaluation/results directory, separating correct and incorrect samples into separate CSV files for machine learning analysis.
+
+#### Core Components
+
+- **[results_aggregator.py](../evaluation/results_aggregator.py)**: Main aggregation module
+
+#### Usage
+
+Run the aggregator from the project root:
+
+```bash
+python evaluation/results_aggregator.py --dataset gsm8k
+```
+
+#### Available Arguments
+
+| Argument              | Type | Default | Description                                 |
+| --------------------- | ---- | ------- | ------------------------------------------- |
+| `--base-path`         | str  | Current directory | Base path to the project directory |
+| `--dataset`           | str  | gsm8k   | Dataset to analyze (gsm8k, humaneval, mmlu) |
+| `--output-dir`        | str  | None    | Output directory for aggregated CSV files   |
+
+#### Output Files
+
+The aggregator generates two CSV files in `evaluation/results/{dataset}/aggregated/`:
+
+**correct_samples.csv**:
+- dataset, task_type, experiment_name, agent_architecture, num_rounds, main_id, ground_truth, agent_type, execution_order, round, time_cost, average_entropy, predicted_answer, is_correct
+
+**incorrect_samples.csv**:
+- [Same fields as correct_samples.csv]
+
+#### Examples
+
+**Aggregate GSM8K results:**
+```bash
+python evaluation/results_aggregator.py --dataset gsm8k
+```
+
+**Aggregate HumanEval results with custom output:**
+```bash
+python evaluation/results_aggregator.py --dataset humaneval --output-dir /custom/output
+```
+
+**Aggregate MMLU results from specific base path:**
+```bash
+python evaluation/results_aggregator.py --dataset mmlu --base-path /path/to/project
+```
