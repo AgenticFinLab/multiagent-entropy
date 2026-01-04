@@ -233,12 +233,12 @@ class ExperimentAnalyzer:
             comparison["architectures"][arch].append(
                 {
                     "experiment_name": exp_name,
-                    "accuracy": metrics["summary"]["accuracy"],
-                    "format_compliance_rate": metrics["summary"][
+                    "accuracy": metrics["summary"]["last_agent_stats"]["accuracy"],
+                    "format_compliance_rate": metrics["summary"]["last_agent_stats"][
                         "format_compliance_rate"
                     ],
-                    "average_time_cost": metrics["summary"]["average_time_cost"],
-                    "average_entropy": metrics["summary"]["average_entropy"],
+                    "average_time_cost": metrics["summary"]["last_agent_stats"]["average_time"],
+                    "average_entropy": metrics["summary"]["last_agent_stats"]["average_entropy"],
                 }
             )
 
