@@ -29,58 +29,56 @@ multiagent-entropy/
 ├── README.md                          ## Project overview and documentation
 ├── description.txt                    ## Project description
 ├── requirements.txt                   ## Python dependencies
-├── setup.py                          ## Package setup configuration
-├── configs/                          ## Configuration files
-├── docs/                             ## Documentation
-│   ├── evaluation-guidance.md        ## Evaluation framework documentation
-│   ├── experiment-guidance.md        ## Experiment configuration guide
-│   ├── Progress-record.md            ## Development progress log
-│   └── reference.md                  ## Reference materials
-├── examples/                         ## Example implementations
-│   └── uTEST/                        ## Test examples
-├── maep/                             ## Core package code
+├── setup.py                           ## Package setup configuration
+├── configs/                           ## Configuration files
+├── docs/                              ## Documentation
+│   ├── evaluation-guidance.md         ## Evaluation framework documentation
+│   ├── experiment-guidance.md         ## Experiment configuration guide
+│   ├── Progress-record.md             ## Development progress log
+│   └── reference.md                   ## Reference materials
+├── examples/                          ## Example implementations
+│   └── uTEST/                         ## Test examples
+├── maep/                              ## Core package code
 │   ├── __init__.py
-│   ├── entropy_infer.py             ## Entropy inference utilities
-│   ├── generic.py                   ## Generic agent implementation
-│   └── language/                    ## Language model integrations
-│       ├── single.py                ## Single agent mode
-│       ├── sequential.py            ## Sequential agent mode
-│       ├── centralized.py           ## Centralized agent mode
-│       ├── decentralized.py         ## Decentralized agent mode
-│       ├── full_decentralized.py    ## Full decentralized agent mode
-│       ├── debate.py                ## Debate agent mode
-│       └── hybrid.py                ## Hybrid agent mode
-├── evaluation/                       ## Evaluation framework
+│   ├── entropy_infer.py               ## Entropy inference utilities
+│   ├── generic.py                     ## Generic agent implementation
+│   └── language/                      ## Language model integrations
+│       ├── single.py                  ## Single agent mode
+│       ├── sequential.py              ## Sequential agent mode
+│       ├── centralized.py             ## Centralized agent mode
+│       ├── decentralized.py           ## Decentralized agent mode
+│       ├── full_decentralized.py      ## Full decentralized agent mode
+│       ├── debate.py                  ## Debate agent mode
+│       └── hybrid.py                  ## Hybrid agent mode
+├── evaluation/                        ## Evaluation framework
 │   ├── __init__.py
-│   ├── data_loader.py              ## Data loading utilities
-│   ├── entropy_analyzer.py         ## Entropy analysis tools
-│   ├── evaluator.py               ## Evaluation logic
-│   ├── experiment_analyzer.py     ## Experiment analysis
-│   ├── metrics_calculator.py      ## Metrics calculation
-│   ├── results_aggregator.py      ## Result aggregation
-│   ├── utils.py                   ## Utility functions
-│   └── results/                   ## Evaluation results
-└── experiments/                     ## Experiment management
-    ├── configs/                    ## Experiment configurations
+│   ├── data_loader.py                 ## Data loading utilities
+│   ├── entropy_analyzer.py            ## Entropy analysis tools
+│   ├── evaluator.py                   ## Evaluation logic
+│   ├── experiment_analyzer.py         ## Experiment analysis
+│   ├── metrics_calculator.py          ## Metrics calculation
+│   ├── results_aggregator.py          ## Result aggregation
+│   ├── utils.py                       ## Utility functions
+│   └── results/                       ## Evaluation results
+└── experiments/                       ## Experiment management
+    ├── configs/                       ## Experiment configurations
     │   ├── base_config.yml
-    │   ├── batch_example_qwen3_4b_gsm8k.yml
-    │   ├── batch_example_qwen3_8b_gsm8k.yml
-    │   ├── agent_specific/         ## Agent configurations
-    │   ├── dataset_specific/        ## Dataset configurations
-    │   ├── entropy_configs/         ## Entropy configurations
-    │   ├── infer_configs/           ## Inference configurations
-    │   └── model_specific/          ## Model configurations
-    ├── configs_exp/                ## Generated experiment configs
-    ├── data/                       ## Experiment data
-    ├── logs/                       ## Experiment logs
-    ├── results/                    ## Experiment results
-    │   ├── aggregated/             ## Aggregated results
-    │   └── raw/                    ## Raw results
-    ├── scripts/                    ## Experiment scripts
-    │   ├── run_experiment.py       ## Experiment runner
-    │   ├── config_loader.py        ## Configuration loader
-    │   └── result_aggregator.py   ## Result aggregator
-    └── temp/                       ## Temporary files
+    │   ├── agent_specific/            ## Agent configurations
+    │   ├── dataset_specific/          ## Dataset configurations
+    │   ├── entropy_configs/           ## Entropy configurations
+    │   ├── infer_configs/             ## Inference configurations
+    │   └── model_specific/            ## Model configurations
+    ├── configs_exp/                   ## Generated experiment configs
+    ├── data/                          ## Experiment data
+    ├── logs/                          ## Experiment logs
+    ├── results/                       ## Experiment results
+    │   ├── aggregated/                ## Aggregated results
+    │   └── raw/                       ## Raw results
+    ├── scripts/                       ## Experiment scripts
+    │   ├── run_experiment.py          ## Experiment runner
+    │   ├── config_loader.py           ## Configuration loader
+    │   └── result_aggregator.py       ## Result aggregator
+    └── temp/                          ## Temporary files
 ```
 
 ### Quick Start
