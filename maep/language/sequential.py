@@ -24,6 +24,7 @@ from lmbase.inference.base import InferInput, InferOutput
 
 from maep.generic import AgentState, BaseAgents
 from maep.entropy_infer import HFEntropyInference
+from examples.uTEST.prompts import get_identifier
 
 
 class SequentialAgents(BaseAgents):
@@ -151,11 +152,20 @@ class SequentialAgents(BaseAgents):
         history = self.format_round_history(state, sample_idx)
 
         if history:
-            return (
-                f"{question}\n\n"
-                f"{history}"
-                f"Please consider the previous attempts above and provide your {current_agent_name} output."
-            )
+            if current_agent_name == "solver" or current_agent_name == "judger":
+                identifier = get_identifier(self.task_type)
+                return (
+                    f"{question}\n\n"
+                    f"{history}"
+                    f"Please consider the previous attempts above and place the final answer in {identifier}."
+                )
+            else:
+                return (
+                    f"{question}\n\n"
+                    f"{history}"
+                    f"Please consider the previous attempts above and provide your {current_agent_name} output."
+                )
+
 
         return base_prompt.format(question=question)
 

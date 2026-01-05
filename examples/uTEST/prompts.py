@@ -40,7 +40,7 @@ def validate_task_type(task_type: str) -> bool:
 
 # --- From maep/language/single.py ---
 SINGLE_SYS = """You are a precise solver.
-Solve the problem correctly and concisely. """
+Solve the problem correctly and concisely and place the final answer in {identifier}."""
 
 SINGLE_USER = """Question:
 {question}
@@ -62,7 +62,7 @@ SOLVER_USER = """Question: {question}
 ### Plans ###
 {block}
 ### Plans ###
-Follow the plans to solve the question step by step."""
+Follow the plans to solve the question step by step and place the final answer in {identifier}."""
 
 CRITIC_SYS = """You are the critic agent. Review the solver's solution in detail, re-derive independently, and correct any mistakes.
 Keep the review terse."""

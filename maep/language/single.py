@@ -24,6 +24,7 @@ from lmbase.inference.base import InferInput, InferOutput
 
 from maep.generic import AgentState, BaseAgents
 from maep.entropy_infer import HFEntropyInference
+from examples.uTEST.prompts import get_identifier
 
 
 class SingleAgent(BaseAgents):
@@ -134,10 +135,11 @@ class SingleAgent(BaseAgents):
         history = self.format_round_history(state, sample_idx)
 
         if history:
+            identifier = get_identifier(self.task_type)
             return (
                 f"{question}\n\n"
                 f"{history}"
-                f"Please consider the previous attempts above and provide your solution."
+                f"Please consider the previous attempts above and place the final answer in {identifier}."
             )
 
         return base_prompt.format(question=question)
