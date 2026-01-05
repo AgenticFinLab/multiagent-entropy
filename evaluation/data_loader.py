@@ -47,6 +47,7 @@ class DataLoader:
             "humaneval": "HumanEval",
             "mmlu": "MMLU",
             "aime2024": "AIME2024",
+            "math500": "Math500",
         }
         dataset_folder = dataset_map.get(dataset.lower(), dataset)
         dataset_path = self.data_path / dataset_folder
@@ -62,10 +63,13 @@ class DataLoader:
 
         return {str(item["main_id"]): item for item in data}
 
-    def load_experiment_config(self, experiment_name: str) -> Dict[str, Any]:
+    def load_experiment_config(
+        self, dataset: str, experiment_name: str
+    ) -> Dict[str, Any]:
         """Load experiment configuration from YAML file.
 
         Args:
+            dataset: Dataset name (e.g., "gsm8k", "humaneval").
             experiment_name: Name of the experiment.
 
         Returns:
@@ -74,14 +78,20 @@ class DataLoader:
         Raises:
             FileNotFoundError: If config file is not found.
         """
-        config_file = self.configs_path / f"{experiment_name}.yml"
+        config_file = self.configs_path / f"{dataset}" / f"{experiment_name}.yml"
 
         if not config_file.exists():
             config_file = None
-            for f in self.configs_path.glob("*.yml"):
+            for f in self.configs_path.glob(f"{dataset}/*.yml"):
                 if experiment_name.startswith(f.stem):
                     config_file = f
                     break
+
+            if config_file is None:
+                for f in self.configs_path.glob("*.yml"):
+                    if experiment_name.startswith(f.stem):
+                        config_file = f
+                        break
 
             if config_file is None:
                 raise FileNotFoundError(
