@@ -47,5 +47,8 @@ inference_config:
   # device_map: "auto" would distribute model across all available GPUs
   device_map: "auto"
   
+# Entropy base configuration
+entropy_config: ""
+
 # Save folder configuration
 save_folder: "/experiments/results/raw"
