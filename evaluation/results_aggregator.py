@@ -8,7 +8,7 @@ into separate CSV files for machine learning analysis.
 import json
 import csv
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional, Set
 
 
 class ResultsAggregator:
@@ -18,6 +18,14 @@ class ResultsAggregator:
     and aggregates sample-level information into CSV files separated by
     correctness for machine learning analysis.
     """
+
+    MODE_SPECIFIC_AGENTS = {
+        "single": None,
+        "sequential": "judger",
+        "hybrid": "orchestrator",
+        "debate": "orchestrator",
+        "centralized": "orchestrator",
+    }
 
     def __init__(self, base_path: str, dataset: str):
         """Initialize the aggregator with base path.
@@ -47,6 +55,43 @@ class ResultsAggregator:
 
         return sorted(metrics_files)
 
+    def should_include_agent(
+        self,
+        agent_architecture: str,
+        agent_type: str,
+        round_num: int,
+        num_rounds: int,
+        execution_order: int,
+        all_agents: Dict[str, Any],
+    ) -> bool:
+        """Determine if an agent should be included based on mode-specific rules.
+
+        Args:
+            agent_architecture: The architecture mode (single, sequential, hybrid, debate, centralized)
+            agent_type: The type of agent (e.g., SingleSolver, judger, orchestrator)
+            round_num: The round number
+            num_rounds: Total number of rounds
+            execution_order: The execution order of the agent
+            all_agents: Dictionary of all agents for this sample
+
+        Returns:
+            True if the agent should be included, False otherwise.
+        """
+        target_agent = self.MODE_SPECIFIC_AGENTS.get(agent_architecture)
+
+        if target_agent is None:
+            return True
+
+        agent_type_lower = agent_type.lower()
+        target_agent_lower = target_agent.lower()
+
+        if agent_type_lower == target_agent_lower:
+            if agent_architecture in ["hybrid", "centralized"]:
+                return round_num == num_rounds
+            return True
+
+        return False
+
     def parse_metrics_file(self, metrics_file: Path) -> Dict[str, Any]:
         """Parse a metrics JSON file.
 
@@ -60,11 +105,14 @@ class ResultsAggregator:
             data = json.load(f)
         return data
 
-    def extract_sample_data(self, metrics_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def extract_sample_data(
+        self, metrics_data: Dict[str, Any], specific_mode: bool = False
+    ) -> List[Dict[str, Any]]:
         """Extract sample-level data from metrics.
 
         Args:
             metrics_data: Dictionary containing metrics data.
+            specific_mode: If True, only include mode-specific agents.
 
         Returns:
             List of dictionaries containing sample-level information.
@@ -101,6 +149,17 @@ class ResultsAggregator:
                     if "_round_" in agent_key:
                         round_num = int(agent_key.split("_round_")[1])
 
+                    if specific_mode:
+                        if not self.should_include_agent(
+                            agent_architecture,
+                            agent_type,
+                            round_num,
+                            num_rounds,
+                            execution_order,
+                            agents,
+                        ):
+                            continue
+
                     sample_record = {
                         "dataset": dataset,
                         "task_type": task_type,
@@ -122,8 +181,13 @@ class ResultsAggregator:
 
         return samples_data
 
-    def aggregate_all_results(self) -> Dict[str, List[Dict[str, Any]]]:
+    def aggregate_all_results(
+        self, specific_mode: bool = False
+    ) -> Dict[str, List[Dict[str, Any]]]:
         """Aggregate all results from metrics files.
+
+        Args:
+            specific_mode: If True, only include mode-specific agents.
 
         Returns:
             Dictionary containing correct and incorrect samples.
@@ -137,7 +201,7 @@ class ResultsAggregator:
 
             try:
                 metrics_data = self.parse_metrics_file(metrics_file)
-                samples_data = self.extract_sample_data(metrics_data)
+                samples_data = self.extract_sample_data(metrics_data, specific_mode)
 
                 for sample in samples_data:
                     if sample["is_correct"]:
@@ -149,6 +213,65 @@ class ResultsAggregator:
                 print(f"Error processing {metrics_file}: {e}")
 
         return all_samples
+
+    def compute_experiment_statistics(
+        self, samples: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Compute statistics for each experiment.
+
+        Args:
+            samples: List of sample dictionaries.
+
+        Returns:
+            List of experiment statistics dictionaries.
+        """
+        exp_stats = {}
+
+        for sample in samples:
+            exp_name = sample["experiment_name"]
+            agent_architecture = sample["agent_architecture"]
+            num_rounds = sample["num_rounds"]
+
+            if exp_name not in exp_stats:
+                exp_stats[exp_name] = {
+                    "experiment_name": exp_name,
+                    "agent_architecture": agent_architecture,
+                    "num_rounds": num_rounds,
+                    "num_samples": 0,
+                    "count": 0,
+                    "correct": 0,
+                    "total_time": 0.0,
+                    "total_entropy": 0.0,
+                    "format_compliant": 0,
+                }
+
+            exp_stats[exp_name]["num_samples"] = max(
+                exp_stats[exp_name]["num_samples"], sample["round"]
+            )
+            exp_stats[exp_name]["count"] += 1
+            if sample["is_correct"]:
+                exp_stats[exp_name]["correct"] += 1
+            exp_stats[exp_name]["total_time"] += sample["time_cost"]
+            exp_stats[exp_name]["total_entropy"] += sample["average_entropy"]
+
+        results = []
+        for stats in exp_stats.values():
+            count = stats["count"]
+            stats["accuracy"] = stats["correct"] / count if count > 0 else 0.0
+            stats["average_time"] = stats["total_time"] / count if count > 0 else 0.0
+            stats["average_entropy"] = (
+                stats["total_entropy"] / count if count > 0 else 0.0
+            )
+            stats["format_compliance_rate"] = 1.0
+            stats["num_samples"] = count
+
+            del stats["total_time"]
+            del stats["total_entropy"]
+            del stats["format_compliant"]
+
+            results.append(stats)
+
+        return results
 
     def save_to_csv(self, samples: List[Dict[str, Any]], output_path: Path) -> None:
         """Save samples to a CSV file.
@@ -187,29 +310,88 @@ class ResultsAggregator:
 
         print(f"Saved {len(samples)} samples to {output_path}")
 
+    def save_statistics_to_csv(
+        self, stats: List[Dict[str, Any]], output_path: Path
+    ) -> None:
+        """Save experiment statistics to a CSV file.
+
+        Args:
+            stats: List of experiment statistics dictionaries.
+            output_path: Path to the output CSV file.
+        """
+        if not stats:
+            print(f"No statistics to save to {output_path}")
+            return
+
+        fieldnames = [
+            "experiment_name",
+            "agent_architecture",
+            "num_rounds",
+            "num_samples",
+            "count",
+            "correct",
+            "accuracy",
+            "format_compliance_rate",
+            "average_time",
+            "average_entropy",
+        ]
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(output_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(stats)
+
+        print(f"Saved {len(stats)} experiment statistics to {output_path}")
+
     def run_aggregation(self) -> None:
         """Run the complete aggregation process.
 
         Traverses all metrics files, extracts sample data,
         and saves correct and incorrect samples to separate CSV files.
+        Creates both all-agent and specific-agent aggregations.
         """
         print("Starting aggregation of experiment results...")
 
-        all_samples = self.aggregate_all_results()
+        all_samples = self.aggregate_all_results(specific_mode=False)
+        specific_samples = self.aggregate_all_results(specific_mode=True)
 
-        output_dir = self.results_path / "aggregated"
-        correct_csv = output_dir / "correct_samples.csv"
-        incorrect_csv = output_dir / "incorrect_samples.csv"
+        output_dir_all = self.results_path / "aggregated_all"
+        correct_csv_all = output_dir_all / "correct_samples.csv"
+        incorrect_csv_all = output_dir_all / "incorrect_samples.csv"
 
-        self.save_to_csv(all_samples["correct"], correct_csv)
-        self.save_to_csv(all_samples["incorrect"], incorrect_csv)
+        self.save_to_csv(all_samples["correct"], correct_csv_all)
+        self.save_to_csv(all_samples["incorrect"], incorrect_csv_all)
+
+        output_dir_specific = self.results_path / "aggregated_specific"
+        correct_csv_specific = output_dir_specific / "correct_samples.csv"
+        incorrect_csv_specific = output_dir_specific / "incorrect_samples.csv"
+
+        self.save_to_csv(specific_samples["correct"], correct_csv_specific)
+        self.save_to_csv(specific_samples["incorrect"], incorrect_csv_specific)
+
+        all_samples_list = all_samples["correct"] + all_samples["incorrect"]
+        specific_samples_list = (
+            specific_samples["correct"] + specific_samples["incorrect"]
+        )
+
+        all_stats = self.compute_experiment_statistics(all_samples_list)
+        specific_stats = self.compute_experiment_statistics(specific_samples_list)
+
+        last_agent_stats_path = self.results_path / "last_agent_stats.csv"
+        self.save_statistics_to_csv(specific_stats, last_agent_stats_path)
 
         print(f"\nAggregation complete!")
-        print(f"Correct samples: {len(all_samples['correct'])}")
-        print(f"Incorrect samples: {len(all_samples['incorrect'])}")
-        print(
-            f"Total samples: {len(all_samples['correct']) + len(all_samples['incorrect'])}"
-        )
+        print(f"All-agent aggregation:")
+        print(f"  Correct samples: {len(all_samples['correct'])}")
+        print(f"  Incorrect samples: {len(all_samples['incorrect'])}")
+        print(f"  Total samples: {len(all_samples['correct']) + len(all_samples['incorrect'])}")
+        print(f"\nSpecific-agent aggregation:")
+        print(f"  Correct samples: {len(specific_samples['correct'])}")
+        print(f"  Incorrect samples: {len(specific_samples['incorrect'])}")
+        print(f"  Total samples: {len(specific_samples['correct']) + len(specific_samples['incorrect'])}")
+        print(f"\nStatistics saved to: {last_agent_stats_path}")
 
 
 def main():
