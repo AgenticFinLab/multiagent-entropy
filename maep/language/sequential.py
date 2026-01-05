@@ -24,7 +24,7 @@ from lmbase.inference.base import InferInput, InferOutput
 
 from maep.generic import AgentState, BaseAgents
 from maep.entropy_infer import HFEntropyInference
-from examples.uTEST.prompts import get_identifier
+from maep.prompts import get_identifier
 
 
 class SequentialAgents(BaseAgents):

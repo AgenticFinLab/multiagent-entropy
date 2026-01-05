@@ -7,5 +7,5 @@ agents:
     entropy_config: "${entropy_configs.entropy_config}"
     generation_config: "${base_config.generation_config}"
 
-    sys_message: "examples.uTEST.prompts:SINGLE_SYS"
-    user_message: "examples.uTEST.prompts:SINGLE_USER"
+    sys_message: "maep.prompts:SINGLE_SYS"
+    user_message: "maep.prompts:SINGLE_USER"

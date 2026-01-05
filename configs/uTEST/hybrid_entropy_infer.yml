@@ -48,8 +48,8 @@ agents:
     entropy_config: *entropy
     generation_config: *gen
 
-    sys_message: "examples.uTEST.prompts:MATH_SYS"
-    user_message: "examples.uTEST.prompts:MATH_USER"
+    sys_message: "maep.prompts:MATH_SYS"
+    user_message: "maep.prompts:MATH_USER"
 
   ScienceAgent:
     lm_name: *lm_name
@@ -57,8 +57,8 @@ agents:
     entropy_config: *entropy
     generation_config: *gen
 
-    sys_message: "examples.uTEST.prompts:SCIENCE_SYS"
-    user_message: "examples.uTEST.prompts:SCIENCE_USER"
+    sys_message: "maep.prompts:SCIENCE_SYS"
+    user_message: "maep.prompts:SCIENCE_USER"
 
   CodeAgent:
     lm_name: *lm_name
@@ -66,8 +66,8 @@ agents:
     entropy_config: *entropy
     generation_config: *gen
 
-    sys_message: "examples.uTEST.prompts:CODE_SYS"
-    user_message: "examples.uTEST.prompts:CODE_USER"
+    sys_message: "maep.prompts:CODE_SYS"
+    user_message: "maep.prompts:CODE_USER"
 
   OrchestratorAgent:
     lm_name: *lm_name
@@ -75,7 +75,7 @@ agents:
     entropy_config: *entropy
     generation_config: *gen
 
-    sys_message: "examples.uTEST.prompts:ORCHESTRATOR_SYS"
-    user_message: "examples.uTEST.prompts:ORCHESTRATOR_USER"
-    sys_feedback_message: "examples.uTEST.prompts:ORCHESTRATOR_FEEDBACK_SYS"
-    user_feedback_message: "examples.uTEST.prompts:ORCHESTRATOR_FEEDBACK_USER"
+    sys_message: "maep.prompts:ORCHESTRATOR_SYS"
+    user_message: "maep.prompts:ORCHESTRATOR_USER"
+    sys_feedback_message: "maep.prompts:ORCHESTRATOR_FEEDBACK_SYS"
+    user_feedback_message: "maep.prompts:ORCHESTRATOR_FEEDBACK_USER"

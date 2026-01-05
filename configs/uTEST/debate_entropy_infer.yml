@@ -47,21 +47,21 @@ agents:
     inference_config: *infer
     entropy_config: *entropy
     generation_config: *gen
-    sys_message: "examples.uTEST.prompts:DEBATE_AGENT1_SYS"
-    user_message: "examples.uTEST.prompts:DEBATE_AGENT1_USER"
+    sys_message: "maep.prompts:DEBATE_AGENT1_SYS"
+    user_message: "maep.prompts:DEBATE_AGENT1_USER"
 
   agent2:
     lm_name: *lm_name
     inference_config: *infer
     entropy_config: *entropy
     generation_config: *gen
-    sys_message: "examples.uTEST.prompts:DEBATE_AGENT2_SYS"
-    user_message: "examples.uTEST.prompts:DEBATE_AGENT2_USER"
+    sys_message: "maep.prompts:DEBATE_AGENT2_SYS"
+    user_message: "maep.prompts:DEBATE_AGENT2_USER"
 
   agent3:
     lm_name: *lm_name
     inference_config: *infer
     entropy_config: *entropy
     generation_config: *gen
-    sys_message: "examples.uTEST.prompts:DEBATE_AGENT3_SYS"
-    user_message: "examples.uTEST.prompts:DEBATE_AGENT3_USER"
+    sys_message: "maep.prompts:DEBATE_AGENT3_SYS"
+    user_message: "maep.prompts:DEBATE_AGENT3_USER"
