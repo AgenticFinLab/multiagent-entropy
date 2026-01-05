@@ -75,13 +75,6 @@ def parse_args() -> argparse.Namespace:
         help="Path to entropy configuration file",
     )
     parser.add_argument(
-        "-i",
-        "--infer-config",
-        type=str,
-        default="experiments/configs/infer_configs/cuda_auto.yml",
-        help="Path to inference configuration file (CUDA device settings)",
-    )
-    parser.add_argument(
         "-n",
         "--experiment-name",
         type=str,
@@ -336,7 +329,6 @@ def run_batch_experiments(
             model_config_path=exp["model_config"],
             dataset_config_path=exp["dataset_config"],
             entropy_config_path=exp["entropy_config"],
-            infer_config_path=exp.get("infer_config"),
             experiment_name=exp["name"],
             agent_type=exp.get("agent_type"),
         )
@@ -401,7 +393,6 @@ def main():
             model_config_path=args.model_config,
             dataset_config_path=args.dataset_config,
             entropy_config_path=args.entropy_config,
-            infer_config_path=args.infer_config,
             experiment_name=args.experiment_name,
             agent_type=args.agent_type,
         )
