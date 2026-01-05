@@ -69,12 +69,6 @@ def parse_args() -> argparse.Namespace:
         help="Path to dataset-specific configuration file",
     )
     parser.add_argument(
-        "-e",
-        "--entropy-config",
-        type=str,
-        help="Path to entropy configuration file",
-    )
-    parser.add_argument(
         "-n",
         "--experiment-name",
         type=str,
@@ -122,8 +116,6 @@ def parse_args() -> argparse.Namespace:
             parser.error("--model-config is required when not using --batch-config")
         if not args.dataset_config:
             parser.error("--dataset-config is required when not using --batch-config")
-        if not args.entropy_config:
-            parser.error("--entropy-config is required when not using --batch-config")
         if not args.experiment_name:
             parser.error("--experiment-name is required when not using --batch-config")
         # Note: --infer-config is optional, defaults to None
@@ -328,7 +320,6 @@ def run_batch_experiments(
             ),
             model_config_path=exp["model_config"],
             dataset_config_path=exp["dataset_config"],
-            entropy_config_path=exp["entropy_config"],
             experiment_name=exp["name"],
             agent_type=exp.get("agent_type"),
         )
@@ -392,7 +383,6 @@ def main():
             base_config_path=args.base_config,
             model_config_path=args.model_config,
             dataset_config_path=args.dataset_config,
-            entropy_config_path=args.entropy_config,
             experiment_name=args.experiment_name,
             agent_type=args.agent_type,
         )

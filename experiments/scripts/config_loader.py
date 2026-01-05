@@ -16,7 +16,6 @@ Usage:
         base_config_path='experiments/configs/base_config.yml',
         model_config_path='experiments/configs/model_specific/qwen3-0.6b.yml',
         dataset_config_path='experiments/configs/dataset_specific/gsm8k.yml',
-        entropy_config_path='experiments/configs/entropy_configs/standard.yml',
         experiment_name='test_experiment',
         agent_type='centralized'
     )
@@ -103,7 +102,6 @@ def resolve_agent_placeholders(
     agent_template: Dict[str, Any],
     model_config: Dict[str, Any],
     base_config: Dict[str, Any],
-    entropy_config: Dict[str, Any],
     dataset_config: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
     """Resolve placeholders in agent configuration template with actual values.
@@ -112,7 +110,6 @@ def resolve_agent_placeholders(
         agent_template (Dict[str, Any]): Agent configuration template
         model_config (Dict[str, Any]): Model configuration
         base_config (Dict[str, Any]): Base configuration
-        entropy_config (Dict[str, Any]): Entropy configuration
         dataset_config (Dict[str, Any]): Dataset-specific configuration (optional, overrides base_config)
 
     Returns:
@@ -134,10 +131,7 @@ def resolve_agent_placeholders(
             "device": "cuda",
             "torch_dtype": "float16",
             "device_map": "auto"
-        }
-    
-    resolved_agent["entropy_config"] = entropy_config["entropy_config"]
-    
+        }    
     # Determine generation_config priority: dataset_config > base_config
     # If dataset_config has generation_config, merge it with base_config to ensure all fields are present
     if dataset_config and "generation_config" in dataset_config:
@@ -155,7 +149,6 @@ def load_experiment_config(
     base_config_path: str,
     model_config_path: str,
     dataset_config_path: str,
-    entropy_config_path: str,
     experiment_name: str,
     agent_type: str = None,
 ) -> Dict[str, Any]:
@@ -165,7 +158,6 @@ def load_experiment_config(
         base_config_path (str): Path to base configuration file.
         model_config_path (str): Path to model-specific configuration file.
         dataset_config_path (str): Path to dataset-specific configuration file.
-        entropy_config_path (str): Path to entropy configuration file.
         experiment_name (str): Name of the experiment.
         agent_type (str): Type of agent configuration to load (single/sequential/centralized/decentralized/full_decentralized/debate/hybrid).
 
@@ -177,7 +169,6 @@ def load_experiment_config(
         base_config = load_config(base_config_path)
         model_config = load_config(model_config_path)
         dataset_config = load_config(dataset_config_path)
-        entropy_config = load_config(entropy_config_path)
 
         # Get dataset name for path creation
         dataset_name = dataset_config['data']['data_name'].lower()
@@ -214,7 +205,6 @@ def load_experiment_config(
                 agent_template=agent_template,
                 model_config=model_config,
                 base_config=base_config,
-                entropy_config=entropy_config,
                 dataset_config=dataset_config,
             )
             agents_config["agents"][agent_name] = resolved_agent
@@ -224,7 +214,6 @@ def load_experiment_config(
             base_config,
             model_config,
             dataset_config,
-            entropy_config,
             experiment_config,
             agents_config,
         ]
@@ -265,7 +254,6 @@ def generate_batch_configs(batch_config_path: str) -> Dict[str, Any]:
             )
             model_config_path = experiment["model_config"]
             dataset_config_path = experiment["dataset_config"]
-            entropy_config_path = experiment["entropy_config"]
             agent_type = experiment.get("agent_type")
 
             # Load and merge configurations
@@ -273,7 +261,6 @@ def generate_batch_configs(batch_config_path: str) -> Dict[str, Any]:
                 base_config_path=base_config_path,
                 model_config_path=model_config_path,
                 dataset_config_path=dataset_config_path,
-                entropy_config_path=entropy_config_path,
                 experiment_name=name,
                 agent_type=agent_type,
             )
@@ -346,7 +333,6 @@ if __name__ == "__main__":
                 base_config_path="experiments/configs/base_config.yml",
                 model_config_path="experiments/configs/model_specific/qwen3-0.6b.yml",
                 dataset_config_path="experiments/configs/dataset_specific/gsm8k.yml",
-                entropy_config_path="experiments/configs/entropy_configs/standard.yml",
                 experiment_name="test_experiment",
                 agent_type=args.agent_type,
             )
