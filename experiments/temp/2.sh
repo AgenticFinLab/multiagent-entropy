@@ -1,5 +1,3 @@
-cd /home/yuxuanzhao/multiagent-entropy
-
 python experiments/scripts/run_experiment.py \
   --experiment-name qwen3-4b_gsm8k_debate_agent \
   --base-config "experiments/configs/base_config.yml" \
