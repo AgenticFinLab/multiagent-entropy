@@ -85,7 +85,7 @@ class EntropyAnalyzer:
         Returns:
             Dictionary containing macro and micro level entropy statistics.
         """
-        config = self.data_loader.load_experiment_config(experiment_name)
+        config = self.data_loader.load_experiment_config(dataset, experiment_name)
         agent_architecture = config.get("agent_type", "unknown")
         num_rounds = config.get("round", 1)
 
