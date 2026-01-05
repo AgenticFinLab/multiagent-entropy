@@ -15,9 +15,6 @@ experiments/
 │   │   ├── aime2024.yml                    # AIME2024 dataset configuration
 │   │   ├── mmlu.yml                        # MMLU dataset configuration
 │   │   └── humaneval.yml                   # HumanEval dataset configuration
-│   ├── entropy_configs/                    # Entropy calculation configuration files
-│   │   ├── standard.yml                    # Standard entropy configuration
-│   │   └── no_entropy.yml                  # No entropy calculation configuration
 │   ├── agent_specific/                     # Agent-specific configuration files
 │   │   ├── single_agents.yml               # Single agent configuration
 │   │   ├── sequential_agents.yml           # Sequential agent configuration
@@ -26,12 +23,6 @@ experiments/
 │   │   ├── full_decentralized_agents.yml   # Full decentralized agent configuration
 │   │   ├── debate_agents.yml               # Debate agent configuration
 │   │   └── hybrid_agents.yml               # Hybrid agent configuration
-│   ├── infer_configs/                      # Inference configuration files
-│   │   ├── cuda0.yml                       # CUDA device 0 configuration
-│   │   ├── cuda1.yml                       # CUDA device 1 configuration
-│   │   ├── cuda2.yml                       # CUDA device 2 configuration
-│   │   ├── cuda3.yml                       # CUDA device 3 configuration
-│   │   └── cuda_auto.yml                   # CUDA auto device mapping configuration
 │   └── model_specific/                     # Model-specific configuration files
 │       ├── qwen3-0.6b.yml                  # Qwen3-0.6B model configuration
 │       ├── qwen3-1.7b.yml                  # Qwen3-1.7B model configuration
@@ -53,23 +44,21 @@ experiments/
 ## Configuration System
 
 ### Base Configuration
-The `base_config.yml` file contains common settings shared across all experiments, such as:
+The `base_config.yml` file contains common settings shared across all experiments, including:
 - Environment settings (dotenv_path)
 - Graph configuration (recursion_limit)
 - Generation base configuration (max_new_tokens, do_sample, temperature, top_p)
+- Inference configuration (device, torch_dtype, device_map)
+- Entropy configuration (calculate_entropy, entropy_type, etc.)
 - Agent round settings (round, aggregate_history, max_history_chars, max_history_rounds)
 - Save folder configuration
+
+The `inference_config` and `entropy_config` sections in `base_config.yml` provide default settings for all experiments. These can be overridden by model-specific configurations if needed.
 
 ### Model-Specific Configuration
 Model-specific configurations (`model_specific/`) define settings for each model, including:
 - Model name/path
-- Model-specific inference settings (device type, precision, etc.)
-
-### Inference Configuration
-Inference configurations (`infer_configs/`) define device and precision settings for model inference, including:
-- Device type: "cuda" (NVIDIA), "mps" (Mac), or "cpu"
-- Device mapping: "auto" to distribute model across all available GPUs, or null to load on specified device only
-- Torch data type: "float16", "bfloat16", or "float32" (use float32 for CPU/MPS stability if needed)
+- Optional model-specific inference settings (can override base_config's inference_config)
 
 ### Dataset-Specific Configuration
 Dataset-specific configurations (`dataset_specific/`) define settings for each dataset, including:
@@ -77,6 +66,7 @@ Dataset-specific configurations (`dataset_specific/`) define settings for each d
 - Dataset path
 - Number of samples to process
 - Batch size
+- Optional generation_config overrides (can override base_config's generation_config)
 
 ### Configuration Priority and Override Mechanism
 The configuration system supports a hierarchical priority mechanism that allows dataset-specific configurations to override base configuration settings. This enables flexible customization for different datasets while maintaining a common baseline.
@@ -134,12 +124,6 @@ This design ensures that:
 - New datasets can easily customize generation parameters without modifying the base configuration
 - Missing parameters in dataset-specific configurations are safely inherited from the base configuration
 - The system remains flexible and maintainable as new datasets are added
-
-### Entropy Configuration
-Entropy configurations (`entropy_configs/`) define settings for entropy calculation, including:
-- Whether to calculate entropy
-- Type of entropy to calculate
-- Entropy-related parameters
 
 ### Agent-Specific Configuration
 Agent-specific configurations (`agent_specific/`) define the structure and parameters for each agent mode:
@@ -199,8 +183,6 @@ python experiments/scripts/run_experiment.py \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
   --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
-  --entropy-config "experiments/configs/entropy_configs/standard.yml" \
-  --infer-config "experiments/configs/infer_configs/cuda2.yml" \
   --agent-type "single"
 ```
 
@@ -212,8 +194,6 @@ python experiments/scripts/run_experiment.py \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
   --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
-  --entropy-config "experiments/configs/entropy_configs/standard.yml" \
-  --infer-config "experiments/configs/infer_configs/cuda0.yml" \
   --agent-type "sequential"
 ```
 
@@ -225,8 +205,6 @@ python experiments/scripts/run_experiment.py \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
   --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
-  --entropy-config "experiments/configs/entropy_configs/standard.yml" \
-  --infer-config "experiments/configs/infer_configs/cuda1.yml" \
   --agent-type "centralized"
 ```
 
@@ -238,8 +216,6 @@ python experiments/scripts/run_experiment.py \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
   --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
-  --entropy-config "experiments/configs/entropy_configs/standard.yml" \
-  --infer-config "experiments/configs/infer_configs/cuda0.yml" \
   --agent-type "decentralized"
 ```
 
@@ -251,8 +227,6 @@ python experiments/scripts/run_experiment.py \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
   --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
-  --entropy-config "experiments/configs/entropy_configs/standard.yml" \
-  --infer-config "experiments/configs/infer_configs/cuda1.yml" \
   --agent-type "full_decentralized"
 ```
 
@@ -264,8 +238,6 @@ python experiments/scripts/run_experiment.py \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
   --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
-  --entropy-config "experiments/configs/entropy_configs/standard.yml" \
-  --infer-config "experiments/configs/infer_configs/cuda2.yml" \
   --agent-type "debate"
 ```
 
@@ -278,8 +250,6 @@ python experiments/scripts/run_experiment.py \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
   --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
-  --entropy-config "experiments/configs/entropy_configs/standard.yml" \
-  --infer-config "experiments/configs/infer_configs/cuda3.yml" \
   --agent-type "hybrid"
 ```
 
@@ -297,8 +267,6 @@ python experiments/scripts/run_experiment.py \
 - `-b, --base-config`: Path to base configuration file (default: experiments/configs/base_config.yml)
 - `-m, --model-config`: Path to model-specific configuration file (required for single experiment)
 - `-d, --dataset-config`: Path to dataset-specific configuration file (required for single experiment)
-- `-e, --entropy-config`: Path to entropy configuration file (required for single experiment)
-- `-i, --infer-config`: Path to inference configuration file (default: experiments/configs/infer_configs/cuda_auto.yml)
 - `-n, --experiment-name`: Name of the experiment (required for single experiment)
 - `--agent-type`: Type of agent configuration to use (single, sequential, centralized, decentralized, full_decentralized, debate, hybrid)
 - `--batch-config`: Path to batch configuration file (for batch experiments)
@@ -365,14 +333,6 @@ python experiments/scripts/result_aggregator.py \
      # Other generation parameters (do_sample, temperature, top_p) will be inherited from base_config.yml
    ```
 
-### Adding a New Entropy Configuration
-1. Create a new YAML file in `experiments/configs/entropy_configs/`
-2. Define entropy calculation settings (calculate_entropy, entropy_type, etc.)
-
-### Adding a New Inference Configuration
-1. Create a new YAML file in `experiments/configs/infer_configs/`
-2. Define inference settings (device, max_new_tokens, temperature, etc.)
-
 ## Best Practices
 
 1. **Configuration Reuse**: Leverage the base configuration to avoid duplication
@@ -382,11 +342,6 @@ python experiments/scripts/result_aggregator.py \
 5. **Batch Processing**: Use batch mode for running multiple experiments efficiently
 
 ## Special Notes and Limitations
-
-### Inference Configuration Notes
-- **Device Selection**: The `device_map: "auto"` option distributes the model across all available GPUs automatically, which is useful for large models. Set `device_map: null` to force the model to load on the specified device only.
-- **Precision Settings**: Use `torch_dtype: "float32"` for CPU or MPS (Mac) devices to ensure stability. For NVIDIA GPUs, `float16` or `bfloat16` is recommended for better performance.
-- **Optional infer_config**: The `infer_config` parameter is optional in batch configuration files. If not provided, `experiments/configs/infer_configs/cuda_auto.yml` will be used by default.
 
 ### Agent Mode Specific Notes
 - **Debate Mode**: Unlike other agent modes, Debate mode uses majority voting instead of an orchestrator agent. The orchestrator does NOT use LLM inference; it extracts answers wrapped in \\boxed{} from each agent's response and selects the most frequent one as the final result.
