@@ -14,4 +14,4 @@ task_type: "code"
 # Generation configuration (overrides base_config.yml)
 # HumanEval requires code generation with moderate length
 generation_config:
-  max_new_tokens: 2000
+  max_new_tokens: 8192

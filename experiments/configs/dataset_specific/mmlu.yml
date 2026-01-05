@@ -14,4 +14,4 @@ task_type: "option"
 # Generation configuration (overrides base_config.yml)
 # MMLU is multiple-choice, requires shorter responses
 generation_config:
-  max_new_tokens: 2000
+  max_new_tokens: 8192
