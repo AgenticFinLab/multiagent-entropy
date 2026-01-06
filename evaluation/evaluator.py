@@ -8,9 +8,9 @@ import json
 import argparse
 from pathlib import Path
 
+from aggregator import Aggregator
 from entropy_analyzer import EntropyAnalyzer
 from experiment_analyzer import ExperimentAnalyzer
-from aggregator import ResultsAggregator
 
 
 def main():
@@ -212,17 +212,39 @@ def main():
                     with open(json_output_path, "w", encoding="utf-8") as f:
                         json.dump(entropy_results, f, indent=2, ensure_ascii=False)
 
-    if args.run_aggregator or args.aggregate_all:      
-        aggregator = ResultsAggregator(base_path)
+    if args.run_aggregator or args.aggregate_all:
+        base_results_path = Path(base_path) / "evaluation" / "results"
         
         if args.aggregate_all:
-            output_path = aggregator.save_all_aggregated_results()
-            print(f"All datasets aggregated results saved to: {output_path}")
+            datasets = ["gsm8k", "humaneval", "mmlu", "aime2024", "math500"]
+            for dataset in datasets:
+                dataset_path = base_results_path / dataset
+                entropy_file = dataset_path / "all_entropy_results.json"
+                metrics_file = dataset_path / "all_metrics.json"
+                output_csv = dataset_path / "aggregated_data.csv"
+                
+                if entropy_file.exists() and metrics_file.exists():
+                    converter = Aggregator(
+                        str(entropy_file),
+                        str(metrics_file),
+                        str(output_csv)
+                    )
+                    converter.convert_to_csv()
+                    print(f"CSV generated for {dataset}: {output_csv}")
         else:
-            output_path = aggregator.save_aggregated_results(args.dataset)
-            print(f"Aggregated results saved to: {output_path}")
+            dataset_path = base_results_path / args.dataset
+            entropy_file = dataset_path / "all_entropy_results.json"
+            metrics_file = dataset_path / "all_metrics.json"
+            output_csv = dataset_path / "aggregated_data.csv"
             
-            aggregated = aggregator.aggregate_dataset_results(args.dataset)
+            if entropy_file.exists() and metrics_file.exists():
+                converter = Aggregator(
+                    str(entropy_file),
+                    str(metrics_file),
+                    str(output_csv)
+                )
+                converter.convert_to_csv()
+                print(f"CSV generated for {args.dataset}: {output_csv}")
 
 if __name__ == "__main__":
     main()

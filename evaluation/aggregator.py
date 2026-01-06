@@ -1,489 +1,168 @@
 """Aggregator for multi-agent experiment results.
 
 This module provides functionality to aggregate experiment results
-from multiple sources into a unified format suitable for data mining
-and analysis.
+from `all_entropy_results.json` and `all_metrics.json` into a unified format csv file which suitable for data mining and analysis.
 """
 
-from pathlib import Path
-from typing import Dict, List, Any, Optional
-from collections import defaultdict
+import csv
 import json
+from pathlib import Path
+from typing import Dict, Any, List
+from collections import defaultdict
 
 
-class ResultsAggregator:
-    """Aggregator for multi-agent experiment results.
+class Aggregator:
+    """Convert JSON results to CSV format for data mining."""
 
-    Combines entropy statistics, performance metrics, and architecture
-    information into a unified format for data mining and analysis.
-    """
-
-    def __init__(self, base_path: str):
-        """Initialize the results aggregator.
+    def __init__(self, entropy_file: str, metrics_file: str, output_csv: str):
+        """Initialize the converter.
 
         Args:
-            base_path: Base path to the project directory.
+            entropy_file: Path to all_entropy_results.json
+            metrics_file: Path to all_metrics.json
+            output_csv: Path to output CSV file
         """
-        self.base_path = Path(base_path)
-        if (self.base_path / "results").exists():
-            self.results_dir = self.base_path / "results"
-        elif (self.base_path / "evaluation" / "results").exists():
-            self.results_dir = self.base_path / "evaluation" / "results"
-        else:
-            self.results_dir = self.base_path / "results"
+        self.entropy_file = Path(entropy_file)
+        self.metrics_file = Path(metrics_file)
+        self.output_csv = Path(output_csv)
 
-    def aggregate_dataset_results(
-        self, dataset: str
-    ) -> Dict[str, Any]:
-        """Aggregate all results for a specific dataset.
-
-        Args:
-            dataset: Dataset name (e.g., "gsm8k", "humaneval").
+    def load_json_files(self) -> tuple:
+        """Load both JSON files.
 
         Returns:
-            Dictionary containing aggregated results in a data-mining friendly format.
+            Tuple of (entropy_data, metrics_data)
         """
-        dataset_dir = self.results_dir / dataset
-
-        entropy_file = dataset_dir / "all_entropy_results.json"
-        metrics_file = dataset_dir / "all_metrics.json"
-
-        if not entropy_file.exists() or not metrics_file.exists():
-            raise FileNotFoundError(
-                f"Results files not found for dataset {dataset}. "
-                f"Please run evaluation first."
-            )
-
-        with open(entropy_file, "r", encoding="utf-8") as f:
+        with open(self.entropy_file, "r", encoding="utf-8") as f:
             entropy_data = json.load(f)
 
-        with open(metrics_file, "r", encoding="utf-8") as f:
+        with open(self.metrics_file, "r", encoding="utf-8") as f:
             metrics_data = json.load(f)
 
-        aggregated = {
-            "dataset": dataset,
-            "summary": self._create_dataset_summary(entropy_data, metrics_data),
-            "experiments": self._aggregate_experiments(entropy_data, metrics_data),
-            "architecture_comparison": self._compare_architectures(entropy_data, metrics_data),
-            "entropy_performance_correlation": self._analyze_entropy_performance_correlation(
-                entropy_data, metrics_data
-            ),
-            "round_analysis": self._analyze_rounds(entropy_data, metrics_data),
-            "agent_analysis": self._analyze_agents(entropy_data, metrics_data),
-        }
+        return entropy_data, metrics_data
 
-        return aggregated
-
-    def _calculate_experiment_metrics(
-        self, exp_metrics: Dict[str, Any]
-    ) -> Dict[str, float]:
-        """Calculate metrics from experiment data.
-
-        Args:
-            exp_metrics: Experiment metrics data.
-
-        Returns:
-            Dictionary containing calculated metrics.
-        """
-        samples = exp_metrics.get("samples", {})
-        
-        total_samples = len(samples)
-        correct_predictions = 0
-        total_time = 0.0
-        total_predictions = 0
-        
-        for sample_id, sample_data in samples.items():
-            agents = sample_data.get("agents", {})
-            for agent_name, agent_data in agents.items():
-                total_time += agent_data.get("time_cost", 0)
-                if agent_data.get("predicted_answer") is not None:
-                    total_predictions += 1
-                    if agent_data.get("is_correct", False):
-                        correct_predictions += 1
-        
-        accuracy = correct_predictions / total_predictions if total_predictions > 0 else 0
-        average_time = total_time / total_predictions if total_predictions > 0 else 0
-        
-        return {
-            "accuracy": accuracy,
-            "total_time": total_time,
-            "average_time": average_time,
-            "total_samples": total_samples,
-            "total_predictions": total_predictions,
-        }
-
-    def _create_dataset_summary(
-        self, entropy_data: Dict[str, Any], metrics_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Create a high-level summary of the dataset.
-
-        Args:
-            entropy_data: Entropy analysis results.
-            metrics_data: Performance metrics.
-
-        Returns:
-            Dictionary containing dataset summary.
-        """
-        summary = {
-            "total_experiments": len(entropy_data.get("experiments", {})),
-            "architectures": list(entropy_data.get("architectures", {}).keys()),
-            "total_samples": 0,
-            "total_rounds": 0,
-            "average_accuracy": 0.0,
-            "average_entropy": 0.0,
-        }
-
-        total_accuracy = 0.0
-        total_entropy = 0.0
-        exp_count = 0
-
-        for exp_name, exp_data in entropy_data.get("experiments", {}).items():
-            if "error" in exp_data:
-                continue
-
-            exp_count += 1
-            macro_stats = exp_data.get("macro_statistics", {})
-            exp_level = macro_stats.get("experiment_level", {})
-
-            summary["total_samples"] += exp_level.get("total_samples", 0)
-            summary["total_rounds"] += exp_data.get("num_rounds", 0)
-            total_entropy += exp_level.get("average_entropy", 0)
-
-            if exp_name in metrics_data.get("experiments", {}):
-                metrics = metrics_data["experiments"][exp_name]
-                calculated_metrics = self._calculate_experiment_metrics(metrics)
-                total_accuracy += calculated_metrics["accuracy"]
-
-        if exp_count > 0:
-            summary["average_accuracy"] = total_accuracy / exp_count
-            summary["average_entropy"] = total_entropy / exp_count
-
-        return summary
-
-    def _aggregate_experiments(
-        self, entropy_data: Dict[str, Any], metrics_data: Dict[str, Any]
+    def extract_sample_level_data(
+        self,
+        entropy_data: Dict[str, Any],
+        metrics_data: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """Aggregate individual experiment data.
+        """Extract sample-level data from both JSON files.
 
         Args:
-            entropy_data: Entropy analysis results.
-            metrics_data: Performance metrics.
+            entropy_data: Entropy analysis results
+            metrics_data: Performance metrics
 
         Returns:
-            List of aggregated experiment records.
+            List of dictionaries containing sample-level data
         """
-        experiments = []
+        records = []
 
         for exp_name, exp_entropy in entropy_data.get("experiments", {}).items():
             if "error" in exp_entropy:
                 continue
 
-            if exp_name not in metrics_data.get("experiments", {}):
+            exp_metrics = metrics_data.get("experiments", {}).get(exp_name, {})
+            if not exp_metrics:
                 continue
 
-            exp_metrics = metrics_data["experiments"][exp_name]
-            calculated_metrics = self._calculate_experiment_metrics(exp_metrics)
+            architecture = exp_entropy.get("agent_architecture", "unknown")
+            num_rounds = exp_entropy.get("num_rounds", 0)
 
-            aggregated_exp = {
-                "experiment_name": exp_name,
-                "architecture": exp_entropy.get("agent_architecture"),
-                "num_rounds": exp_entropy.get("num_rounds"),
-                "num_samples": exp_entropy.get("num_samples"),
-                "entropy": {
-                    "total": exp_entropy["macro_statistics"]["experiment_level"].get(
-                        "total_entropy", 0
-                    ),
-                    "average": exp_entropy["macro_statistics"]["experiment_level"].get(
-                        "average_entropy", 0
-                    ),
-                    "per_round": exp_entropy["macro_statistics"].get("round_level", {}),
-                },
-                "performance": {
-                    "accuracy": calculated_metrics["accuracy"],
-                    "total_time": calculated_metrics["total_time"],
-                    "average_time": calculated_metrics["average_time"],
-                },
-                "agents": self._aggregate_agents_for_experiment(exp_entropy, exp_metrics),
-                "trends": self._extract_trend_data(exp_entropy),
-            }
+            sample_level_entropy = exp_entropy.get("micro_statistics", {}).get("sample_level", {})
+            samples_metrics = exp_metrics.get("samples", {})
 
-            experiments.append(aggregated_exp)
-
-        return experiments
-
-    def _aggregate_agents_for_experiment(
-        self, exp_entropy: Dict[str, Any], exp_metrics: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """Aggregate agent-level data for an experiment.
-
-        Args:
-            exp_entropy: Entropy data for the experiment.
-            exp_metrics: Performance metrics for the experiment.
-
-        Returns:
-            List of aggregated agent records.
-        """
-        agents = []
-
-        agent_level_entropy = exp_entropy.get("macro_statistics", {}).get(
-            "agent_level", {}
-        )
-
-        samples = exp_metrics.get("samples", {})
-
-        agent_performance = defaultdict(lambda: {"correct": 0, "total": 0, "time": 0.0})
-
-        for sample_id, sample_data in samples.items():
-            agents_data = sample_data.get("agents", {})
-            for agent_name, agent_data in agents_data.items():
-                agent_type = agent_data.get("agent_type", agent_name.split("_")[0])
-                agent_performance[agent_type]["time"] += agent_data.get("time_cost", 0)
-                if agent_data.get("predicted_answer") is not None:
-                    agent_performance[agent_type]["total"] += 1
-                    if agent_data.get("is_correct", False):
-                        agent_performance[agent_type]["correct"] += 1
-
-        for agent_name, agent_entropy in agent_level_entropy.items():
-            perf = agent_performance.get(agent_name, {"correct": 0, "total": 0, "time": 0.0})
-            accuracy = perf["correct"] / perf["total"] if perf["total"] > 0 else 0
-            avg_time = perf["time"] / perf["total"] if perf["total"] > 0 else 0
-
-            agent_data = {
-                "agent_name": agent_name,
-                "entropy": {
-                    "total": agent_entropy.get("total_entropy", 0),
-                    "average": agent_entropy.get("average_entropy", 0),
-                    "mean": agent_entropy.get("mean_entropy", 0),
-                    "std": agent_entropy.get("std_entropy", 0),
-                    "max": agent_entropy.get("max_entropy", 0),
-                    "min": agent_entropy.get("min_entropy", 0),
-                    "median": agent_entropy.get("median_entropy", 0),
-                    "variance": agent_entropy.get("variance_entropy", 0),
-                },
-                "performance": {
-                    "accuracy": accuracy,
-                    "average_time": avg_time,
-                },
-            }
-
-            agents.append(agent_data)
-
-        return agents
-
-    def _compare_architectures(
-        self, entropy_data: Dict[str, Any], metrics_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Compare different architectures.
-
-        Args:
-            entropy_data: Entropy analysis results.
-            metrics_data: Performance metrics.
-
-        Returns:
-            Dictionary containing architecture comparison data.
-        """
-        comparison = {}
-
-        for arch, exp_names in entropy_data.get("architectures", {}).items():
-            arch_data = {
-                "experiments": [],
-                "average_entropy": 0.0,
-                "average_accuracy": 0.0,
-                "average_time": 0.0,
-                "entropy_std": 0.0,
-                "accuracy_std": 0.0,
-            }
-
-            entropies = []
-            accuracies = []
-            times = []
-
-            for exp_name in exp_names:
-                if exp_name not in entropy_data.get("experiments", {}):
+            for sample_id, sample_metrics in samples_metrics.items():
+                if sample_id not in sample_level_entropy:
                     continue
 
-                exp_entropy = entropy_data["experiments"][exp_name]
-                if "error" in exp_entropy:
-                    continue
+                sample_entropy = sample_level_entropy[sample_id]
 
-                exp_metrics = metrics_data.get("experiments", {}).get(exp_name, {})
-                if not exp_metrics:
-                    continue
+                ground_truth = sample_metrics.get("ground_truth", "")
 
-                calculated_metrics = self._calculate_experiment_metrics(exp_metrics)
+                for agent_key, agent_metrics in sample_metrics.get("agents", {}).items():
+                    agent_type = agent_metrics.get("agent_type", agent_key.split("_")[0])
+                    execution_order = agent_metrics.get("execution_order", 0)
+                    time_cost = agent_metrics.get("time_cost", 0)
+                    avg_entropy = agent_metrics.get("average_entropy", 0)
+                    predicted_answer = agent_metrics.get("predicted_answer", "")
+                    is_correct = agent_metrics.get("is_correct", False)
 
-                exp_level = exp_entropy["macro_statistics"]["experiment_level"]
-                entropy = exp_level.get("average_entropy", 0)
-                accuracy = calculated_metrics["accuracy"]
-                time_cost = calculated_metrics["average_time"]
-
-                entropies.append(entropy)
-                accuracies.append(accuracy)
-                times.append(time_cost)
-
-                arch_data["experiments"].append(
-                    {
-                        "name": exp_name,
-                        "entropy": entropy,
-                        "accuracy": accuracy,
-                        "time": time_cost,
+                    record = {
+                        "sample_id": sample_id,
+                        "experiment_name": exp_name,
+                        "architecture": architecture,
+                        "ground_truth": ground_truth,
+                        "agent_name": agent_type,
+                        "agent_key": agent_key,
+                        "execution_order": execution_order,
+                        "time_cost": time_cost,
+                        "predicted_answer": predicted_answer,
+                        "is_correct": is_correct,
+                        "sample_total_entropy": sample_entropy.get("total_entropy", 0),
+                        "sample_max_entropy": sample_entropy.get("max_entropy", 0),
+                        "sample_min_entropy": sample_entropy.get("min_entropy", 0),
+                        "sample_mean_entropy": sample_entropy.get("mean_entropy", 0),
+                        "sample_median_entropy": sample_entropy.get("median_entropy", 0),
+                        "sample_std_entropy": sample_entropy.get("std_entropy", 0),
+                        "sample_variance_entropy": sample_entropy.get("variance_entropy", 0),
+                        "sample_q1_entropy": sample_entropy.get("q1_entropy", 0),
+                        "sample_q3_entropy": sample_entropy.get("q3_entropy", 0),
+                        "sample_token_count": sample_entropy.get("token_count", 0),
+                        "sample_count": sample_entropy.get("sample_count", 0),
+                        "sample_avg_entropy_per_token": sample_entropy.get("average_entropy_per_token", 0),
+                        "agent_avg_entropy": avg_entropy,
                     }
-                )
 
-            if entropies:
-                import numpy as np
+                    records.append(record)
 
-                arch_data["average_entropy"] = np.mean(entropies)
-                arch_data["average_accuracy"] = np.mean(accuracies)
-                arch_data["average_time"] = np.mean(times)
-                arch_data["entropy_std"] = np.std(entropies)
-                arch_data["accuracy_std"] = np.std(accuracies)
+        return records
 
-            comparison[arch] = arch_data
-
-        return comparison
-
-    def _analyze_entropy_performance_correlation(
-        self, entropy_data: Dict[str, Any], metrics_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Analyze correlation between entropy and performance.
+    def extract_round_level_data(
+        self,
+        entropy_data: Dict[str, Any],
+        metrics_data: Dict[str, Any]
+    ) -> Dict[str, Dict[str, Any]]:
+        """Extract round-level statistics.
 
         Args:
-            entropy_data: Entropy analysis results.
-            metrics_data: Performance metrics.
+            entropy_data: Entropy analysis results
+            metrics_data: Performance metrics
 
         Returns:
-            Dictionary containing correlation analysis.
+            Dictionary mapping (exp_name, round_num) to round statistics
         """
-        import numpy as np
-
-        data_points = []
+        round_stats = {}
 
         for exp_name, exp_entropy in entropy_data.get("experiments", {}).items():
             if "error" in exp_entropy:
                 continue
 
-            if exp_name not in metrics_data.get("experiments", {}):
-                continue
+            round_level = exp_entropy.get("macro_statistics", {}).get("round_level", {})
 
-            exp_metrics = metrics_data["experiments"][exp_name]
-            calculated_metrics = self._calculate_experiment_metrics(exp_metrics)
-
-            exp_level = exp_entropy["macro_statistics"]["experiment_level"]
-            entropy = exp_level.get("average_entropy", 0)
-            accuracy = calculated_metrics["accuracy"]
-            time_cost = calculated_metrics["average_time"]
-            architecture = exp_entropy.get("agent_architecture")
-
-            data_points.append(
-                {
-                    "experiment": exp_name,
-                    "architecture": architecture,
-                    "entropy": entropy,
-                    "accuracy": accuracy,
-                    "time": time_cost,
-                }
-            )
-
-        if len(data_points) < 2:
-            return {
-                "correlation_entropy_accuracy": 0.0,
-                "correlation_entropy_time": 0.0,
-                "correlation_accuracy_time": 0.0,
-                "data_points": data_points,
-            }
-
-        entropies = [dp["entropy"] for dp in data_points]
-        accuracies = [dp["accuracy"] for dp in data_points]
-        times = [dp["time"] for dp in data_points]
-
-        corr_entropy_accuracy = np.corrcoef(entropies, accuracies)[0, 1]
-        corr_entropy_time = np.corrcoef(entropies, times)[0, 1]
-        corr_accuracy_time = np.corrcoef(accuracies, times)[0, 1]
-
-        return {
-            "correlation_entropy_accuracy": float(corr_entropy_accuracy)
-            if not np.isnan(corr_entropy_accuracy)
-            else 0.0,
-            "correlation_entropy_time": float(corr_entropy_time)
-            if not np.isnan(corr_entropy_time)
-            else 0.0,
-            "correlation_accuracy_time": float(corr_accuracy_time)
-            if not np.isnan(corr_accuracy_time)
-            else 0.0,
-            "data_points": data_points,
-        }
-
-    def _analyze_rounds(
-        self, entropy_data: Dict[str, Any], metrics_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Analyze entropy and performance across rounds.
-
-        Args:
-            entropy_data: Entropy analysis results.
-            metrics_data: Performance metrics.
-
-        Returns:
-            Dictionary containing round-level analysis.
-        """
-        import numpy as np
-
-        round_data = defaultdict(lambda: {"entropies": [], "accuracies": [], "times": []})
-
-        for exp_name, exp_entropy in entropy_data.get("experiments", {}).items():
-            if "error" in exp_entropy:
-                continue
-
-            if exp_name not in metrics_data.get("experiments", {}):
-                continue
-
-            exp_metrics = metrics_data["experiments"][exp_name]
-            round_level_entropy = exp_entropy.get("macro_statistics", {}).get(
-                "round_level", {}
-            )
-
-            for round_num, round_stats in round_level_entropy.items():
-                round_data[round_num]["entropies"].append(
-                    round_stats.get("average_entropy", 0)
-                )
-
-        round_analysis = {}
-
-        for round_num, data in round_data.items():
-            if data["entropies"]:
-                round_analysis[round_num] = {
-                    "average_entropy": np.mean(data["entropies"]),
-                    "entropy_std": np.std(data["entropies"]),
-                    "min_entropy": np.min(data["entropies"]),
-                    "max_entropy": np.max(data["entropies"]),
-                    "num_experiments": len(data["entropies"]),
+            for round_num, round_data in round_level.items():
+                key = (exp_name, int(round_num))
+                round_stats[key] = {
+                    "round_total_entropy": round_data.get("total_entropy", 0),
+                    "round_count": round_data.get("count", 0),
+                    "round_avg_entropy": round_data.get("average_entropy", 0),
                 }
 
-        return round_analysis
+        return round_stats
 
-    def _analyze_agents(
-        self, entropy_data: Dict[str, Any], metrics_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Analyze entropy and performance by agent type.
+    def extract_agent_level_data(
+        self,
+        entropy_data: Dict[str, Any],
+        metrics_data: Dict[str, Any]
+    ) -> Dict[str, Dict[str, Any]]:
+        """Extract agent-level statistics.
 
         Args:
-            entropy_data: Entropy analysis results.
-            metrics_data: Performance metrics.
+            entropy_data: Entropy analysis results
+            metrics_data: Performance metrics
 
         Returns:
-            Dictionary containing agent-level analysis.
+            Dictionary mapping (exp_name, agent_name) to agent statistics
         """
-        import numpy as np
-
-        agent_data = defaultdict(
-            lambda: {
-                "entropies": [],
-                "mean_entropies": [],
-                "std_entropies": [],
-                "max_entropies": [],
-                "experiments": [],
-            }
-        )
+        agent_stats = {}
 
         for exp_name, exp_entropy in entropy_data.get("experiments", {}).items():
             if "error" in exp_entropy:
@@ -491,130 +170,158 @@ class ResultsAggregator:
 
             agent_level = exp_entropy.get("macro_statistics", {}).get("agent_level", {})
 
-            for agent_name, agent_stats in agent_level.items():
-                agent_data[agent_name]["entropies"].append(
-                    agent_stats.get("average_entropy", 0)
-                )
-                agent_data[agent_name]["mean_entropies"].append(
-                    agent_stats.get("mean_entropy", 0)
-                )
-                agent_data[agent_name]["std_entropies"].append(
-                    agent_stats.get("std_entropy", 0)
-                )
-                agent_data[agent_name]["max_entropies"].append(
-                    agent_stats.get("max_entropy", 0)
-                )
-                agent_data[agent_name]["experiments"].append(exp_name)
-
-        agent_analysis = {}
-
-        for agent_name, data in agent_data.items():
-            if data["entropies"]:
-                agent_analysis[agent_name] = {
-                    "average_entropy": np.mean(data["entropies"]),
-                    "entropy_std": np.std(data["entropies"]),
-                    "min_entropy": np.min(data["entropies"]),
-                    "max_entropy": np.max(data["entropies"]),
-                    "average_mean_entropy": np.mean(data["mean_entropies"]),
-                    "average_std_entropy": np.mean(data["std_entropies"]),
-                    "average_max_entropy": np.mean(data["max_entropies"]),
-                    "num_experiments": len(data["entropies"]),
-                    "experiments": data["experiments"],
+            for agent_name, agent_data in agent_level.items():
+                key = (exp_name, agent_name)
+                agent_stats[key] = {
+                    "agent_total_entropy": agent_data.get("total_entropy", 0),
+                    "agent_sample_count": agent_data.get("sample_count", 0),
+                    "agent_total_tokens": agent_data.get("total_tokens", 0),
+                    "agent_avg_entropy": agent_data.get("average_entropy", 0),
+                    "agent_mean_entropy": agent_data.get("mean_entropy", 0),
+                    "agent_max_entropy": agent_data.get("max_entropy", 0),
+                    "agent_min_entropy": agent_data.get("min_entropy", 0),
+                    "agent_median_entropy": agent_data.get("median_entropy", 0),
+                    "agent_std_entropy": agent_data.get("std_entropy", 0),
+                    "agent_variance_entropy": agent_data.get("variance_entropy", 0),
+                    "agent_q1_entropy": agent_data.get("q1_entropy", 0),
+                    "agent_q3_entropy": agent_data.get("q3_entropy", 0),
                 }
 
-        return agent_analysis
+        return agent_stats
 
-    def _extract_trend_data(self, exp_entropy: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Extract trend analysis data from entropy results.
-
-        Args:
-            exp_entropy: Entropy data for the experiment.
-
-        Returns:
-            Trend analysis data if available, None otherwise.
-        """
-        if "trend_analysis" not in exp_entropy:
-            return None
-
-        trend_data = exp_entropy["trend_analysis"]
-        trend_stats = trend_data.get("trend_statistics", {})
-
-        return {
-            "num_rounds": trend_data.get("num_rounds", 0),
-            "intra_round_stats": trend_stats.get("intra_round_stats", {}),
-            "inter_round_stats": trend_stats.get("inter_round_stats", {}),
-            "overall_summary": trend_stats.get("overall_summary", {}),
-        }
-
-    def save_aggregated_results(
-        self, dataset: str, output_path: Optional[str] = None
-    ) -> str:
-        """Aggregate and save results for a dataset.
+    def extract_experiment_level_data(
+        self,
+        entropy_data: Dict[str, Any],
+        metrics_data: Dict[str, Any]
+    ) -> Dict[str, Dict[str, Any]]:
+        """Extract experiment-level statistics.
 
         Args:
-            dataset: Dataset name.
-            output_path: Optional output file path. If not provided,
-                        saves to evaluation/results/{dataset}/aggregated_results.json.
+            entropy_data: Entropy analysis results
+            metrics_data: Performance metrics
 
         Returns:
-            Path to the saved file.
+            Dictionary mapping exp_name to experiment statistics
         """
-        aggregated = self.aggregate_dataset_results(dataset)
+        exp_stats = {}
 
-        if output_path is None:
-            output_path = self.results_dir / dataset / "aggregated_results.json"
-
-        output_path = Path(output_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(aggregated, f, indent=2, ensure_ascii=False)
-
-        return str(output_path)
-
-    def aggregate_all_datasets(self) -> Dict[str, Any]:
-        """Aggregate results for all available datasets.
-
-        Returns:
-            Dictionary containing aggregated results for all datasets.
-        """
-        all_results = {}
-
-        for dataset_dir in self.results_dir.iterdir():
-            if not dataset_dir.is_dir():
+        for exp_name, exp_entropy in entropy_data.get("experiments", {}).items():
+            if "error" in exp_entropy:
                 continue
 
-            dataset = dataset_dir.name
-            entropy_file = dataset_dir / "all_entropy_results.json"
-            metrics_file = dataset_dir / "all_metrics.json"
+            exp_metrics = metrics_data.get("experiments", {}).get(exp_name, {})
+            if not exp_metrics:
+                continue
 
-            if entropy_file.exists() and metrics_file.exists():
-                try:
-                    all_results[dataset] = self.aggregate_dataset_results(dataset)
-                except Exception as e:
-                    print(f"Warning: Failed to aggregate {dataset}: {e}")
+            exp_level = exp_entropy.get("macro_statistics", {}).get("experiment_level", {})
 
-        return all_results
+            samples = exp_metrics.get("samples", {})
+            total_correct = 0
+            total_predictions = 0
+            total_time = 0
 
-    def save_all_aggregated_results(self, output_path: Optional[str] = None) -> str:
-        """Aggregate and save results for all datasets.
+            for sample_id, sample_data in samples.items():
+                for agent_key, agent_data in sample_data.get("agents", {}).items():
+                    total_time += agent_data.get("time_cost", 0)
+                    if agent_data.get("predicted_answer") is not None:
+                        total_predictions += 1
+                        if agent_data.get("is_correct", False):
+                            total_correct += 1
+
+            accuracy = total_correct / total_predictions if total_predictions > 0 else 0
+            avg_time = total_time / total_predictions if total_predictions > 0 else 0
+
+            exp_stats[exp_name] = {
+                "exp_total_entropy": exp_level.get("total_entropy", 0),
+                "exp_avg_entropy": exp_level.get("average_entropy", 0),
+                "exp_total_samples": exp_level.get("total_samples", 0),
+                "exp_accuracy": accuracy,
+                "exp_total_time": total_time,
+                "exp_avg_time": avg_time,
+            }
+
+        return exp_stats
+
+    def merge_all_data(
+        self,
+        sample_records: List[Dict[str, Any]],
+        round_stats: Dict[str, Dict[str, Any]],
+        agent_stats: Dict[str, Dict[str, Any]],
+        exp_stats: Dict[str, Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Merge all levels of data into sample records.
 
         Args:
-            output_path: Optional output file path. If not provided,
-                        saves to evaluation/results/all_datasets_aggregated.json.
+            sample_records: Sample-level records
+            round_stats: Round-level statistics
+            agent_stats: Agent-level statistics
+            exp_stats: Experiment-level statistics
 
         Returns:
-            Path to the saved file.
+            List of merged records
         """
-        all_results = self.aggregate_all_datasets()
+        merged_records = []
 
-        if output_path is None:
-            output_path = self.results_dir / "all_datasets_aggregated.json"
+        for record in sample_records:
+            exp_name = record["experiment_name"]
+            agent_name = record["agent_name"]
 
-        output_path = Path(output_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+            key = (exp_name, agent_name)
+            if key in agent_stats:
+                record.update(agent_stats[key])
 
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(all_results, f, indent=2, ensure_ascii=False)
+            if exp_name in exp_stats:
+                record.update(exp_stats[exp_name])
 
-        return str(output_path)
+            merged_records.append(record)
+
+        return merged_records
+
+    def convert_to_csv(self):
+        """Convert JSON files to CSV format."""
+        entropy_data, metrics_data = self.load_json_files()
+
+        sample_records = self.extract_sample_level_data(entropy_data, metrics_data)
+
+        round_stats = self.extract_round_level_data(entropy_data, metrics_data)
+
+        agent_stats = self.extract_agent_level_data(entropy_data, metrics_data)
+
+        exp_stats = self.extract_experiment_level_data(entropy_data, metrics_data)
+
+        merged_records = self.merge_all_data(
+            sample_records, round_stats, agent_stats, exp_stats
+        )
+
+        if not merged_records:
+            return
+
+        fieldnames = list(merged_records[0].keys())
+
+        with open(self.output_csv, "w", newline="", encoding="utf-8") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(merged_records)
+
+        return merged_records
+
+
+def main():
+    """Main function to run the converter."""
+    base_path = Path("/home/yuxuanzhao/multiagent-entropy/evaluation/results/gsm8k")
+
+    entropy_file = base_path / "all_entropy_results.json"
+    metrics_file = base_path / "all_metrics.json"
+    output_csv = base_path / "aggregated_data.csv"
+
+    converter = JSONToCSVConverter(
+        str(entropy_file),
+        str(metrics_file),
+        str(output_csv)
+    )
+
+    converter.convert_to_csv()
+
+
+if __name__ == "__main__":
+    main()
