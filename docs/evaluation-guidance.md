@@ -2,7 +2,7 @@
 
 ### Overview
 
-The evaluation module provides comprehensive tools for analyzing multi-agent experiment results, including performance metrics, entropy statistics, and cross-architecture comparisons.
+The evaluation module provides comprehensive tools for analyzing multi-agent experiment results, including performance metrics, entropy statistics, entropy change trends, cross-architecture comparisons, and data aggregation for machine learning analysis.
 
 ### Module Structure
 
@@ -11,7 +11,8 @@ The evaluation module provides comprehensive tools for analyzing multi-agent exp
 - **[DataLoader](../evaluation/data_loader.py)**: Loads experiment data, configurations, and results
 - **[MetricsCalculator](../evaluation/metrics_calculator.py)**: Calculates performance metrics
 - **[ExperimentAnalyzer](../evaluation/experiment_analyzer.py)**: Analyzes experiment results
-- **[EntropyAnalyzer](../evaluation/entropy_analyzer.py)**: Analyzes entropy statistics
+- **[EntropyAnalyzer](../evaluation/entropy_analyzer.py)**: Analyzes entropy statistics and change trends
+- **[Aggregator](../evaluation/aggregator.py)**: Aggregates metrics and entropy data into unified CSV format
 - **[evaluator.py](../evaluation/evaluator.py)**: Main entry point for evaluation
 - **[utils.py](../evaluation/utils.py)**: Utility functions for saving results
 
@@ -29,19 +30,22 @@ python -m evaluation.evaluator --dataset gsm8k --task-type math
 
 | Argument              | Type | Default | Description                                 |
 | --------------------- | ---- | ------- | ------------------------------------------- |
-| `--dataset`           | str  | gsm8k   | Dataset to analyze (gsm8k, humaneval, mmlu) |
+| `--dataset`           | str  | gsm8k   | Dataset to analyze (gsm8k, humaneval, mmlu, aime2024, math500) |
 | `--task-type`         | str  | math    | Task type (math, code, option)              |
 | `--experiment`        | str  | None    | Specific experiment to analyze              |
 | `--output`            | str  | None    | Output file path                            |
 | `--compare`           | flag | False   | Compare experiments by architecture         |
-| `--save-csv`          | bool | True    | Save summary to CSV                         |
-| `--analyze-entropy`   | bool | True    | Perform entropy analysis                    |
-| `--entropy-compare`   | bool | True    | Compare entropy across architectures        |
+| `--analyze-entropy`   | bool | True    | Perform entropy statistical analysis       |
 | `--save-entropy-json` | bool | True    | Save entropy results to JSON                |
+| `--aggregate`         | bool | True    | Aggregate results from metrics files        |
+| `--analyze-trends`    | bool | True    | Analyze entropy change trends between agents across rounds |
+| `--save-trends-json`  | bool | True    | Save detailed trend results to JSON file    |
+| `--run-aggregator`    | bool | True    | Run results aggregator to combine metrics and entropy for data mining |
+| `--aggregate-all`     | bool | False   | Aggregate results from all datasets        |
 
 #### Examples
 
-**Analyze a single experiment:**
+**Analyze a single experiment with entropy and trend analysis:**
 ```bash
 python -m evaluation.evaluator --dataset gsm8k --experiment single_gsm8k
 ```
@@ -54,6 +58,16 @@ python -m evaluation.evaluator --dataset gsm8k --compare
 **Analyze with custom output:**
 ```bash
 python -m evaluation.evaluator --dataset humaneval --output results/custom.json
+```
+
+**Analyze all datasets and aggregate results:**
+```bash
+python -m evaluation.evaluator --aggregate-all
+```
+
+**Analyze without running aggregator:**
+```bash
+python -m evaluation.evaluator --dataset gsm8k --run-aggregator False
 ```
 
 ### Metrics
@@ -85,6 +99,7 @@ python -m evaluation.evaluator --dataset humaneval --output results/custom.json
 - **architecture_comparison**: Architecture comparison data
 
 **Micro Statistics:**
+- **sample_level**: Sample-level entropy statistics with the same metrics as agent_level but aggregated per sample
 - **sequence_level**: Sequence-level entropy statistics with composite keys in the format `{main_id}-{agent_type}-{execution_order}`. Each key uniquely identifies a specific sequence and contains:
   - total_entropy: Sum of all entropy values for the sequence
   - max_entropy: Maximum entropy value
@@ -98,7 +113,6 @@ python -m evaluation.evaluator --dataset humaneval --output results/custom.json
   - token_count: Total number of tokens
   - sample_count: Number of samples
   - average_entropy_per_token: Average entropy per token
-  - average_tokens_per_sample: Average number of tokens per sample
 
   Example structure for single agent architecture:
   ```json
@@ -115,7 +129,7 @@ python -m evaluation.evaluator --dataset humaneval --output results/custom.json
       "min_entropy": 0.0,
       "token_count": 2000,
       "sample_count": 1,
-      "average_entropy_per_token": 0.062,
+      "average_entropy_per_token": 0.062
     },
     "ID1-SingleSolver-2": {
       ...
@@ -134,6 +148,29 @@ python -m evaluation.evaluator --dataset humaneval --output results/custom.json
   - q1: First quartile at each token position
   - q3: Third quartile at each token position
   - count: Number of samples at each token position
+
+#### Entropy Change Trends
+
+**Intra-round Trends:**
+- **trends**: Ranking of agents by entropy within each round
+- **differences**: Pairwise differences between agents in the same round
+- **summary**: Summary of intra-round patterns
+
+**Inter-round Trends:**
+- **agent_trends**: Per-agent entropy changes across rounds
+- **round_to_round_changes**: Round-to-round entropy changes for each agent
+- **summary**: Overall trend summary including:
+  - total_change: Total change from first to last round
+  - average_change: Average change across rounds
+  - total_percentage_change: Total percentage change
+  - average_percentage_change: Average percentage change
+  - trend_direction: "increasing" or "decreasing"
+  - volatility: Standard deviation of changes
+
+**Trend Statistics:**
+- **intra_round_stats**: Statistics on agent differences within rounds
+- **inter_round_stats**: Statistics on round-to-round changes
+- **overall_summary**: Overall summary of trend patterns across all agents
 
 ### Agent Architectures
 
@@ -154,15 +191,35 @@ evaluation/results/
 │   ├── {experiment_name}_metrics.json
 │   ├── all_metrics.json
 │   ├── comparison.json
-│   ├── all_metrics_summary.csv
+│   ├── aggregated_data.csv
 │   └── entropy/
 │       ├── {experiment_name}_entropy.json
 │       ├── all_entropy_results.json
-│       ├── macro_statistics.csv
-│       ├── micro_statistics.csv
-│       ├── token_position_statistics.csv
-│       └── architecture_comparison.csv
+│       ├── {experiment_name}_trends.json
 ```
+
+#### Key Output Files
+
+**all_metrics.json**: Contains performance metrics for all experiments
+- experiment_name, dataset, task_type, agent_architecture, num_rounds, num_samples
+- samples: Detailed metrics for each sample including agent-level performance
+- summary: Aggregated statistics across all samples
+
+**all_entropy_results.json**: Contains entropy analysis for all experiments
+- dataset, architectures (mapping architecture type to experiment names)
+- experiments: Per-experiment entropy analysis including:
+  - macro_statistics: experiment_level, round_level, agent_level, architecture_comparison
+  - micro_statistics: sample_level, sequence_level, token_position_level
+  - trend_analysis: (optional) entropy change trends if analyzed
+
+**aggregated_data.csv**: Unified CSV file combining metrics and entropy data for data mining
+- sample_id, experiment_name, architecture, ground_truth
+- agent_name, agent_key, execution_order, time_cost
+- predicted_answer, is_correct
+- sample-level entropy statistics (total, max, min, mean, median, std, variance, q1, q3)
+- sample token count and average entropy per token
+- agent-level entropy statistics (total, sample_count, total_tokens, avg, mean, max, min, median, std, variance, q1, q3)
+- experiment-level statistics (total_entropy, avg_entropy, total_samples, accuracy, total_time, avg_time)
 
 ### JSON Result File Structure
 
@@ -223,6 +280,23 @@ The entropy analysis generates JSON files with the following structure:
         "architecture_comparison": {}
       },
       "micro_statistics": {
+        "sample_level": {
+          "ID1": {
+            "total_entropy": 123.45,
+            "max_entropy": 1.123,
+            "mean_entropy": 0.062,
+            "variance_entropy": 0.031,
+            "median_entropy": 0.0,
+            "q1_entropy": 0.0,
+            "q3_entropy": 0.012,
+            "std_entropy": 0.176,
+            "min_entropy": 0.0,
+            "token_count": 2000,
+            "sample_count": 8,
+            "average_entropy_per_token": 0.062
+          },
+          ...
+        },
         "sequence_level": {
           "ID1-MathAgent-1": {
             "total_entropy": 123.45,
@@ -236,7 +310,7 @@ The entropy analysis generates JSON files with the following structure:
             "min_entropy": 0.0,
             "token_count": 2000,
             "sample_count": 1,
-            "average_entropy_per_token": 0.062,
+            "average_entropy_per_token": 0.062
           },
           "ID1-MathAgent-2": {
             ...
@@ -266,6 +340,106 @@ The entropy analysis generates JSON files with the following structure:
           },
           ...
         }
+      },
+      "trend_analysis": {
+        "experiment_name": "...",
+        "dataset": "gsm8k",
+        "agent_architecture": "centralized",
+        "num_rounds": 2,
+        "entropy_by_round_agent": {
+          "1": {
+            "MathAgent": {
+              "mean_entropy": 0.051,
+              "std_entropy": 0.195,
+              "median_entropy": 0.0,
+              "min_entropy": 0.0,
+              "max_entropy": 1.123,
+              "total_entropy": 12345.67,
+              "sample_count": 100
+            },
+            ...
+          },
+          "2": {
+            ...
+          }
+        },
+        "intra_round_trends": {
+          "1": {
+            "trends": {
+              "ranking": "MathAgent(0.051) -> ScienceAgent(0.062) -> CodeAgent(0.058) -> OrchestratorAgent(0.071)",
+              "highest_entropy_agent": "OrchestratorAgent",
+              "lowest_entropy_agent": "MathAgent",
+              "entropy_range": 0.020
+            },
+            "differences": {
+              "MathAgent_vs_ScienceAgent": {
+                "absolute_difference": -0.011,
+                "percentage_difference": -17.74,
+                "agent1_entropy": 0.051,
+                "agent2_entropy": 0.062,
+                "agent1_std": 0.195,
+                "agent2_std": 0.206
+              },
+              ...
+            },
+            "summary": ""
+          },
+          ...
+        },
+        "inter_round_trends": {
+          "agent_trends": {
+            "MathAgent": {
+              "mean_entropies": [0.051, 0.042],
+              "rounds": [1, 2],
+              "changes": [-0.009],
+              "percentage_changes": [-17.65]
+            },
+            ...
+          },
+          "round_to_round_changes": {
+            "1_to_2": {
+              "MathAgent": {
+                "change": -0.009,
+                "percentage_change": -17.65,
+                "from_entropy": 0.051,
+                "to_entropy": 0.042
+              },
+              ...
+            },
+            ...
+          },
+          "summary": {
+            "MathAgent": {
+              "total_change": -0.009,
+              "average_change": -0.009,
+              "total_percentage_change": -17.65,
+              "average_percentage_change": -17.65,
+              "trend_direction": "decreasing",
+              "volatility": 0.0
+            },
+            ...
+          }
+        },
+        "trend_statistics": {
+          "intra_round_stats": {
+            "mean_agent_difference": 0.015,
+            "max_agent_difference": 0.025,
+            "min_agent_difference": 0.005,
+            "std_agent_difference": 0.008
+          },
+          "inter_round_stats": {
+            "mean_round_to_round_change": -0.007,
+            "max_round_to_round_change": 0.002,
+            "min_round_to_round_change": -0.015,
+            "std_round_to_round_change": 0.006
+          },
+          "overall_summary": {
+            "total_agents_analyzed": 4,
+            "agents_with_increasing_trend": 1,
+            "agents_with_decreasing_trend": 3,
+            "dominant_trend": "decreasing"
+          }
+        }
       }
     }
   }
@@ -277,41 +451,107 @@ The entropy analysis generates JSON files with the following structure:
 **Macro Statistics** now includes:
 - `experiment_level`: High-level experiment summary
 - `round_level`: Per-round entropy statistics
-- `agent_level`: Per-agent entropy statistics (moved from micro_statistics)
+- `agent_level`: Per-agent entropy statistics
 - `architecture_comparison`: Cross-architecture comparison data
 
 **Micro Statistics** now includes:
-- `sequence_level`: Per-sequence entropy statistics (new, replaces agent_level)
+- `sample_level`: Per-sample entropy statistics (new)
+- `sequence_level`: Per-sequence entropy statistics
 - `token_position_level`: Per-token-position entropy statistics (enhanced with min, max, q1, q3)
 
-#### CSV Output Files
-
-**macro_statistics.csv**:
-- experiment_name, agent_architecture, num_rounds, num_samples, total_results, total_entropy, average_entropy, level, round_number, count
-
-**micro_statistics.csv**:
-- experiment_name, agent_architecture, sequence_id (format: {main_id}-{agent_type}-{execution_order}), total_entropy, max_entropy, mean_entropy, variance_entropy, median_entropy, q1_entropy, q3_entropy, std_entropy, min_entropy, token_count, sample_count, average_entropy_per_token, average_tokens_per_sample
-
-**token_position_statistics.csv**:
-- experiment_name, agent_architecture, token_position, mean_entropy, std_entropy, median_entropy, min_entropy, max_entropy, q1_entropy, q3_entropy, count
-
-**architecture_comparison.csv**:
-- agent_architecture, experiment_name, total_entropy, average_entropy, num_samples
+**Trend Analysis** (optional, added when `--analyze-trends` is enabled):
+- `entropy_by_round_agent`: Entropy values organized by round and agent
+- `intra_round_trends`: Trends between agents within the same round
+- `inter_round_trends`: Trends of individual agents across rounds
+- `trend_statistics`: Overall trend statistics across all agents and rounds
 
 ### Programmatic Usage
 
+#### Analyzing Experiments
+
 ```python
-from evaluation import ExperimentAnalyzer, EntropyAnalyzer
+from evaluation.experiment_analyzer import ExperimentAnalyzer
+from evaluation.entropy_analyzer import EntropyAnalyzer
+from evaluation.aggregator import Aggregator
 
 base_path = "/path/to/project"
 
-## Analyze experiments
+# Analyze experiment metrics
 analyzer = ExperimentAnalyzer(base_path)
-metrics = analyzer.analyze_experiment("gsm8k", "single_gsm8k", "math")
+results = analyzer.analyze_experiment(
+    dataset="gsm8k",
+    experiment_name="single_gsm8k",
+    task_type="math"
+)
 
-## Analyze entropy
+# Analyze entropy statistics
 entropy_analyzer = EntropyAnalyzer(base_path)
-entropy_results = entropy_analyzer.analyze_experiment_entropy("gsm8k", "single_gsm8k")
+entropy_results = entropy_analyzer.analyze_experiment_entropy(
+    dataset="gsm8k",
+    experiment_name="single_gsm8k"
+)
+
+# Analyze entropy change trends
+trend_results = entropy_analyzer.analyze_entropy_trends(
+    dataset="gsm8k",
+    experiment_name="single_gsm8k"
+)
+
+# Aggregate results for data mining
+aggregator = Aggregator(base_path)
+aggregator.aggregate_results(dataset="gsm8k")
+```
+
+#### Comparing Architectures
+
+```python
+from evaluation.experiment_analyzer import ExperimentAnalyzer
+
+analyzer = ExperimentAnalyzer(base_path)
+comparison = analyzer.compare_architectures(
+    dataset="gsm8k",
+    task_type="math"
+)
+```
+
+#### Loading Results
+
+```python
+from evaluation.data_loader import DataLoader
+
+loader = DataLoader(base_path)
+
+# Load experiment configuration
+config = loader.load_experiment_config("gsm8k", "single_gsm8k")
+
+# Load ground truth
+ground_truths = loader.load_ground_truth("gsm8k")
+
+# Load all results
+results = loader.load_all_results("gsm8k", "single_gsm8k")
+
+# Load result store info
+info = loader.load_result_store_info("gsm8k", "single_gsm8k")
+
+# Parse result ID
+parsed = loader.parse_result_id("gsm8k_single_gsm8k_ID1_SingleSolver_1")
+# Returns: {'dataset': 'gsm8k', 'experiment': 'single_gsm8k', 'main_id': 'ID1', 'agent_type': 'SingleSolver', 'execution_order': 1}
+```
+
+#### Calculating Metrics
+
+```python
+from evaluation.metrics_calculator import MetricsCalculator
+
+# Check answer correctness
+is_correct = MetricsCalculator.is_answer_correct(
+    predicted="42",
+    ground_truth="42"
+)
+
+# Normalize answer
+normalized = MetricsCalculator.normalize_answer("The answer is 42.")
+# Returns: "42"
 ```
 
 ### Data Loading
@@ -322,54 +562,82 @@ The [DataLoader](../evaluation/data_loader.py) class handles:
 - Experiment configs from `experiments/configs_exp/{experiment}.yml`
 - Results from `experiments/results/raw/{dataset}/{experiment}/traces/`
 - Entropy tensors from `traces/tensors/{result_id}_extras_entropy.pt`
+- Result store info from `experiments/results/raw/{dataset}/{experiment}/result_store_info.json`
+
+#### Key Methods
+
+- `load_experiment_config(dataset, experiment_name)`: Load experiment configuration
+- `load_ground_truth(dataset)`: Load ground truth answers
+- `load_all_results(dataset, experiment_name)`: Load all experiment results
+- `load_result_store_info(dataset, experiment_name)`: Load result store information
+- `parse_result_id(result_id)`: Parse result ID into components
 
 ### Results Aggregator
 
-The results aggregator provides functionality to aggregate statistical results from the evaluation/results directory, separating correct and incorrect samples into separate CSV files for machine learning analysis.
+The results aggregator provides functionality to aggregate metrics and entropy data from JSON files into unified CSV format for machine learning analysis.
 
 #### Core Components
 
-- **[results_aggregator.py](../evaluation/results_aggregator.py)**: Main aggregation module
+- **[Aggregator](../evaluation/aggregator.py)**: Main aggregation module
 
 #### Usage
 
 Run the aggregator from the project root:
 
 ```bash
-python evaluation/results_aggregator.py --dataset gsm8k
+python -m evaluation.evaluator --dataset gsm8k --run-aggregator True
 ```
 
-#### Available Arguments
+Or aggregate all datasets:
 
-| Argument              | Type | Default | Description                                 |
-| --------------------- | ---- | ------- | ------------------------------------------- |
-| `--base-path`         | str  | Current directory | Base path to the project directory |
-| `--dataset`           | str  | gsm8k   | Dataset to analyze (gsm8k, humaneval, mmlu) |
-| `--output-dir`        | str  | None    | Output directory for aggregated CSV files   |
+```bash
+python -m evaluation.evaluator --aggregate-all
+```
 
-#### Output Files
+#### Aggregation Process
 
-The aggregator generates two CSV files in `evaluation/results/{dataset}/aggregated/`:
+The aggregator:
 
-**correct_samples.csv**:
-- dataset, task_type, experiment_name, agent_architecture, num_rounds, main_id, ground_truth, agent_type, execution_order, round, time_cost, average_entropy, predicted_answer, is_correct
+1. Loads metrics from `evaluation/results/{dataset}/all_metrics.json`
+2. Loads entropy data from `evaluation/results/{dataset}/entropy/all_entropy_results.json`
+3. Merges metrics and entropy data for each sample
+4. Generates unified CSV file with comprehensive features
 
-**incorrect_samples.csv**:
-- [Same fields as correct_samples.csv]
+#### Output File
+
+The aggregator generates a single CSV file in `evaluation/results/{dataset}/aggregated_data.csv`:
+
+**Columns:**
+- sample_id, experiment_name, architecture, ground_truth
+- agent_name, agent_key, execution_order, time_cost
+- predicted_answer, is_correct
+- sample-level entropy statistics (total, max, min, mean, median, std, variance, q1, q3)
+- sample token count and average entropy per token
+- agent-level entropy statistics (total, sample_count, total_tokens, avg, mean, max, min, median, std, variance, q1, q3)
+- experiment-level statistics (total_entropy, avg_entropy, total_samples, accuracy, total_time, avg_time)
+
+#### CSV Structure
+
+Each row represents a unique combination of sample and agent sequence, with the following structure:
+
+```csv
+sample_id,experiment_name,architecture,ground_truth,agent_name,agent_key,execution_order,time_cost,predicted_answer,is_correct,sample_entropy_total,sample_entropy_max,sample_entropy_min,sample_entropy_mean,sample_entropy_median,sample_entropy_std,sample_entropy_variance,sample_entropy_q1,sample_entropy_q3,sample_token_count,sample_avg_entropy_per_token,agent_entropy_total,agent_sample_count,agent_total_tokens,agent_entropy_avg,agent_entropy_mean,agent_entropy_max,agent_entropy_min,agent_entropy_median,agent_entropy_std,agent_entropy_variance,agent_entropy_q1,agent_entropy_q3,experiment_total_entropy,experiment_avg_entropy,experiment_total_samples,experiment_accuracy,experiment_total_time,experiment_avg_time
+ID1,single_gsm8k,single,42,SingleSolver,ID1-SingleSolver-1,1,2.5,42,True,123.45,1.123,0.0,0.062,0.0,0.176,0.031,0.0,0.012,2000,0.062,12345.67,100,69094,0.051,0.051,1.123,0.0,0.0,0.195,0.028,0.0,0.005,37961.39,47.45,100,0.75,250.0,2.5
+```
 
 #### Examples
 
 **Aggregate GSM8K results:**
 ```bash
-python evaluation/results_aggregator.py --dataset gsm8k
+python -m evaluation.evaluator --dataset gsm8k --run-aggregator True
 ```
 
-**Aggregate HumanEval results with custom output:**
+**Aggregate all datasets:**
 ```bash
-python evaluation/results_aggregator.py --dataset humaneval --output-dir /custom/output
+python -m evaluation.evaluator --aggregate-all
 ```
 
-**Aggregate MMLU results from specific base path:**
+**Analyze without running aggregator:**
 ```bash
-python evaluation/results_aggregator.py --dataset mmlu --base-path /path/to/project
+python -m evaluation.evaluator --dataset gsm8k --run-aggregator False
 ```
