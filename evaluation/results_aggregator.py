@@ -379,20 +379,6 @@ class ResultsAggregator:
         all_stats = self.compute_experiment_statistics(all_samples_list)
         specific_stats = self.compute_experiment_statistics(specific_samples_list)
 
-        last_agent_stats_path = self.results_path / "last_agent_stats.csv"
-        self.save_statistics_to_csv(specific_stats, last_agent_stats_path)
-
-        print(f"\nAggregation complete!")
-        print(f"All-agent aggregation:")
-        print(f"  Correct samples: {len(all_samples['correct'])}")
-        print(f"  Incorrect samples: {len(all_samples['incorrect'])}")
-        print(f"  Total samples: {len(all_samples['correct']) + len(all_samples['incorrect'])}")
-        print(f"\nSpecific-agent aggregation:")
-        print(f"  Correct samples: {len(specific_samples['correct'])}")
-        print(f"  Incorrect samples: {len(specific_samples['incorrect'])}")
-        print(f"  Total samples: {len(specific_samples['correct']) + len(specific_samples['incorrect'])}")
-        print(f"\nStatistics saved to: {last_agent_stats_path}")
-
 
 def main():
     """Main entry point for the aggregator script.

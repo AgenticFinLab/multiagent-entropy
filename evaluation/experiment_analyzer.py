@@ -8,7 +8,7 @@ from collections import defaultdict
 from typing import Dict, List, Any, Optional
 
 from data_loader import DataLoader
-from utils import save_csv, save_json
+from utils import save_json
 from metrics_calculator import MetricsCalculator
 
 
@@ -322,53 +322,3 @@ class ExperimentAnalyzer:
             )
 
         return comparison
-
-    def save_last_agent_stats_to_csv(
-        self, dataset: str, output_path: str, task_type: str = "math"
-    ):
-        """Save last agent statistics to CSV file.
-
-        Args:
-            dataset: Dataset name (e.g., "gsm8k", "humaneval").
-            output_path: Path to save the CSV file.
-            task_type: Type of task (e.g., "math", "code", "option").
-        """
-        all_metrics = self.analyze_all_experiments(dataset, task_type)
-
-        rows = []
-        for exp_name, metrics in all_metrics["experiments"].items():
-            if "error" in metrics:
-                continue
-
-            last_agent_stats = metrics["summary"]["last_agent_stats"]
-            rows.append(
-                {
-                    "experiment_name": exp_name,
-                    "agent_architecture": metrics["agent_architecture"],
-                    "num_rounds": metrics["num_rounds"],
-                    "num_samples": metrics["num_samples"],
-                    "count": last_agent_stats["count"],
-                    "correct": last_agent_stats["correct"],
-                    "accuracy": last_agent_stats["accuracy"],
-                    "format_compliance_rate": last_agent_stats[
-                        "format_compliance_rate"
-                    ],
-                    "average_time": last_agent_stats["average_time"],
-                    "average_entropy": last_agent_stats["average_entropy"],
-                }
-            )
-
-        fieldnames = [
-            "experiment_name",
-            "agent_architecture",
-            "num_rounds",
-            "num_samples",
-            "count",
-            "correct",
-            "accuracy",
-            "format_compliance_rate",
-            "average_time",
-            "average_entropy",
-        ]
-
-        save_csv(rows, output_path, fieldnames)
