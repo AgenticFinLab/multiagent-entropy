@@ -2,13 +2,13 @@
 Sequential multi-agent framework built with LangGraph.
 
 Topology:
-Input -> Agent 1 --> Agent 2 --> Agent 3 --> ..... -> Output
+Input -> Agent 1 (planner) --> Agent 2 (solver) --> Agent 3 (critic) --> Agent 4 (judger) --> Output
 
 For multiple rounds:
-Input -> Agent 1 --> Agent 2 --> Agent 3 --> Agent 1 --> ..... -> Output
+Input -> planner --> solver --> critic --> judger --> planner --> ..... -> Output
 
 Memory:
-After each round, the history is aggregated and passed to the Agent 1 in next round for further planning.
+After each round, the history is aggregated and passed to the planner in next round for further planning.
 
 LLM calls: r * N (rounds * number of agents)
 """
