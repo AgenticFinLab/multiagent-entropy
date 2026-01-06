@@ -10,7 +10,7 @@ from pathlib import Path
 
 from entropy_analyzer import EntropyAnalyzer
 from experiment_analyzer import ExperimentAnalyzer
-from results_aggregator import ResultsAggregator
+from aggregator import ResultsAggregator
 
 
 def main():
@@ -78,6 +78,16 @@ def main():
         default=True,
         help="Save detailed trend results to JSON file",
     )
+    parser.add_argument(
+        "--run-aggregator",
+        default=True,
+        help="Run results aggregator to combine metrics and entropy for data mining",
+    )
+    parser.add_argument(
+        "--aggregate-all",
+        default=False,
+        help="Aggregate results from all datasets",
+    )
 
     args = parser.parse_args()
 
@@ -127,43 +137,12 @@ def main():
                     json.dump(entropy_results, f, indent=2, ensure_ascii=False)
                 print(f"Entropy JSON saved to: {json_output_path}")
 
-            print(f"Architecture: {entropy_results['agent_architecture']}")
-            print(
-                f"Total entropy: {entropy_results['macro_statistics']['experiment_level']['total_entropy']:.4f}"
-            )
-            print(
-                f"Average entropy: {entropy_results['macro_statistics']['experiment_level']['average_entropy']:.4f}"
-            )
-
             if args.analyze_trends:
                 print(f"\nAnalyzing entropy change trends for experiment: {args.experiment}")
                 trend_results = entropy_analyzer.analyze_entropy_change_trends(
                     args.dataset, args.experiment
                 )
-
-                print(f"\nTrend Analysis Summary:")
-                print(f"  Architecture: {trend_results['agent_architecture']}")
-                print(f"  Number of rounds: {trend_results['num_rounds']}")
                 
-                if "intra_round_stats" in trend_results["trend_statistics"]:
-                    intra_stats = trend_results["trend_statistics"]["intra_round_stats"]
-                    print(f"\n  Intra-round Statistics:")
-                    print(f"    Mean agent difference: {intra_stats.get('mean_agent_difference', 0):.4f}")
-                    print(f"    Max agent difference: {intra_stats.get('max_agent_difference', 0):.4f}")
-                
-                if "inter_round_stats" in trend_results["trend_statistics"]:
-                    inter_stats = trend_results["trend_statistics"]["inter_round_stats"]
-                    print(f"\n  Inter-round Statistics:")
-                    print(f"    Mean round-to-round change: {inter_stats.get('mean_round_to_round_change', 0):.4f}")
-                    print(f"    Max round-to-round change: {inter_stats.get('max_round_to_round_change', 0):.4f}")
-                
-                if "overall_summary" in trend_results["trend_statistics"]:
-                    summary = trend_results["trend_statistics"]["overall_summary"]
-                    print(f"\n  Overall Summary:")
-                    print(f"    Total agents analyzed: {summary.get('total_agents_analyzed', 0)}")
-                    print(f"    Agents with increasing trend: {summary.get('agents_with_increasing_trend', 0)}")
-                    print(f"    Agents with decreasing trend: {summary.get('agents_with_decreasing_trend', 0)}")
-                    print(f"    Dominant trend: {summary.get('dominant_trend', 'unknown')}")
     else:
         if args.compare:
             print(f"Comparing all experiments for dataset: {args.dataset}")
@@ -214,9 +193,7 @@ def main():
                     json.dump(entropy_results, f, indent=2, ensure_ascii=False)
                 print(f"Entropy JSON saved to: {json_output_path}")
 
-            if args.analyze_trends:
-                print(f"\nAnalyzing entropy change trends for all experiments in dataset: {args.dataset}")
-                
+            if args.analyze_trends:              
                 for exp_name in entropy_results["experiments"].keys():
                     if "error" not in entropy_results["experiments"][exp_name]:
                         try:
@@ -234,26 +211,18 @@ def main():
                     json_output_path = entropy_output_dir / "all_entropy_results.json"
                     with open(json_output_path, "w", encoding="utf-8") as f:
                         json.dump(entropy_results, f, indent=2, ensure_ascii=False)
-                    print(f"Updated entropy JSON with trend analysis saved to: {json_output_path}")
-                    
-                    print(f"\nTrend Analysis Summary Across Experiments:")
-                    for exp_name, exp_data in entropy_results["experiments"].items():
-                        if "trend_analysis" in exp_data and "error" not in exp_data["trend_analysis"]:
-                            trend_data = exp_data["trend_analysis"]
-                            arch = trend_data["agent_architecture"]
-                            num_rounds = trend_data["num_rounds"]
-                            print(f"\n  {exp_name} ({arch}, {num_rounds} rounds):")
-                            
-                            if "overall_summary" in trend_data["trend_statistics"]:
-                                summary = trend_data["trend_statistics"]["overall_summary"]
-                                print(f"    Dominant trend: {summary.get('dominant_trend', 'unknown')}")
-                                print(f"    Agents analyzed: {summary.get('total_agents_analyzed', 0)}")
 
-    if args.aggregate:
-        print(f"\nAggregating results for dataset: {args.dataset}")
-        aggregator = ResultsAggregator(base_path, args.dataset)
-        aggregator.run_aggregation()
-
+    if args.run_aggregator or args.aggregate_all:      
+        aggregator = ResultsAggregator(base_path)
+        
+        if args.aggregate_all:
+            output_path = aggregator.save_all_aggregated_results()
+            print(f"All datasets aggregated results saved to: {output_path}")
+        else:
+            output_path = aggregator.save_aggregated_results(args.dataset)
+            print(f"Aggregated results saved to: {output_path}")
+            
+            aggregated = aggregator.aggregate_dataset_results(args.dataset)
 
 if __name__ == "__main__":
     main()
