@@ -5,7 +5,6 @@ from experiment results, including macro and micro level analysis,
 and comparison across different agent architectures.
 """
 
-import csv
 from pathlib import Path
 from typing import Dict, List, Any
 from collections import defaultdict
@@ -14,7 +13,7 @@ import torch
 import numpy as np
 
 from data_loader import DataLoader
-from utils import save_csv, save_json
+from utils import save_json
 
 
 class EntropyAnalyzer:
@@ -632,243 +631,6 @@ class EntropyAnalyzer:
 
         return distribution
 
-    def save_macro_statistics_to_csv(self, dataset: str, output_path: str):
-        """Save macro-level entropy statistics to CSV file.
-
-        Args:
-            dataset: Dataset name (e.g., "gsm8k", "humaneval").
-            output_path: Path to output CSV file.
-        """
-        all_results = self.analyze_all_experiments_entropy(dataset)
-
-        rows = []
-        for exp_name, results in all_results["experiments"].items():
-            if "error" in results:
-                continue
-
-            macro = results["macro_statistics"]
-            exp_level = macro["experiment_level"]
-
-            rows.append(
-                {
-                    "experiment_name": exp_name,
-                    "agent_architecture": results["agent_architecture"],
-                    "num_rounds": results["num_rounds"],
-                    "num_samples": exp_level["total_samples"],
-                    "total_results": exp_level["total_results"],
-                    "total_entropy": exp_level["total_entropy"],
-                    "average_entropy": exp_level["average_entropy"],
-                }
-            )
-
-            for round_num, round_data in macro["round_level"].items():
-                rows.append(
-                    {
-                        "experiment_name": exp_name,
-                        "agent_architecture": results["agent_architecture"],
-                        "level": "round",
-                        "round_number": round_num,
-                        "total_entropy": round_data["total_entropy"],
-                        "average_entropy": round_data["average_entropy"],
-                        "count": round_data["count"],
-                    }
-                )
-
-        fieldnames = [
-            "experiment_name",
-            "agent_architecture",
-            "num_rounds",
-            "num_samples",
-            "total_results",
-            "total_entropy",
-            "average_entropy",
-            "level",
-            "round_number",
-            "count",
-        ]
-
-        save_csv(rows, output_path, fieldnames)
-        print(f"Macro statistics saved to: {output_path}")
-
-    def save_micro_statistics_to_csv(self, dataset: str, output_path: str):
-        """Save micro-level entropy statistics to CSV file.
-
-        Args:
-            dataset: Dataset name (e.g., "gsm8k", "humaneval").
-            output_path: Path to output CSV file.
-        """
-        all_results = self.analyze_all_experiments_entropy(dataset)
-
-        rows = []
-        for exp_name, results in all_results["experiments"].items():
-            if "error" in results:
-                continue
-
-            micro = results["micro_statistics"]
-
-            for sequence_id, seq_stats in micro["sequence_level"].items():
-                rows.append(
-                    {
-                        "experiment_name": exp_name,
-                        "agent_architecture": results["agent_architecture"],
-                        "sequence_id": sequence_id,
-                        "total_entropy": seq_stats["total_entropy"],
-                        "max_entropy": seq_stats["max_entropy"],
-                        "mean_entropy": seq_stats["mean_entropy"],
-                        "variance_entropy": seq_stats["variance_entropy"],
-                        "median_entropy": seq_stats["median_entropy"],
-                        "q1_entropy": seq_stats["q1_entropy"],
-                        "q3_entropy": seq_stats["q3_entropy"],
-                        "std_entropy": seq_stats["std_entropy"],
-                        "min_entropy": seq_stats["min_entropy"],
-                        "token_count": seq_stats["token_count"],
-                        "sample_count": seq_stats["sample_count"],
-                        "average_entropy_per_token": seq_stats[
-                            "average_entropy_per_token"
-                        ],
-                    }
-                )
-
-        fieldnames = [
-            "experiment_name",
-            "agent_architecture",
-            "sequence_id",
-            "total_entropy",
-            "max_entropy",
-            "mean_entropy",
-            "variance_entropy",
-            "median_entropy",
-            "q1_entropy",
-            "q3_entropy",
-            "std_entropy",
-            "min_entropy",
-            "token_count",
-            "sample_count",
-            "average_entropy_per_token",
-        ]
-
-        save_csv(rows, output_path, fieldnames)
-        print(f"Micro statistics saved to: {output_path}")
-
-    def save_token_position_statistics_to_csv(self, dataset: str, output_path: str):
-        """Save token position level entropy statistics to CSV file.
-
-        Args:
-            dataset: Dataset name (e.g., "gsm8k", "humaneval").
-            output_path: Path to output CSV file.
-        """
-        all_results = self.analyze_all_experiments_entropy(dataset)
-
-        rows = []
-        for exp_name, results in all_results["experiments"].items():
-            if "error" in results:
-                continue
-
-            micro = results["micro_statistics"]
-
-            for pos, pos_stats in micro["token_position_level"].items():
-                rows.append(
-                    {
-                        "experiment_name": exp_name,
-                        "agent_architecture": results["agent_architecture"],
-                        "token_position": pos,
-                        "mean_entropy": pos_stats["mean"],
-                        "std_entropy": pos_stats["std"],
-                        "median_entropy": pos_stats["median"],
-                        "min_entropy": pos_stats["min"],
-                        "max_entropy": pos_stats["max"],
-                        "q1_entropy": pos_stats["q1"],
-                        "q3_entropy": pos_stats["q3"],
-                        "count": pos_stats["count"],
-                    }
-                )
-
-        fieldnames = [
-            "experiment_name",
-            "agent_architecture",
-            "token_position",
-            "mean_entropy",
-            "std_entropy",
-            "median_entropy",
-            "min_entropy",
-            "max_entropy",
-            "q1_entropy",
-            "q3_entropy",
-            "count",
-        ]
-
-        save_csv(rows, output_path, fieldnames)
-        print(f"Token position statistics saved to: {output_path}")
-
-    def save_all_entropy_statistics_to_csv(self, dataset: str, output_dir: str):
-        """Save all entropy statistics to CSV files.
-
-        Args:
-            dataset: Dataset name (e.g., "gsm8k", "humaneval").
-            output_dir: Directory to save CSV files.
-        """
-        output_path = Path(output_dir)
-        output_path.mkdir(parents=True, exist_ok=True)
-
-        macro_csv = output_path / "macro_statistics.csv"
-        micro_csv = output_path / "micro_statistics.csv"
-        token_pos_csv = output_path / "token_position_statistics.csv"
-
-        self.save_macro_statistics_to_csv(dataset, str(macro_csv))
-        self.save_micro_statistics_to_csv(dataset, str(micro_csv))
-        self.save_token_position_statistics_to_csv(dataset, str(token_pos_csv))
-
-        comparison = self.compare_architectures_entropy(dataset)
-        comparison_csv = output_path / "architecture_comparison.csv"
-
-        comparison_rows = []
-        for arch, exps in comparison["architectures"].items():
-            for exp in exps:
-                comparison_rows.append(
-                    {
-                        "agent_architecture": arch,
-                        "experiment_name": exp["experiment_name"],
-                        "total_entropy": exp["total_entropy"],
-                        "average_entropy": exp["average_entropy"],
-                        "num_samples": exp["num_samples"],
-                    }
-                )
-
-        if arch in comparison["trends"]:
-            trend = comparison["trends"][arch]
-            comparison_rows.append(
-                {
-                    "agent_architecture": arch,
-                    "experiment_name": "TREND_SUMMARY",
-                    "total_entropy": None,
-                    "average_entropy": trend["mean"],
-                    "num_samples": trend["count"],
-                    "trend_std": trend["std"],
-                    "trend_min": trend["min"],
-                    "trend_max": trend["max"],
-                }
-            )
-
-        fieldnames = [
-            "agent_architecture",
-            "experiment_name",
-            "total_entropy",
-            "average_entropy",
-            "num_samples",
-            "trend_std",
-            "trend_min",
-            "trend_max",
-        ]
-
-        with open(comparison_csv, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(comparison_rows)
-
-        print(f"Architecture comparison saved to: {comparison_csv}")
-
-        print(f"\nAll entropy statistics saved to: {output_dir}")
-
     def save_results_json(self, results: Dict[str, Any], output_path: str):
         """Save entropy analysis results to JSON file.
 
@@ -877,4 +639,353 @@ class EntropyAnalyzer:
             output_path: Path to output JSON file.
         """
         save_json(results, output_path)
-        print(f"Results saved to: {output_path}")
+
+    def analyze_entropy_change_trends(
+        self, dataset: str, experiment_name: str
+    ) -> Dict[str, Any]:
+        """Analyze entropy change trends between agents across rounds.
+
+        Args:
+            dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            experiment_name: Name of the experiment.
+
+        Returns:
+            Dictionary containing entropy change trend analysis results.
+        """
+        config = self.data_loader.load_experiment_config(dataset, experiment_name)
+        agent_architecture = config.get("agent_type", "unknown")
+        num_rounds = config.get("round", 1)
+
+        info = self.data_loader.load_result_store_info(dataset, experiment_name)
+        entropy_data = self._collect_entropy_data(dataset, experiment_name, info)
+
+        trend_results = {
+            "experiment_name": experiment_name,
+            "dataset": dataset,
+            "agent_architecture": agent_architecture,
+            "num_rounds": num_rounds,
+            "entropy_by_round_agent": {},
+            "intra_round_trends": {},
+            "inter_round_trends": {},
+            "trend_statistics": {},
+        }
+
+        trend_results["entropy_by_round_agent"] = self._extract_entropy_by_round_agent(
+            entropy_data, agent_architecture, num_rounds
+        )
+
+        trend_results["intra_round_trends"] = self._calculate_intra_round_trends(
+            trend_results["entropy_by_round_agent"]
+        )
+
+        trend_results["inter_round_trends"] = self._calculate_inter_round_trends(
+            trend_results["entropy_by_round_agent"]
+        )
+
+        trend_results["trend_statistics"] = self._calculate_trend_statistics(
+            trend_results["intra_round_trends"],
+            trend_results["inter_round_trends"],
+        )
+
+        return trend_results
+
+    def _extract_entropy_by_round_agent(
+        self,
+        entropy_data: Dict[str, List[Dict[str, Any]]],
+        agent_architecture: str,
+        num_rounds: int,
+    ) -> Dict[int, Dict[str, List[float]]]:
+        """Extract entropy values organized by round and agent.
+
+        Args:
+            entropy_data: Dictionary of entropy data by sequence.
+            agent_architecture: Type of agent architecture.
+            num_rounds: Number of rounds in the experiment.
+
+        Returns:
+            Dictionary mapping round numbers to agent types to entropy values.
+        """
+        round_agent_entropy = defaultdict(
+            lambda: defaultdict(lambda: {"entropies": [], "sums": []})
+        )
+
+        for sequence_id, sample_entropies in entropy_data.items():
+            for entropy_info in sample_entropies:
+                entropy_tensor = entropy_info["entropy_tensor"]
+                agent_type = entropy_info["agent_type"]
+
+                if isinstance(entropy_tensor, torch.Tensor):
+                    entropy_array = entropy_tensor.cpu().numpy()
+                else:
+                    entropy_array = np.array(entropy_tensor)
+
+                round_num = self._get_round_number(
+                    entropy_info, agent_architecture, num_rounds
+                )
+
+                entropy_sum = float(np.sum(entropy_array))
+                entropy_mean = float(np.mean(entropy_array))
+
+                round_agent_entropy[round_num][agent_type]["entropies"].append(
+                    entropy_mean
+                )
+                round_agent_entropy[round_num][agent_type]["sums"].append(entropy_sum)
+
+        result = {}
+        for round_num in sorted(round_agent_entropy.keys()):
+            result[round_num] = {}
+            for agent_type in sorted(round_agent_entropy[round_num].keys()):
+                result[round_num][agent_type] = {
+                    "mean_entropy": float(
+                        np.mean(round_agent_entropy[round_num][agent_type]["entropies"])
+                    ),
+                    "std_entropy": float(
+                        np.std(round_agent_entropy[round_num][agent_type]["entropies"])
+                    ),
+                    "median_entropy": float(
+                        np.median(round_agent_entropy[round_num][agent_type]["entropies"])
+                    ),
+                    "min_entropy": float(
+                        np.min(round_agent_entropy[round_num][agent_type]["entropies"])
+                    ),
+                    "max_entropy": float(
+                        np.max(round_agent_entropy[round_num][agent_type]["entropies"])
+                    ),
+                    "total_entropy": float(
+                        np.sum(round_agent_entropy[round_num][agent_type]["sums"])
+                    ),
+                    "sample_count": len(
+                        round_agent_entropy[round_num][agent_type]["entropies"]
+                    ),
+                }
+
+        return result
+
+    def _calculate_intra_round_trends(
+        self, entropy_by_round_agent: Dict[int, Dict[str, Dict[str, float]]]
+    ) -> Dict[int, Dict[str, Dict[str, float]]]:
+        """Calculate entropy change trends between agents within the same round.
+
+        Args:
+            entropy_by_round_agent: Dictionary mapping rounds to agents to entropy stats.
+
+        Returns:
+            Dictionary containing intra-round trend analysis.
+        """
+        intra_round_trends = {}
+
+        for round_num, agents_data in entropy_by_round_agent.items():
+            agent_types = list(agents_data.keys())
+
+            if len(agent_types) < 2:
+                intra_round_trends[round_num] = {
+                    "trends": {},
+                    "differences": {},
+                    "summary": "Only one agent in this round",
+                }
+                continue
+
+            intra_round_trends[round_num] = {
+                "trends": {},
+                "differences": {},
+                "summary": "",
+            }
+
+            trends = {}
+            differences = {}
+
+            for i in range(len(agent_types)):
+                for j in range(i + 1, len(agent_types)):
+                    agent1 = agent_types[i]
+                    agent2 = agent_types[j]
+
+                    diff = (
+                        agents_data[agent1]["mean_entropy"]
+                        - agents_data[agent2]["mean_entropy"]
+                    )
+                    pct_change = (
+                        (diff / agents_data[agent2]["mean_entropy"]) * 100
+                        if agents_data[agent2]["mean_entropy"] != 0
+                        else 0.0
+                    )
+
+                    pair_key = f"{agent1}_vs_{agent2}"
+                    differences[pair_key] = {
+                        "absolute_difference": diff,
+                        "percentage_difference": pct_change,
+                        "agent1_entropy": agents_data[agent1]["mean_entropy"],
+                        "agent2_entropy": agents_data[agent2]["mean_entropy"],
+                        "agent1_std": agents_data[agent1]["std_entropy"],
+                        "agent2_std": agents_data[agent2]["std_entropy"],
+                    }
+
+            intra_round_trends[round_num]["differences"] = differences
+
+            if len(agent_types) == 4:
+                sorted_agents = sorted(
+                    agent_types, key=lambda x: agents_data[x]["mean_entropy"]
+                )
+                trend_desc = " -> ".join(
+                    [f"{a}({agents_data[a]['mean_entropy']:.4f})" for a in sorted_agents]
+                )
+                trends["ranking"] = trend_desc
+                trends["highest_entropy_agent"] = sorted_agents[-1]
+                trends["lowest_entropy_agent"] = sorted_agents[0]
+                trends["entropy_range"] = (
+                    agents_data[sorted_agents[-1]]["mean_entropy"]
+                    - agents_data[sorted_agents[0]]["mean_entropy"]
+                )
+
+            intra_round_trends[round_num]["trends"] = trends
+
+        return intra_round_trends
+
+    def _calculate_inter_round_trends(
+        self, entropy_by_round_agent: Dict[int, Dict[str, Dict[str, float]]]
+    ) -> Dict[str, Dict[str, List[float]]]:
+        """Calculate entropy change trends of individual agents across consecutive rounds.
+
+        Args:
+            entropy_by_round_agent: Dictionary mapping rounds to agents to entropy stats.
+
+        Returns:
+            Dictionary containing inter-round trend analysis.
+        """
+        inter_round_trends = {
+            "agent_trends": {},
+            "round_to_round_changes": {},
+            "summary": {},
+        }
+
+        round_numbers = sorted(entropy_by_round_agent.keys())
+
+        for round_num, agents_data in entropy_by_round_agent.items():
+            for agent_type, stats in agents_data.items():
+                if agent_type not in inter_round_trends["agent_trends"]:
+                    inter_round_trends["agent_trends"][agent_type] = {
+                        "mean_entropies": [],
+                        "rounds": [],
+                        "changes": [],
+                        "percentage_changes": [],
+                    }
+
+                inter_round_trends["agent_trends"][agent_type]["mean_entropies"].append(
+                    stats["mean_entropy"]
+                )
+                inter_round_trends["agent_trends"][agent_type]["rounds"].append(
+                    round_num
+                )
+
+        for agent_type, agent_data in inter_round_trends["agent_trends"].items():
+            mean_entropies = agent_data["mean_entropies"]
+            rounds = agent_data["rounds"]
+
+            for i in range(1, len(mean_entropies)):
+                change = mean_entropies[i] - mean_entropies[i - 1]
+                pct_change = (
+                    (change / mean_entropies[i - 1]) * 100
+                    if mean_entropies[i - 1] != 0
+                    else 0.0
+                )
+
+                agent_data["changes"].append(change)
+                agent_data["percentage_changes"].append(pct_change)
+
+                round_pair = f"{rounds[i - 1]}_to_{rounds[i]}"
+                if round_pair not in inter_round_trends["round_to_round_changes"]:
+                    inter_round_trends["round_to_round_changes"][round_pair] = {}
+
+                inter_round_trends["round_to_round_changes"][round_pair][agent_type] = {
+                    "change": change,
+                    "percentage_change": pct_change,
+                    "from_entropy": mean_entropies[i - 1],
+                    "to_entropy": mean_entropies[i],
+                }
+
+        for agent_type, agent_data in inter_round_trends["agent_trends"].items():
+            if len(agent_data["changes"]) > 0:
+                inter_round_trends["summary"][agent_type] = {
+                    "total_change": agent_data["changes"][-1]
+                    if len(agent_data["changes"]) > 0
+                    else 0.0,
+                    "average_change": float(np.mean(agent_data["changes"])),
+                    "total_percentage_change": agent_data["percentage_changes"][-1]
+                    if len(agent_data["percentage_changes"]) > 0
+                    else 0.0,
+                    "average_percentage_change": float(
+                        np.mean(agent_data["percentage_changes"])
+                    ),
+                    "trend_direction": "increasing"
+                    if np.mean(agent_data["changes"]) > 0
+                    else "decreasing",
+                    "volatility": float(np.std(agent_data["changes"])),
+                }
+
+        return inter_round_trends
+
+    def _calculate_trend_statistics(
+        self,
+        intra_round_trends: Dict[int, Dict[str, Dict[str, float]]],
+        inter_round_trends: Dict[str, Dict[str, List[float]]],
+    ) -> Dict[str, Any]:
+        """Calculate overall trend statistics.
+
+        Args:
+            intra_round_trends: Intra-round trend analysis results.
+            inter_round_trends: Inter-round trend analysis results.
+
+        Returns:
+            Dictionary containing overall trend statistics.
+        """
+        statistics = {
+            "intra_round_stats": {},
+            "inter_round_stats": {},
+            "overall_summary": {},
+        }
+
+        all_differences = []
+        for round_num, round_data in intra_round_trends.items():
+            if "differences" in round_data:
+                for diff_key, diff_data in round_data["differences"].items():
+                    all_differences.append(
+                        abs(diff_data["absolute_difference"])
+                    )
+
+        if all_differences:
+            statistics["intra_round_stats"] = {
+                "mean_agent_difference": float(np.mean(all_differences)),
+                "max_agent_difference": float(np.max(all_differences)),
+                "min_agent_difference": float(np.min(all_differences)),
+                "std_agent_difference": float(np.std(all_differences)),
+            }
+
+        all_agent_changes = []
+        for agent_type, agent_data in inter_round_trends["agent_trends"].items():
+            all_agent_changes.extend(agent_data["changes"])
+
+        if all_agent_changes:
+            statistics["inter_round_stats"] = {
+                "mean_round_to_round_change": float(np.mean(all_agent_changes)),
+                "max_round_to_round_change": float(np.max(all_agent_changes)),
+                "min_round_to_round_change": float(np.min(all_agent_changes)),
+                "std_round_to_round_change": float(np.std(all_agent_changes)),
+            }
+
+        if "summary" in inter_round_trends:
+            num_increasing = sum(
+                1
+                for summary in inter_round_trends["summary"].values()
+                if summary["trend_direction"] == "increasing"
+            )
+            num_decreasing = len(inter_round_trends["summary"]) - num_increasing
+
+            statistics["overall_summary"] = {
+                "total_agents_analyzed": len(inter_round_trends["summary"]),
+                "agents_with_increasing_trend": num_increasing,
+                "agents_with_decreasing_trend": num_decreasing,
+                "dominant_trend": "increasing"
+                if num_increasing > num_decreasing
+                else "decreasing",
+            }
+
+        return statistics
