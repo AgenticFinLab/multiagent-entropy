@@ -95,7 +95,9 @@ class EntropyAnalyzer:
         macro_stats = self._calculate_macro_statistics(
             entropy_data, agent_architecture, num_rounds
         )
-        micro_stats = self._calculate_micro_statistics(entropy_data)
+        micro_stats = self._calculate_micro_statistics(
+            entropy_data, agent_architecture, num_rounds
+        )
 
         results = {
             "experiment_name": experiment_name,
@@ -249,18 +251,20 @@ class EntropyAnalyzer:
         return macro_stats
 
     def _calculate_micro_statistics(
-        self, entropy_data: Dict[str, List[Dict[str, Any]]]
+        self, entropy_data: Dict[str, List[Dict[str, Any]]], agent_architecture: str, num_rounds: int
     ) -> Dict[str, Any]:
         """Calculate micro-level entropy statistics.
 
         Args:
             entropy_data: Dictionary of entropy data by sequence.
+            agent_architecture: Type of agent architecture.
+            num_rounds: Total number of rounds.
 
         Returns:
             Dictionary containing sample, sequence, and token position level statistics.
         """
         micro_stats = {
-            "sample_level": defaultdict(
+            "samples": defaultdict(
                 lambda: {
                     "total_entropy": 0.0,
                     "max_entropy": 0.0,
@@ -273,20 +277,7 @@ class EntropyAnalyzer:
                     "min_entropy": 0.0,
                     "token_count": 0,
                     "num_agents": 0,
-                }
-            ),
-            "sequence_level": defaultdict(
-                lambda: {
-                    "total_entropy": 0.0,
-                    "max_entropy": 0.0,
-                    "mean_entropy": 0.0,
-                    "variance_entropy": 0.0,
-                    "median_entropy": 0.0,
-                    "q1_entropy": 0.0,
-                    "q3_entropy": 0.0,
-                    "std_entropy": 0.0,
-                    "min_entropy": 0.0,
-                    "token_count": 0,
+                    "agents": {},
                 }
             ),
             "token_position_level": defaultdict(list),
@@ -304,8 +295,15 @@ class EntropyAnalyzer:
             sequence_min_entropy = 0.0
             sequence_token_count = 0
             sequence_sample_count = len(sample_entropies)
+            
+            sequence_agent_type = None
+            sequence_execution_order = None
 
             for entropy_info in sample_entropies:
+                if sequence_agent_type is None:
+                    sequence_agent_type = entropy_info["agent_type"]
+                    sequence_execution_order = entropy_info["execution_order"]
+                
                 entropy_tensor = entropy_info["entropy_tensor"]
 
                 if isinstance(entropy_tensor, torch.Tensor):
@@ -338,33 +336,9 @@ class EntropyAnalyzer:
                 for pos, entropy_val in enumerate(entropy_array):
                     micro_stats["token_position_level"][pos].append(float(entropy_val))
 
-            if sequence_sample_count > 0:
-                seq_stats = micro_stats["sequence_level"][sequence_id]
-                seq_stats["total_entropy"] = sequence_total_entropy
-                seq_stats["max_entropy"] = sequence_max_entropy / sequence_sample_count
-                seq_stats["mean_entropy"] = (
-                    sequence_mean_entropy / sequence_sample_count
-                )
-                seq_stats["variance_entropy"] = (
-                    sequence_variance_entropy / sequence_sample_count
-                )
-                seq_stats["median_entropy"] = (
-                    sequence_median_entropy / sequence_sample_count
-                )
-                seq_stats["q1_entropy"] = sequence_q1_entropy / sequence_sample_count
-                seq_stats["q3_entropy"] = sequence_q3_entropy / sequence_sample_count
-                seq_stats["std_entropy"] = sequence_std_entropy / sequence_sample_count
-                seq_stats["min_entropy"] = sequence_min_entropy / sequence_sample_count
-                seq_stats["token_count"] = sequence_token_count
-                seq_stats["average_entropy_per_token"] = (
-                    sequence_total_entropy / sequence_token_count
-                    if sequence_token_count > 0
-                    else 0.0
-                )
-
             main_id = sequence_id.split("-")[0]
-            if main_id not in micro_stats["sample_level"]:
-                micro_stats["sample_level"][main_id] = {
+            if main_id not in micro_stats["samples"]:
+                micro_stats["samples"][main_id] = {
                     "total_entropy": 0.0,
                     "max_entropy": 0.0,
                     "mean_entropy": 0.0,
@@ -376,9 +350,10 @@ class EntropyAnalyzer:
                     "min_entropy": 0.0,
                     "token_count": 0,
                     "num_agents": 0,
+                    "agents": {},
                 }
 
-            stats = micro_stats["sample_level"][main_id]
+            stats = micro_stats["samples"][main_id]
             stats["total_entropy"] += sequence_total_entropy
             stats["max_entropy"] += (
                 sequence_max_entropy / sequence_sample_count
@@ -423,9 +398,40 @@ class EntropyAnalyzer:
             stats["token_count"] += sequence_token_count
             stats["num_agents"] += 1
 
-        micro_stats["sample_level"] = dict(micro_stats["sample_level"])
+            if sequence_sample_count > 0:
+                round_number = self._get_round_number(
+                    {
+                        "agent_type": sequence_agent_type,
+                        "execution_order": sequence_execution_order,
+                    },
+                    agent_architecture,
+                    num_rounds,
+                )
+                agent_key = f"{sequence_agent_type}_round_{round_number}"
+                stats["agents"][agent_key] = {
+                    "agent_type": sequence_agent_type,
+                    "execution_order": sequence_execution_order,
+                    "round_number": round_number,
+                    "total_entropy": sequence_total_entropy,
+                    "max_entropy": sequence_max_entropy / sequence_sample_count,
+                    "mean_entropy": sequence_mean_entropy / sequence_sample_count,
+                    "variance_entropy": sequence_variance_entropy / sequence_sample_count,
+                    "median_entropy": sequence_median_entropy / sequence_sample_count,
+                    "q1_entropy": sequence_q1_entropy / sequence_sample_count,
+                    "q3_entropy": sequence_q3_entropy / sequence_sample_count,
+                    "std_entropy": sequence_std_entropy / sequence_sample_count,
+                    "min_entropy": sequence_min_entropy / sequence_sample_count,
+                    "token_count": sequence_token_count,
+                    "average_entropy_per_token": (
+                        sequence_total_entropy / sequence_token_count
+                        if sequence_token_count > 0
+                        else 0.0
+                    ),
+                }
 
-        for main_id, stats in micro_stats["sample_level"].items():
+        micro_stats["samples"] = dict(micro_stats["samples"])
+
+        for main_id, stats in micro_stats["samples"].items():
             if stats["num_agents"] > 0:
                 stats["max_entropy"] = stats["max_entropy"] / stats["num_agents"]
                 stats["mean_entropy"] = stats["mean_entropy"] / stats["num_agents"]
@@ -444,15 +450,6 @@ class EntropyAnalyzer:
                     if stats["token_count"] > 0
                     else 0.0
                 )
-
-        for sequence_key, seq_stats in micro_stats["sequence_level"].items():
-            seq_stats["average_entropy_per_token"] = (
-                seq_stats["total_entropy"] / seq_stats["token_count"]
-                if seq_stats["token_count"] > 0
-                else 0.0
-            )
-
-        micro_stats["sequence_level"] = dict(micro_stats["sequence_level"])
 
         for pos, entropies in micro_stats["token_position_level"].items():
             entropies_array = np.array(entropies)
