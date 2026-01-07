@@ -203,6 +203,8 @@ evaluation/results/
 **all_metrics.json**: Contains performance metrics for all experiments
 - experiment_name, dataset, task_type, agent_architecture, num_rounds, num_samples
 - samples: Detailed metrics for each sample including agent-level performance
+  - main_id, ground_truth, final_predicted_answer, is_finally_correct, agents
+  - agents: Per-agent metrics including agent_type, execution_order, time_cost, average_entropy, predicted_answer, is_correct
 - summary: Aggregated statistics across all samples
 
 **all_entropy_results.json**: Contains entropy analysis for all experiments
@@ -215,7 +217,7 @@ evaluation/results/
 **aggregated_data.csv**: Unified CSV file combining metrics and entropy data for data mining
 - sample_id, experiment_name, architecture, ground_truth
 - agent_name, agent_key, execution_order, time_cost
-- predicted_answer, is_correct
+- predicted_answer, is_correct, final_predicted_answer, is_finally_correct
 - sample-level entropy statistics (total, max, min, mean, median, std, variance, q1, q3)
 - sample token count and average entropy per token
 - agent-level entropy statistics (total, sample_count, total_tokens, avg, mean, max, min, median, std, variance, q1, q3)
