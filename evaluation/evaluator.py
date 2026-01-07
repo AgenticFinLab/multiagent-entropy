@@ -49,11 +49,6 @@ def main():
         help="Output file path (if not provided, save to evaluation/results/)",
     )
     parser.add_argument(
-        "--compare",
-        action="store_true",
-        help="Compare experiments by architecture",
-    )
-    parser.add_argument(
         "--analyze-entropy",
         default=True,
         help="Perform entropy statistical analysis",
@@ -146,37 +141,18 @@ def main():
                 )
 
     else:
-        if args.compare:
-            print(f"Comparing all experiments for dataset: {args.dataset}")
-            comparison = analyzer.compare_experiments(args.dataset, args.task_type)
+        print(f"Analyzing all experiments for dataset: {args.dataset}")
+        all_metrics = analyzer.analyze_all_experiments(args.dataset, args.task_type)
 
-            if args.output:
-                output_path = args.output
-            else:
-                output_dir = Path(base_path) / "evaluation" / "results" / args.dataset
-                output_dir.mkdir(parents=True, exist_ok=True)
-                output_path = output_dir / "comparison.json"
-
-            analyzer.save_results(comparison, output_path)
-            print(f"Comparison results saved to: {output_path}")
-
-            for arch, exps in comparison["architectures"].items():
-                print(f"\n{arch.upper()} Architecture:")
-                for exp in exps:
-                    print(f"  {exp['experiment_name']}")
+        if args.output:
+            output_path = args.output
         else:
-            print(f"Analyzing all experiments for dataset: {args.dataset}")
-            all_metrics = analyzer.analyze_all_experiments(args.dataset, args.task_type)
+            output_dir = Path(base_path) / "evaluation" / "results" / args.dataset
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / "all_metrics.json"
 
-            if args.output:
-                output_path = args.output
-            else:
-                output_dir = Path(base_path) / "evaluation" / "results" / args.dataset
-                output_dir.mkdir(parents=True, exist_ok=True)
-                output_path = output_dir / "all_metrics.json"
-
-            analyzer.save_results(all_metrics, output_path)
-            print(f"All metrics saved to: {output_path}")
+        analyzer.save_results(all_metrics, output_path)
+        print(f"All metrics saved to: {output_path}")
 
         if entropy_analyzer:
             print(f"\nAnalyzing entropy for all experiments in dataset: {args.dataset}")
@@ -227,25 +203,25 @@ def main():
                 dataset_path = base_results_path / dataset
                 entropy_file = dataset_path / "all_entropy_results.json"
                 metrics_file = dataset_path / "all_metrics.json"
-                output_csv = dataset_path / "aggregated_data.csv"
+                output_csv = dataset_path / "aggregated"
 
                 if entropy_file.exists() and metrics_file.exists():
                     converter = Aggregator(
                         str(entropy_file), str(metrics_file), str(output_csv)
                     )
-                    converter.convert_to_csv()
+                    converter.generate_aggregated_csvs()
                     print(f"CSV generated for {dataset}: {output_csv}")
         else:
             dataset_path = base_results_path / args.dataset
             entropy_file = dataset_path / "all_entropy_results.json"
             metrics_file = dataset_path / "all_metrics.json"
-            output_csv = dataset_path / "aggregated_data.csv"
+            output_csv = dataset_path / "aggregated"
 
             if entropy_file.exists() and metrics_file.exists():
                 converter = Aggregator(
                     str(entropy_file), str(metrics_file), str(output_csv)
                 )
-                converter.convert_to_csv()
+                converter.generate_aggregated_csvs()
                 print(f"CSV generated for {args.dataset}: {output_csv}")
 
 

@@ -15,8 +15,8 @@ from metrics_calculator import MetricsCalculator
 class ExperimentAnalyzer:
     """Analyzer for multi-agent experiment results.
 
-    Provides methods to analyze individual experiments, compare
-    architectures, and generate summary statistics.
+    Provides methods to analyze individual experiments and compare
+    architectures.
     """
 
     def __init__(self, base_path: str):
@@ -81,10 +81,6 @@ class ExperimentAnalyzer:
                 experiment_name,
             )
             metrics["samples"][main_id] = sample_metrics
-
-        metrics["summary"] = self._calculate_summary(
-            metrics["samples"], agent_architecture
-        )
 
         return metrics
 
@@ -184,61 +180,6 @@ class ExperimentAnalyzer:
 
         return sample_metrics
 
-    def _calculate_summary(
-        self, samples: Dict[str, Any], agent_architecture: str
-    ) -> Dict[str, Any]:
-        """Calculate summary statistics across all samples.
-
-        Args:
-            samples: Dictionary of sample metrics.
-            agent_architecture: Type of agent architecture.
-
-        Returns:
-            Dictionary containing summary statistics.
-        """
-        summary = {
-            "total_samples": len(samples),
-            "last_agent_stats": {},
-            "agent_stats": defaultdict(
-                lambda: {
-                    "count": 0,
-                    "correct": 0,
-                    "has_format": 0,
-                    "total_time": 0.0,
-                    "total_entropy": 0.0,
-                }
-            ),
-        }
-
-        for main_id, sample in samples.items():
-            ground_truth = sample["ground_truth"]
-
-            for agent_key, agent_data in sample["agents"].items():
-                stats = summary["agent_stats"][agent_key]
-                stats["count"] += 1
-                stats["total_time"] += agent_data["time_cost"]
-                stats["total_entropy"] += agent_data["average_entropy"]
-
-                if agent_data["is_correct"]:
-                    stats["correct"] += 1
-
-                if agent_data["predicted_answer"] is not None:
-                    stats["has_format"] += 1
-
-        for agent_key, stats in summary["agent_stats"].items():
-            if stats["count"] > 0:
-                stats["accuracy"] = stats["correct"] / stats["count"]
-                stats["format_compliance_rate"] = stats["has_format"] / stats["count"]
-                stats["average_time"] = stats["total_time"] / stats["count"]
-                stats["average_entropy"] = stats["total_entropy"] / stats["count"]
-
-        summary["agent_stats"] = dict(summary["agent_stats"])
-        summary["last_agent_stats"] = dict(
-            summary["agent_stats"][self._get_final_agent_keys(agent_architecture)[-1]]
-        )
-
-        return summary
-
     def _get_final_agent_keys(self, agent_architecture: str) -> List[str]:
         """Get the keys for the final agent in each architecture.
 
@@ -337,46 +278,17 @@ class ExperimentAnalyzer:
             metrics: Dictionary containing analysis metrics.
             output_path: Path to save the results.
         """
-        save_json(metrics, output_path)
-
-    def compare_experiments(
-        self, dataset: str, task_type: str = "math"
-    ) -> Dict[str, Any]:
-        """Compare experiments across different architectures.
-
-        Args:
-            dataset: Dataset name (e.g., "gsm8k", "humaneval").
-            task_type: Type of task (e.g., "math", "code", "option").
-
-        Returns:
-            Dictionary containing comparison results across architectures.
-        """
-        all_metrics = self.analyze_all_experiments(dataset, task_type)
-
-        comparison = {"dataset": dataset, "task_type": task_type, "architectures": {}}
-
-        for exp_name, metrics in all_metrics["experiments"].items():
-            if "error" in metrics:
-                continue
-
-            arch = metrics["agent_architecture"]
-            if arch not in comparison["architectures"]:
-                comparison["architectures"][arch] = []
-
-            comparison["architectures"][arch].append(
-                {
-                    "experiment_name": exp_name,
-                    "accuracy": metrics["summary"]["last_agent_stats"]["accuracy"],
-                    "format_compliance_rate": metrics["summary"]["last_agent_stats"][
-                        "format_compliance_rate"
-                    ],
-                    "average_time_cost": metrics["summary"]["last_agent_stats"][
-                        "average_time"
-                    ],
-                    "average_entropy": metrics["summary"]["last_agent_stats"][
-                        "average_entropy"
-                    ],
-                }
-            )
-
-        return comparison
+        metrics_copy = metrics.copy()
+        
+        if "experiments" in metrics_copy:
+            for exp_name, exp_metrics in metrics_copy["experiments"].items():
+                if "samples" in exp_metrics:
+                    for sample_id, sample_data in exp_metrics["samples"].items():
+                        if "agents" in sample_data:
+                            for agent_key in sample_data["agents"]:
+                                if "predicted_answer" in sample_data["agents"][agent_key]:
+                                    del sample_data["agents"][agent_key]["predicted_answer"]
+                                if "is_correct" in sample_data["agents"][agent_key]:
+                                    del sample_data["agents"][agent_key]["is_correct"]
+        
+        save_json(metrics_copy, output_path)

@@ -1,8 +1,7 @@
 """Entropy analyzer for multi-agent system experiments.
 
 This module provides functionality to analyze entropy statistics
-from experiment results, including macro and micro level analysis,
-and comparison across different agent architectures.
+from experiment results, including macro and micro level analysis.
 """
 
 from pathlib import Path
@@ -172,15 +171,6 @@ class EntropyAnalyzer:
         macro_stats = {
             "experiment_level": {},
             "round_level": defaultdict(lambda: {"total_entropy": 0.0, "num_inferences": 0}),
-            "agent_level": defaultdict(
-                lambda: {
-                    "total_entropy": 0.0,
-                    "num_inferences": 0,
-                    "total_tokens": 0,
-                    "all_entropies": [],
-                }
-            ),
-            "architecture_comparison": {},
         }
 
         total_experiment_entropy = 0.0
@@ -201,21 +191,12 @@ class EntropyAnalyzer:
                 macro_stats["round_level"][round_num]["num_inferences"] += 1
 
                 agent_type = entropy_info["agent_type"]
-                macro_stats["agent_level"][agent_type]["total_entropy"] += entropy_sum
-                macro_stats["agent_level"][agent_type]["num_inferences"] += 1
-                macro_stats["agent_level"][agent_type]["total_tokens"] += len(
-                    entropy_tensor
-                )
 
                 if isinstance(entropy_tensor, torch.Tensor):
                     entropy_array = entropy_tensor.cpu().numpy()
                 else:
                     entropy_array = np.array(entropy_tensor)
-                macro_stats["agent_level"][agent_type]["all_entropies"].append(
-                    entropy_array
-                )
 
-        num_agents = len(macro_stats["agent_level"])
         macro_stats["experiment_level"]["total_entropy"] = total_experiment_entropy
         macro_stats["experiment_level"]["infer_average_entropy"] = (
             total_experiment_entropy / total_count if total_count > 0 else 0.0
@@ -228,25 +209,6 @@ class EntropyAnalyzer:
                 )
 
         macro_stats["round_level"] = dict(macro_stats["round_level"])
-
-        for agent_type, agent_data in macro_stats["agent_level"].items():
-            if agent_data["num_inferences"] > 0:
-                all_flat_entropies = np.concatenate(agent_data["all_entropies"])
-                agent_data["total_entropy"] = float(agent_data["total_entropy"])
-                agent_data["infer_average_entropy"] = (
-                    agent_data["total_entropy"] / agent_data["num_inferences"]
-                )
-                agent_data["mean_entropy"] = float(np.mean(all_flat_entropies))
-                agent_data["max_entropy"] = float(np.max(all_flat_entropies))
-                agent_data["min_entropy"] = float(np.min(all_flat_entropies))
-                agent_data["median_entropy"] = float(np.median(all_flat_entropies))
-                agent_data["std_entropy"] = float(np.std(all_flat_entropies))
-                agent_data["variance_entropy"] = float(np.var(all_flat_entropies))
-                agent_data["q1_entropy"] = float(np.percentile(all_flat_entropies, 25))
-                agent_data["q3_entropy"] = float(np.percentile(all_flat_entropies, 75))
-                del agent_data["all_entropies"]
-
-        macro_stats["agent_level"] = dict(macro_stats["agent_level"])
 
         return macro_stats
 
@@ -275,7 +237,7 @@ class EntropyAnalyzer:
                     "q3_entropy": 0.0,
                     "std_entropy": 0.0,
                     "min_entropy": 0.0,
-                    "token_count": 0,
+                    "all_agents_token_count": 0,
                     "num_agents": 0,
                     "agents": {},
                 }
@@ -348,7 +310,7 @@ class EntropyAnalyzer:
                     "q3_entropy": 0.0,
                     "std_entropy": 0.0,
                     "min_entropy": 0.0,
-                    "token_count": 0,
+                    "all_agents_token_count": 0,
                     "num_agents": 0,
                     "agents": {},
                 }
@@ -395,7 +357,7 @@ class EntropyAnalyzer:
                 if sequence_sample_count > 0
                 else 0.0
             )
-            stats["token_count"] += sequence_token_count
+            stats["all_agents_token_count"] += sequence_token_count
             stats["num_agents"] += 1
 
             if sequence_sample_count > 0:
@@ -446,8 +408,8 @@ class EntropyAnalyzer:
                 stats["std_entropy"] = stats["std_entropy"] / stats["num_agents"]
                 stats["min_entropy"] = stats["min_entropy"] / stats["num_agents"]
                 stats["average_entropy_per_token"] = (
-                    stats["total_entropy"] / stats["token_count"]
-                    if stats["token_count"] > 0
+                    stats["total_entropy"] / stats["all_agents_token_count"]
+                    if stats["all_agents_token_count"] > 0
                     else 0.0
                 )
 
@@ -497,64 +459,6 @@ class EntropyAnalyzer:
         else:
             return (execution_order - 1) // 4 + 1
 
-    def compare_architectures_entropy(self, dataset: str) -> Dict[str, Any]:
-        """Compare entropy statistics across different architectures.
-
-        Args:
-            dataset: Dataset name (e.g., "gsm8k", "humaneval").
-
-        Returns:
-            Dictionary containing architecture comparison results.
-        """
-        all_results = self.analyze_all_experiments_entropy(dataset)
-
-        comparison = {
-            "dataset": dataset,
-            "architectures": {},
-            "trends": {},
-            "distribution_analysis": {},
-        }
-
-        for exp_name, results in all_results["experiments"].items():
-            if "error" in results:
-                continue
-
-            arch = results["agent_architecture"]
-            if arch not in comparison["architectures"]:
-                comparison["architectures"][arch] = []
-
-            comparison["architectures"][arch].append(
-                {
-                    "experiment_name": exp_name,
-                    "total_entropy": results["macro_statistics"]["experiment_level"][
-                        "total_entropy"
-                    ],
-                    "average_entropy": results["macro_statistics"]["experiment_level"][
-                        "average_entropy"
-                    ],
-                    "num_samples": results["macro_statistics"]["experiment_level"][
-                        "total_samples"
-                    ],
-                }
-            )
-
-        for arch, exps in comparison["architectures"].items():
-            if len(exps) > 0:
-                avg_entropies = [exp["average_entropy"] for exp in exps]
-                comparison["trends"][arch] = {
-                    "mean": float(np.mean(avg_entropies)),
-                    "std": float(np.std(avg_entropies)),
-                    "min": float(np.min(avg_entropies)),
-                    "max": float(np.max(avg_entropies)),
-                    "count": len(exps),
-                }
-
-        comparison["distribution_analysis"] = self._analyze_entropy_distribution(
-            all_results
-        )
-
-        return comparison
-
     def _analyze_entropy_distribution(
         self, all_results: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -580,10 +484,6 @@ class EntropyAnalyzer:
                 }
 
             macro_stats = results["macro_statistics"]
-            for agent_type, agent_stats in macro_stats["agent_level"].items():
-                distribution["architecture_comparison"][arch]["agent_entropies"][
-                    agent_type
-                ].append(agent_stats["mean_entropy"])
 
         for arch, data in distribution["architecture_comparison"].items():
             arch_comparison = {}

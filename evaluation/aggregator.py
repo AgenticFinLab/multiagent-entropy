@@ -8,22 +8,24 @@ import csv
 import json
 from pathlib import Path
 from typing import Dict, Any, List
+from collections import defaultdict
 
 
 class Aggregator:
     """Convert JSON results to CSV format for data mining."""
 
-    def __init__(self, entropy_file: str, metrics_file: str, output_csv: str):
+    def __init__(self, entropy_file: str, metrics_file: str, output_dir: str):
         """Initialize the converter.
 
         Args:
             entropy_file: Path to all_entropy_results.json
             metrics_file: Path to all_metrics.json
-            output_csv: Path to output CSV file
+            output_dir: Path to output directory for CSV files
         """
         self.entropy_file = Path(entropy_file)
         self.metrics_file = Path(metrics_file)
-        self.output_csv = Path(output_csv)
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def load_json_files(self) -> tuple:
         """Load both JSON files.
@@ -64,16 +66,15 @@ class Aggregator:
             architecture = exp_entropy.get("agent_architecture", "unknown")
             num_rounds = exp_entropy.get("num_rounds", 0)
 
-            sample_level_entropy = exp_entropy.get("micro_statistics", {}).get(
-                "sample_level", {}
-            )
+            micro_stats = exp_entropy.get("micro_statistics", {})
+            samples_entropy = micro_stats.get("samples", {})
             samples_metrics = exp_metrics.get("samples", {})
 
             for sample_id, sample_metrics in samples_metrics.items():
-                if sample_id not in sample_level_entropy:
+                if sample_id not in samples_entropy:
                     continue
 
-                sample_entropy = sample_level_entropy[sample_id]
+                sample_entropy = samples_entropy[sample_id]
 
                 ground_truth = sample_metrics.get("ground_truth", "")
                 final_predicted_answer = sample_metrics.get(
@@ -84,26 +85,27 @@ class Aggregator:
                 for agent_key, agent_metrics in sample_metrics.get(
                     "agents", {}
                 ).items():
-                    agent_type = agent_metrics.get(
+                    agent_entropy_data = sample_entropy.get("agents", {}).get(
+                        agent_key, {}
+                    )
+
+                    agent_type = agent_entropy_data.get(
                         "agent_type", agent_key.split("_")[0]
                     )
-                    execution_order = agent_metrics.get("execution_order", 0)
+                    execution_order = agent_entropy_data.get("execution_order", 0)
                     time_cost = agent_metrics.get("time_cost", 0)
                     avg_entropy = agent_metrics.get("average_entropy", 0)
-                    predicted_answer = agent_metrics.get("predicted_answer", "")
-                    is_correct = agent_metrics.get("is_correct", False)
 
                     record = {
                         "sample_id": sample_id,
                         "experiment_name": exp_name,
                         "architecture": architecture,
+                        "num_rounds": num_rounds,
                         "ground_truth": ground_truth,
                         "agent_name": agent_type,
                         "agent_key": agent_key,
                         "execution_order": execution_order,
                         "time_cost": time_cost,
-                        "predicted_answer": predicted_answer,
-                        "is_correct": is_correct,
                         "final_predicted_answer": final_predicted_answer,
                         "is_finally_correct": is_finally_correct,
                         "sample_total_entropy": sample_entropy.get("total_entropy", 0),
@@ -119,11 +121,33 @@ class Aggregator:
                         ),
                         "sample_q1_entropy": sample_entropy.get("q1_entropy", 0),
                         "sample_q3_entropy": sample_entropy.get("q3_entropy", 0),
-                        "sample_token_count": sample_entropy.get("token_count", 0),
-                        "sample_count": sample_entropy.get("sample_count", 0),
+                        "sample_num_agents": sample_entropy.get("num_agents", 0),
+                        "sample_all_agents_token_count": sample_entropy.get(
+                            "all_agents_token_count", 0
+                        ),
                         "sample_avg_entropy_per_token": sample_entropy.get(
                             "average_entropy_per_token", 0
                         ),
+                        "agent_total_entropy": agent_entropy_data.get(
+                            "total_entropy", 0
+                        ),
+                        "agent_max_entropy": agent_entropy_data.get("max_entropy", 0),
+                        "agent_min_entropy": agent_entropy_data.get("min_entropy", 0),
+                        "agent_mean_entropy": agent_entropy_data.get("mean_entropy", 0),
+                        "agent_median_entropy": agent_entropy_data.get(
+                            "median_entropy", 0
+                        ),
+                        "agent_std_entropy": agent_entropy_data.get("std_entropy", 0),
+                        "agent_variance_entropy": agent_entropy_data.get(
+                            "variance_entropy", 0
+                        ),
+                        "agent_q1_entropy": agent_entropy_data.get("q1_entropy", 0),
+                        "agent_q3_entropy": agent_entropy_data.get("q3_entropy", 0),
+                        "agent_token_count": agent_entropy_data.get("token_count", 0),
+                        "agent_avg_entropy_per_token": agent_entropy_data.get(
+                            "average_entropy_per_token", 0
+                        ),
+                        "agent_round_number": agent_entropy_data.get("round_number", 0),
                         "agent_avg_entropy": avg_entropy,
                     }
 
@@ -149,14 +173,15 @@ class Aggregator:
             if "error" in exp_entropy:
                 continue
 
-            round_level = exp_entropy.get("macro_statistics", {}).get("round_level", {})
+            macro_stats = exp_entropy.get("macro_statistics", {})
+            round_level = macro_stats.get("round_level", {})
 
             for round_num, round_data in round_level.items():
                 key = (exp_name, int(round_num))
                 round_stats[key] = {
                     "round_total_entropy": round_data.get("total_entropy", 0),
-                    "round_count": round_data.get("count", 0),
-                    "round_avg_entropy": round_data.get("average_entropy", 0),
+                    "round_num_inferences": round_data.get("num_inferences", 0),
+                    "round_avg_entropy": round_data.get("infer_average_entropy", 0),
                 }
 
         return round_stats
@@ -179,15 +204,16 @@ class Aggregator:
             if "error" in exp_entropy:
                 continue
 
-            agent_level = exp_entropy.get("macro_statistics", {}).get("agent_level", {})
+            macro_stats = exp_entropy.get("macro_statistics", {})
+            agent_level = macro_stats.get("agent_level", {})
 
             for agent_name, agent_data in agent_level.items():
                 key = (exp_name, agent_name)
                 agent_stats[key] = {
                     "agent_total_entropy": agent_data.get("total_entropy", 0),
-                    "agent_sample_count": agent_data.get("sample_count", 0),
+                    "agent_num_inferences": agent_data.get("num_inferences", 0),
                     "agent_total_tokens": agent_data.get("total_tokens", 0),
-                    "agent_avg_entropy": agent_data.get("average_entropy", 0),
+                    "agent_avg_entropy": agent_data.get("infer_average_entropy", 0),
                     "agent_mean_entropy": agent_data.get("mean_entropy", 0),
                     "agent_max_entropy": agent_data.get("max_entropy", 0),
                     "agent_min_entropy": agent_data.get("min_entropy", 0),
@@ -222,9 +248,8 @@ class Aggregator:
             if not exp_metrics:
                 continue
 
-            exp_level = exp_entropy.get("macro_statistics", {}).get(
-                "experiment_level", {}
-            )
+            macro_stats = exp_entropy.get("macro_statistics", {})
+            exp_level = macro_stats.get("experiment_level", {})
 
             samples = exp_metrics.get("samples", {})
             total_correct = 0
@@ -234,21 +259,19 @@ class Aggregator:
             for sample_id, sample_data in samples.items():
                 for agent_key, agent_data in sample_data.get("agents", {}).items():
                     total_time += agent_data.get("time_cost", 0)
-                    if agent_data.get("predicted_answer") is not None:
-                        total_predictions += 1
-                        if agent_data.get("is_correct", False):
-                            total_correct += 1
+                if sample_data.get("final_predicted_answer") is not None:
+                    total_predictions += 1
+                    if sample_data.get("is_finally_correct", False):
+                        total_correct += 1
 
             accuracy = total_correct / total_predictions if total_predictions > 0 else 0
-            avg_time = total_time / total_predictions if total_predictions > 0 else 0
 
             exp_stats[exp_name] = {
                 "exp_total_entropy": exp_level.get("total_entropy", 0),
-                "exp_avg_entropy": exp_level.get("average_entropy", 0),
-                "exp_total_samples": exp_level.get("total_samples", 0),
+                "exp_infer_average_entropy": exp_level.get("infer_average_entropy", 0),
+                "exp_num_inferences": exp_entropy.get("num_inferences", 0),
                 "exp_accuracy": accuracy,
                 "exp_total_time": total_time,
-                "exp_avg_time": avg_time,
             }
 
         return exp_stats
@@ -276,10 +299,15 @@ class Aggregator:
         for record in sample_records:
             exp_name = record["experiment_name"]
             agent_name = record["agent_name"]
+            agent_round_number = record.get("agent_round_number", 0)
 
             key = (exp_name, agent_name)
             if key in agent_stats:
                 record.update(agent_stats[key])
+
+            round_key = (exp_name, agent_round_number)
+            if round_key in round_stats:
+                record.update(round_stats[round_key])
 
             if exp_name in exp_stats:
                 record.update(exp_stats[exp_name])
@@ -288,16 +316,34 @@ class Aggregator:
 
         return merged_records
 
-    def convert_to_csv(self):
-        """Convert JSON files to CSV format."""
+    def write_csv(self, records: List[Dict[str, Any]], filename: str):
+        """Write records to CSV file.
+
+        Args:
+            records: List of dictionaries to write
+            filename: Output filename
+        """
+        if not records:
+            print(f"No records to write for {filename}")
+            return
+
+        output_path = self.output_dir / filename
+        fieldnames = list(records[0].keys())
+
+        with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(records)
+
+        print(f"Successfully wrote {len(records)} records to {output_path}")
+
+    def generate_aggregated_csvs(self):
+        """Generate multiple CSV files based on different experimental conditions."""
         entropy_data, metrics_data = self.load_json_files()
 
         sample_records = self.extract_sample_level_data(entropy_data, metrics_data)
-
         round_stats = self.extract_round_level_data(entropy_data, metrics_data)
-
         agent_stats = self.extract_agent_level_data(entropy_data, metrics_data)
-
         exp_stats = self.extract_experiment_level_data(entropy_data, metrics_data)
 
         merged_records = self.merge_all_data(
@@ -305,14 +351,19 @@ class Aggregator:
         )
 
         if not merged_records:
+            print("No records found to aggregate")
             return
 
-        fieldnames = list(merged_records[0].keys())
+        self.write_csv(merged_records, "aggregated_data.csv")
 
-        with open(self.output_csv, "w", newline="", encoding="utf-8") as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(merged_records)
+        records_by_experiment = defaultdict(list)
+        for record in merged_records:
+            exp = record["experiment_name"]
+            records_by_experiment[exp].append(record)
+
+        for exp, records in records_by_experiment.items():
+            filename = f"aggregated_data_{exp}.csv"
+            self.write_csv(records, filename)
 
         return merged_records
 
@@ -323,13 +374,11 @@ def main():
 
     entropy_file = base_path / "all_entropy_results.json"
     metrics_file = base_path / "all_metrics.json"
-    output_csv = base_path / "aggregated_data.csv"
+    output_dir = base_path / "aggregated"
 
-    converter = JSONToCSVConverter(
-        str(entropy_file), str(metrics_file), str(output_csv)
-    )
+    aggregator = Aggregator(str(entropy_file), str(metrics_file), str(output_dir))
 
-    converter.convert_to_csv()
+    aggregator.generate_aggregated_csvs()
 
 
 if __name__ == "__main__":
