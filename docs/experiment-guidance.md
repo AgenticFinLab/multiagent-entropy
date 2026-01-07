@@ -96,23 +96,14 @@ generation_config:
 **Dataset-Specific Configuration** (`dataset_specific/aime2024.yml`):
 ```yaml
 generation_config:
-  max_new_tokens: 3000
+  max_new_tokens: 8192
 ```
 
 **Result**: When running experiments with AIME2024 dataset:
-- `max_new_tokens`: 3000 (overridden from dataset config)
+- `max_new_tokens`: 8192 (overridden from dataset config)
 - `do_sample`: true (inherited from base config)
 - `temperature`: 0.6 (inherited from base config)
 - `top_p`: 0.95 (inherited from base config)
-
-#### Current Dataset-Specific max_new_tokens Values
-
-| Dataset | max_new_tokens | Rationale |
-|---------|----------------|-----------|
-| AIME2024 | 3000 | Requires longer reasoning chains for complex math problems |
-| GSM8K | 1500 | Moderate reasoning requirements for grade school math |
-| MMLU | 100 | Multiple-choice format requires short responses |
-| HumanEval | 800 | Code generation with moderate length requirements |
 
 #### Implementation Details
 The override mechanism is implemented in `experiments/scripts/config_loader.py` in the `resolve_agent_placeholders()` function. The function:
@@ -329,7 +320,7 @@ python experiments/scripts/result_aggregator.py \
 3. Optionally add `generation_config` section to override base generation parameters:
    ```yaml
    generation_config:
-     max_new_tokens: 2000  # Override default max_new_tokens
+     max_new_tokens: 8192  # Override default max_new_tokens
      # Other generation parameters (do_sample, temperature, top_p) will be inherited from base_config.yml
    ```
 
