@@ -128,19 +128,19 @@ Agent-specific configurations (`agent_specific/`) define the structure and param
 - **Configuration file**: `agent_specific/sequential_agents.yml`
 - **Description**: Sequential pipeline topology with agents in a series
 - **Agents**: planner, solver, critic, judger
-- **Structure**: planner -> solver -> critic -> judger
+- **Structure**: planner -> solver -> critic -> judger -> (Loop)
 
 #### Centralized Agent Mode (Two-Layer)
 - **Configuration file**: `agent_specific/centralized_agents.yml`
 - **Description**: Two-layer centralized topology with domain-specific agents and central orchestrator
 - **Agents**: MathAgent, ScienceAgent, CodeAgent, OrchestratorAgent
-- **Structure**: Layer 1 (Math/Science/Code) → Layer 2 (Orchestrator)
+- **Structure**: Layer 1 (Math/Science/Code) -> Layer 2 (Orchestrator) -> (Loop)
 
 #### Decentralized Agent Mode (Loop + Orchestrator)
 - **Configuration file**: `agent_specific/decentralized_agents.yml`
 - **Description**: Sequential agents with loopback mechanism before final orchestration
 - **Agents**: MathAgent, ScienceAgent, CodeAgent, OrchestratorAgent
-- **Structure**: Math → Science → Code → (Loop) → Orchestrator
+- **Structure**: Math -> Science -> Code -> (Loop) -> Orchestrator
 
 #### Full Decentralized Agent Mode (Loop + Orchestrator)
 - **Configuration file**: `agent_specific/full_decentralized_agents.yml`
@@ -152,14 +152,14 @@ Agent-specific configurations (`agent_specific/`) define the structure and param
 - **Configuration file**: `agent_specific/debate_agents.yml`
 - **Description**: Multi-agent debate system with majority voting mechanism
 - **Agents**: agent1, agent2, agent3 (no orchestrator agent - uses majority voting instead)
-- **Structure**: Sequential agents in loop → Majority voting → Output
+- **Structure**: Sequential agents in loop -> Majority voting -> Output
 - **Note**: Unlike other agent modes, Debate mode uses majority voting instead of an orchestrator agent. The orchestrator does NOT use LLM inference; it extracts answers wrapped in \\boxed{} from each agent's response and selects the most frequent one as the final result.
 
 #### Hybrid Agent Mode (Enhanced Context Sharing)
 - **Configuration file**: `agent_specific/hybrid_agents.yml`
 - **Description**: Two-layer hybrid topology with enhanced context sharing and feedback
 - **Agents**: MathAgent, ScienceAgent, CodeAgent, OrchestratorAgent
-- **Structure**: Layer 1 (Math/Science/Code with loop) → Layer 2 (Orchestrator with feedback)
+- **Structure**: Layer 1 (Math/Science/Code with communication) -> Layer 2 (Orchestrator with feedback) -> (Loop)
 
 ## Running Experiments
 
