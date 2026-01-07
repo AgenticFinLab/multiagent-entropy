@@ -102,7 +102,7 @@ class EntropyAnalyzer:
             "dataset": dataset,
             "agent_architecture": agent_architecture,
             "num_rounds": num_rounds,
-            "num_samples": len(entropy_data),
+            "num_inferences": len(entropy_data),  # Number of unique sequences (main_id-agent_type-execution_order combinations)
             "macro_statistics": macro_stats,
             "micro_statistics": micro_stats,
         }
@@ -169,11 +169,11 @@ class EntropyAnalyzer:
         """
         macro_stats = {
             "experiment_level": {},
-            "round_level": defaultdict(lambda: {"total_entropy": 0.0, "count": 0}),
+            "round_level": defaultdict(lambda: {"total_entropy": 0.0, "num_inferences": 0}),
             "agent_level": defaultdict(
                 lambda: {
                     "total_entropy": 0.0,
-                    "sample_count": 0,
+                    "num_inferences": 0,
                     "total_tokens": 0,
                     "all_entropies": [],
                 }
@@ -196,11 +196,11 @@ class EntropyAnalyzer:
                     entropy_info, agent_architecture, num_rounds
                 )
                 macro_stats["round_level"][round_num]["total_entropy"] += entropy_sum
-                macro_stats["round_level"][round_num]["count"] += 1
+                macro_stats["round_level"][round_num]["num_inferences"] += 1
 
                 agent_type = entropy_info["agent_type"]
                 macro_stats["agent_level"][agent_type]["total_entropy"] += entropy_sum
-                macro_stats["agent_level"][agent_type]["sample_count"] += 1
+                macro_stats["agent_level"][agent_type]["num_inferences"] += 1
                 macro_stats["agent_level"][agent_type]["total_tokens"] += len(
                     entropy_tensor
                 )
@@ -213,27 +213,26 @@ class EntropyAnalyzer:
                     entropy_array
                 )
 
+        num_agents = len(macro_stats["agent_level"])
         macro_stats["experiment_level"]["total_entropy"] = total_experiment_entropy
-        macro_stats["experiment_level"]["average_entropy"] = (
+        macro_stats["experiment_level"]["infer_average_entropy"] = (
             total_experiment_entropy / total_count if total_count > 0 else 0.0
         )
-        macro_stats["experiment_level"]["total_samples"] = len(entropy_data)
-        macro_stats["experiment_level"]["total_results"] = total_count
 
         for round_num, round_data in macro_stats["round_level"].items():
-            if round_data["count"] > 0:
-                round_data["average_entropy"] = (
-                    round_data["total_entropy"] / round_data["count"]
+            if round_data["num_inferences"] > 0:
+                round_data["infer_average_entropy"] = (
+                    round_data["total_entropy"] / round_data["num_inferences"]
                 )
 
         macro_stats["round_level"] = dict(macro_stats["round_level"])
 
         for agent_type, agent_data in macro_stats["agent_level"].items():
-            if agent_data["sample_count"] > 0:
+            if agent_data["num_inferences"] > 0:
                 all_flat_entropies = np.concatenate(agent_data["all_entropies"])
                 agent_data["total_entropy"] = float(agent_data["total_entropy"])
-                agent_data["average_entropy"] = (
-                    agent_data["total_entropy"] / agent_data["sample_count"]
+                agent_data["infer_average_entropy"] = (
+                    agent_data["total_entropy"] / agent_data["num_inferences"]
                 )
                 agent_data["mean_entropy"] = float(np.mean(all_flat_entropies))
                 agent_data["max_entropy"] = float(np.max(all_flat_entropies))
@@ -273,7 +272,7 @@ class EntropyAnalyzer:
                     "std_entropy": 0.0,
                     "min_entropy": 0.0,
                     "token_count": 0,
-                    "sample_count": 0,
+                    "num_agents": 0,
                 }
             ),
             "sequence_level": defaultdict(
@@ -288,7 +287,6 @@ class EntropyAnalyzer:
                     "std_entropy": 0.0,
                     "min_entropy": 0.0,
                     "token_count": 0,
-                    "sample_count": 0,
                 }
             ),
             "token_position_level": defaultdict(list),
@@ -358,7 +356,6 @@ class EntropyAnalyzer:
                 seq_stats["std_entropy"] = sequence_std_entropy / sequence_sample_count
                 seq_stats["min_entropy"] = sequence_min_entropy / sequence_sample_count
                 seq_stats["token_count"] = sequence_token_count
-                seq_stats["sample_count"] = sequence_sample_count
                 seq_stats["average_entropy_per_token"] = (
                     sequence_total_entropy / sequence_token_count
                     if sequence_token_count > 0
@@ -378,7 +375,7 @@ class EntropyAnalyzer:
                     "std_entropy": 0.0,
                     "min_entropy": 0.0,
                     "token_count": 0,
-                    "sample_count": 0,
+                    "num_agents": 0,
                 }
 
             stats = micro_stats["sample_level"][main_id]
@@ -424,24 +421,24 @@ class EntropyAnalyzer:
                 else 0.0
             )
             stats["token_count"] += sequence_token_count
-            stats["sample_count"] += sequence_sample_count
+            stats["num_agents"] += 1
 
         micro_stats["sample_level"] = dict(micro_stats["sample_level"])
 
         for main_id, stats in micro_stats["sample_level"].items():
-            if stats["sample_count"] > 0:
-                stats["max_entropy"] = stats["max_entropy"] / stats["sample_count"]
-                stats["mean_entropy"] = stats["mean_entropy"] / stats["sample_count"]
+            if stats["num_agents"] > 0:
+                stats["max_entropy"] = stats["max_entropy"] / stats["num_agents"]
+                stats["mean_entropy"] = stats["mean_entropy"] / stats["num_agents"]
                 stats["variance_entropy"] = (
-                    stats["variance_entropy"] / stats["sample_count"]
+                    stats["variance_entropy"] / stats["num_agents"]
                 )
                 stats["median_entropy"] = (
-                    stats["median_entropy"] / stats["sample_count"]
+                    stats["median_entropy"] / stats["num_agents"]
                 )
-                stats["q1_entropy"] = stats["q1_entropy"] / stats["sample_count"]
-                stats["q3_entropy"] = stats["q3_entropy"] / stats["sample_count"]
-                stats["std_entropy"] = stats["std_entropy"] / stats["sample_count"]
-                stats["min_entropy"] = stats["min_entropy"] / stats["sample_count"]
+                stats["q1_entropy"] = stats["q1_entropy"] / stats["num_agents"]
+                stats["q3_entropy"] = stats["q3_entropy"] / stats["num_agents"]
+                stats["std_entropy"] = stats["std_entropy"] / stats["num_agents"]
+                stats["min_entropy"] = stats["min_entropy"] / stats["num_agents"]
                 stats["average_entropy_per_token"] = (
                     stats["total_entropy"] / stats["token_count"]
                     if stats["token_count"] > 0
@@ -449,36 +446,11 @@ class EntropyAnalyzer:
                 )
 
         for sequence_key, seq_stats in micro_stats["sequence_level"].items():
-            if seq_stats["sample_count"] > 0:
-                seq_stats["max_entropy"] = (
-                    seq_stats["max_entropy"] / seq_stats["sample_count"]
-                )
-                seq_stats["mean_entropy"] = (
-                    seq_stats["mean_entropy"] / seq_stats["sample_count"]
-                )
-                seq_stats["variance_entropy"] = (
-                    seq_stats["variance_entropy"] / seq_stats["sample_count"]
-                )
-                seq_stats["median_entropy"] = (
-                    seq_stats["median_entropy"] / seq_stats["sample_count"]
-                )
-                seq_stats["q1_entropy"] = (
-                    seq_stats["q1_entropy"] / seq_stats["sample_count"]
-                )
-                seq_stats["q3_entropy"] = (
-                    seq_stats["q3_entropy"] / seq_stats["sample_count"]
-                )
-                seq_stats["std_entropy"] = (
-                    seq_stats["std_entropy"] / seq_stats["sample_count"]
-                )
-                seq_stats["min_entropy"] = (
-                    seq_stats["min_entropy"] / seq_stats["sample_count"]
-                )
-                seq_stats["average_entropy_per_token"] = (
-                    seq_stats["total_entropy"] / seq_stats["token_count"]
-                    if seq_stats["token_count"] > 0
-                    else 0.0
-                )
+            seq_stats["average_entropy_per_token"] = (
+                seq_stats["total_entropy"] / seq_stats["token_count"]
+                if seq_stats["token_count"] > 0
+                else 0.0
+            )
 
         micro_stats["sequence_level"] = dict(micro_stats["sequence_level"])
 
@@ -756,7 +728,7 @@ class EntropyAnalyzer:
                     "total_entropy": float(
                         np.sum(round_agent_entropy[round_num][agent_type]["sums"])
                     ),
-                    "sample_count": len(
+                    "num_inferences": len(
                         round_agent_entropy[round_num][agent_type]["entropies"]
                     ),
                 }
