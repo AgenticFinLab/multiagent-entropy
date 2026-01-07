@@ -128,7 +128,7 @@ Agent-specific configurations (`agent_specific/`) define the structure and param
 - **Configuration file**: `agent_specific/sequential_agents.yml`
 - **Description**: Sequential pipeline topology with agents in a series
 - **Agents**: planner, solver, critic, judger
-- **Structure**: planner → solver → critic → judger
+- **Structure**: planner -> solver -> critic -> judger
 
 #### Centralized Agent Mode (Two-Layer)
 - **Configuration file**: `agent_specific/centralized_agents.yml`
@@ -146,7 +146,7 @@ Agent-specific configurations (`agent_specific/`) define the structure and param
 - **Configuration file**: `agent_specific/full_decentralized_agents.yml`
 - **Description**: Sequential agents with loopback mechanism before final orchestration, each agent can communicate with all other agents
 - **Agents**: MathAgent, ScienceAgent, CodeAgent, OrchestratorAgent
-- **Structure**: Math → Science → Code → (Loop) → Orchestrator
+- **Structure**: Math -> Science -> Code -> (Loop) -> Orchestrator
 
 #### Debate Agent Mode (Multi-Agent with Voting)
 - **Configuration file**: `agent_specific/debate_agents.yml`
