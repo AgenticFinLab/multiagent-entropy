@@ -77,6 +77,8 @@ class Aggregator:
                 sample_entropy = sample_level_entropy[sample_id]
 
                 ground_truth = sample_metrics.get("ground_truth", "")
+                final_predicted_answer = sample_metrics.get("final_predicted_answer", "")
+                is_finally_correct = sample_metrics.get("is_finally_correct", False)
 
                 for agent_key, agent_metrics in sample_metrics.get("agents", {}).items():
                     agent_type = agent_metrics.get("agent_type", agent_key.split("_")[0])
@@ -97,6 +99,8 @@ class Aggregator:
                         "time_cost": time_cost,
                         "predicted_answer": predicted_answer,
                         "is_correct": is_correct,
+                        "final_predicted_answer": final_predicted_answer,
+                        "is_finally_correct": is_finally_correct,
                         "sample_total_entropy": sample_entropy.get("total_entropy", 0),
                         "sample_max_entropy": sample_entropy.get("max_entropy", 0),
                         "sample_min_entropy": sample_entropy.get("min_entropy", 0),

@@ -91,7 +91,7 @@ def main():
 
     args = parser.parse_args()
 
-    base_path = str(Path.cwd())
+    base_path = str(Path(__file__).parent.parent)
     analyzer = ExperimentAnalyzer(base_path)
     entropy_analyzer = None
 

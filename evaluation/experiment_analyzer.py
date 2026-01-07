@@ -113,7 +113,6 @@ class ExperimentAnalyzer:
         sample_metrics = {
             "main_id": main_id,
             "ground_truth": ground_truth["groundtruth"] if ground_truth else None,
-            "agents": {},
         }
 
         for result_info in sample_results:
@@ -158,6 +157,7 @@ class ExperimentAnalyzer:
             else:
                 round_num = (execution_order - 1) // 4 + 1
                 agent_key = f"{agent_type}_round_{round_num}"
+            sample_metrics["agents"] = sample_metrics.get("agents", {})
             sample_metrics["agents"][agent_key] = {
                 "agent_type": agent_type,
                 "execution_order": execution_order,
@@ -166,6 +166,17 @@ class ExperimentAnalyzer:
                 "predicted_answer": predicted_answer,
                 "is_correct": is_correct,
             }
+
+        final_agent_key = self._get_final_agent_key(sample_metrics["agents"], agent_architecture)
+        if final_agent_key and final_agent_key in sample_metrics["agents"]:
+            final_agent_data = sample_metrics["agents"][final_agent_key]
+            sample_metrics["final_predicted_answer"] = final_agent_data["predicted_answer"]
+            sample_metrics["is_finally_correct"] = final_agent_data["is_correct"]
+        else:
+            sample_metrics["final_predicted_answer"] = None
+            sample_metrics["is_finally_correct"] = False
+
+        sample_metrics["agents"] = sample_metrics.pop("agents")
 
         return sample_metrics
 
@@ -245,6 +256,49 @@ class ExperimentAnalyzer:
             return ["OrchestratorAgent_round_1", "OrchestratorAgent_round_2"]
         else:
             return []
+
+    def _get_final_agent_key(
+        self, agents: Dict[str, Any], agent_architecture: str
+    ) -> Optional[str]:
+        """Get the key of the final agent for a given sample.
+
+        Args:
+            agents: Dictionary of agent data for this sample.
+            agent_architecture: Type of agent architecture.
+
+        Returns:
+            The key of the final agent, or None if not found.
+        """
+        if not agents:
+            return None
+
+        if agent_architecture == "single":
+            final_agent_type = "SingleSolver"
+        elif agent_architecture == "sequential":
+            final_agent_type = "judger"
+        elif agent_architecture == "centralized":
+            final_agent_type = "OrchestratorAgent"
+        elif agent_architecture == "debate":
+            final_agent_type = "orchestrator"
+        elif agent_architecture == "hybrid":
+            final_agent_type = "OrchestratorAgent"
+        else:
+            return None
+
+        if agent_architecture == "debate":
+            return "orchestrator"
+
+        max_execution_order = -1
+        final_agent_key = None
+
+        for agent_key, agent_data in agents.items():
+            if agent_data["agent_type"] == final_agent_type:
+                execution_order = agent_data["execution_order"]
+                if execution_order > max_execution_order:
+                    max_execution_order = execution_order
+                    final_agent_key = agent_key
+
+        return final_agent_key
 
     def analyze_all_experiments(
         self, dataset: str, task_type: str = "math"
