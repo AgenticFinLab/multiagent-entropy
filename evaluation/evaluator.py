@@ -138,11 +138,13 @@ def main():
                 print(f"Entropy JSON saved to: {json_output_path}")
 
             if args.analyze_trends:
-                print(f"\nAnalyzing entropy change trends for experiment: {args.experiment}")
+                print(
+                    f"\nAnalyzing entropy change trends for experiment: {args.experiment}"
+                )
                 trend_results = entropy_analyzer.analyze_entropy_change_trends(
                     args.dataset, args.experiment
                 )
-                
+
     else:
         if args.compare:
             print(f"Comparing all experiments for dataset: {args.dataset}")
@@ -193,20 +195,24 @@ def main():
                     json.dump(entropy_results, f, indent=2, ensure_ascii=False)
                 print(f"Entropy JSON saved to: {json_output_path}")
 
-            if args.analyze_trends:              
+            if args.analyze_trends:
                 for exp_name in entropy_results["experiments"].keys():
                     if "error" not in entropy_results["experiments"][exp_name]:
                         try:
-                            trend_results = entropy_analyzer.analyze_entropy_change_trends(
-                                args.dataset, exp_name
+                            trend_results = (
+                                entropy_analyzer.analyze_entropy_change_trends(
+                                    args.dataset, exp_name
+                                )
                             )
-                            entropy_results["experiments"][exp_name]["trend_analysis"] = trend_results
+                            entropy_results["experiments"][exp_name][
+                                "trend_analysis"
+                            ] = trend_results
                         except Exception as e:
                             print(f"Error analyzing trends for {exp_name}: {e}")
-                            entropy_results["experiments"][exp_name]["trend_analysis"] = {
-                                "error": str(e)
-                            }
-                
+                            entropy_results["experiments"][exp_name][
+                                "trend_analysis"
+                            ] = {"error": str(e)}
+
                 if args.save_entropy_json:
                     json_output_path = entropy_output_dir / "all_entropy_results.json"
                     with open(json_output_path, "w", encoding="utf-8") as f:
@@ -214,7 +220,7 @@ def main():
 
     if args.run_aggregator or args.aggregate_all:
         base_results_path = Path(base_path) / "evaluation" / "results"
-        
+
         if args.aggregate_all:
             datasets = ["gsm8k", "humaneval", "mmlu", "aime2024", "math500"]
             for dataset in datasets:
@@ -222,12 +228,10 @@ def main():
                 entropy_file = dataset_path / "all_entropy_results.json"
                 metrics_file = dataset_path / "all_metrics.json"
                 output_csv = dataset_path / "aggregated_data.csv"
-                
+
                 if entropy_file.exists() and metrics_file.exists():
                     converter = Aggregator(
-                        str(entropy_file),
-                        str(metrics_file),
-                        str(output_csv)
+                        str(entropy_file), str(metrics_file), str(output_csv)
                     )
                     converter.convert_to_csv()
                     print(f"CSV generated for {dataset}: {output_csv}")
@@ -236,15 +240,14 @@ def main():
             entropy_file = dataset_path / "all_entropy_results.json"
             metrics_file = dataset_path / "all_metrics.json"
             output_csv = dataset_path / "aggregated_data.csv"
-            
+
             if entropy_file.exists() and metrics_file.exists():
                 converter = Aggregator(
-                    str(entropy_file),
-                    str(metrics_file),
-                    str(output_csv)
+                    str(entropy_file), str(metrics_file), str(output_csv)
                 )
                 converter.convert_to_csv()
                 print(f"CSV generated for {args.dataset}: {output_csv}")
+
 
 if __name__ == "__main__":
     main()

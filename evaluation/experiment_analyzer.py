@@ -167,10 +167,14 @@ class ExperimentAnalyzer:
                 "is_correct": is_correct,
             }
 
-        final_agent_key = self._get_final_agent_key(sample_metrics["agents"], agent_architecture)
+        final_agent_key = self._get_final_agent_key(
+            sample_metrics["agents"], agent_architecture
+        )
         if final_agent_key and final_agent_key in sample_metrics["agents"]:
             final_agent_data = sample_metrics["agents"][final_agent_key]
-            sample_metrics["final_predicted_answer"] = final_agent_data["predicted_answer"]
+            sample_metrics["final_predicted_answer"] = final_agent_data[
+                "predicted_answer"
+            ]
             sample_metrics["is_finally_correct"] = final_agent_data["is_correct"]
         else:
             sample_metrics["final_predicted_answer"] = None

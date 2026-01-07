@@ -8,7 +8,6 @@ import csv
 import json
 from pathlib import Path
 from typing import Dict, Any, List
-from collections import defaultdict
 
 
 class Aggregator:
@@ -41,9 +40,7 @@ class Aggregator:
         return entropy_data, metrics_data
 
     def extract_sample_level_data(
-        self,
-        entropy_data: Dict[str, Any],
-        metrics_data: Dict[str, Any]
+        self, entropy_data: Dict[str, Any], metrics_data: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """Extract sample-level data from both JSON files.
 
@@ -67,7 +64,9 @@ class Aggregator:
             architecture = exp_entropy.get("agent_architecture", "unknown")
             num_rounds = exp_entropy.get("num_rounds", 0)
 
-            sample_level_entropy = exp_entropy.get("micro_statistics", {}).get("sample_level", {})
+            sample_level_entropy = exp_entropy.get("micro_statistics", {}).get(
+                "sample_level", {}
+            )
             samples_metrics = exp_metrics.get("samples", {})
 
             for sample_id, sample_metrics in samples_metrics.items():
@@ -77,11 +76,17 @@ class Aggregator:
                 sample_entropy = sample_level_entropy[sample_id]
 
                 ground_truth = sample_metrics.get("ground_truth", "")
-                final_predicted_answer = sample_metrics.get("final_predicted_answer", "")
+                final_predicted_answer = sample_metrics.get(
+                    "final_predicted_answer", ""
+                )
                 is_finally_correct = sample_metrics.get("is_finally_correct", False)
 
-                for agent_key, agent_metrics in sample_metrics.get("agents", {}).items():
-                    agent_type = agent_metrics.get("agent_type", agent_key.split("_")[0])
+                for agent_key, agent_metrics in sample_metrics.get(
+                    "agents", {}
+                ).items():
+                    agent_type = agent_metrics.get(
+                        "agent_type", agent_key.split("_")[0]
+                    )
                     execution_order = agent_metrics.get("execution_order", 0)
                     time_cost = agent_metrics.get("time_cost", 0)
                     avg_entropy = agent_metrics.get("average_entropy", 0)
@@ -105,14 +110,20 @@ class Aggregator:
                         "sample_max_entropy": sample_entropy.get("max_entropy", 0),
                         "sample_min_entropy": sample_entropy.get("min_entropy", 0),
                         "sample_mean_entropy": sample_entropy.get("mean_entropy", 0),
-                        "sample_median_entropy": sample_entropy.get("median_entropy", 0),
+                        "sample_median_entropy": sample_entropy.get(
+                            "median_entropy", 0
+                        ),
                         "sample_std_entropy": sample_entropy.get("std_entropy", 0),
-                        "sample_variance_entropy": sample_entropy.get("variance_entropy", 0),
+                        "sample_variance_entropy": sample_entropy.get(
+                            "variance_entropy", 0
+                        ),
                         "sample_q1_entropy": sample_entropy.get("q1_entropy", 0),
                         "sample_q3_entropy": sample_entropy.get("q3_entropy", 0),
                         "sample_token_count": sample_entropy.get("token_count", 0),
                         "sample_count": sample_entropy.get("sample_count", 0),
-                        "sample_avg_entropy_per_token": sample_entropy.get("average_entropy_per_token", 0),
+                        "sample_avg_entropy_per_token": sample_entropy.get(
+                            "average_entropy_per_token", 0
+                        ),
                         "agent_avg_entropy": avg_entropy,
                     }
 
@@ -121,9 +132,7 @@ class Aggregator:
         return records
 
     def extract_round_level_data(
-        self,
-        entropy_data: Dict[str, Any],
-        metrics_data: Dict[str, Any]
+        self, entropy_data: Dict[str, Any], metrics_data: Dict[str, Any]
     ) -> Dict[str, Dict[str, Any]]:
         """Extract round-level statistics.
 
@@ -153,9 +162,7 @@ class Aggregator:
         return round_stats
 
     def extract_agent_level_data(
-        self,
-        entropy_data: Dict[str, Any],
-        metrics_data: Dict[str, Any]
+        self, entropy_data: Dict[str, Any], metrics_data: Dict[str, Any]
     ) -> Dict[str, Dict[str, Any]]:
         """Extract agent-level statistics.
 
@@ -194,9 +201,7 @@ class Aggregator:
         return agent_stats
 
     def extract_experiment_level_data(
-        self,
-        entropy_data: Dict[str, Any],
-        metrics_data: Dict[str, Any]
+        self, entropy_data: Dict[str, Any], metrics_data: Dict[str, Any]
     ) -> Dict[str, Dict[str, Any]]:
         """Extract experiment-level statistics.
 
@@ -217,7 +222,9 @@ class Aggregator:
             if not exp_metrics:
                 continue
 
-            exp_level = exp_entropy.get("macro_statistics", {}).get("experiment_level", {})
+            exp_level = exp_entropy.get("macro_statistics", {}).get(
+                "experiment_level", {}
+            )
 
             samples = exp_metrics.get("samples", {})
             total_correct = 0
@@ -251,7 +258,7 @@ class Aggregator:
         sample_records: List[Dict[str, Any]],
         round_stats: Dict[str, Dict[str, Any]],
         agent_stats: Dict[str, Dict[str, Any]],
-        exp_stats: Dict[str, Dict[str, Any]]
+        exp_stats: Dict[str, Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         """Merge all levels of data into sample records.
 
@@ -319,9 +326,7 @@ def main():
     output_csv = base_path / "aggregated_data.csv"
 
     converter = JSONToCSVConverter(
-        str(entropy_file),
-        str(metrics_file),
-        str(output_csv)
+        str(entropy_file), str(metrics_file), str(output_csv)
     )
 
     converter.convert_to_csv()

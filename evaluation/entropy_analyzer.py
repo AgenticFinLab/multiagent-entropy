@@ -743,7 +743,9 @@ class EntropyAnalyzer:
                         np.std(round_agent_entropy[round_num][agent_type]["entropies"])
                     ),
                     "median_entropy": float(
-                        np.median(round_agent_entropy[round_num][agent_type]["entropies"])
+                        np.median(
+                            round_agent_entropy[round_num][agent_type]["entropies"]
+                        )
                     ),
                     "min_entropy": float(
                         np.min(round_agent_entropy[round_num][agent_type]["entropies"])
@@ -826,7 +828,10 @@ class EntropyAnalyzer:
                     agent_types, key=lambda x: agents_data[x]["mean_entropy"]
                 )
                 trend_desc = " -> ".join(
-                    [f"{a}({agents_data[a]['mean_entropy']:.4f})" for a in sorted_agents]
+                    [
+                        f"{a}({agents_data[a]['mean_entropy']:.4f})"
+                        for a in sorted_agents
+                    ]
                 )
                 trends["ranking"] = trend_desc
                 trends["highest_entropy_agent"] = sorted_agents[-1]
@@ -905,19 +910,25 @@ class EntropyAnalyzer:
         for agent_type, agent_data in inter_round_trends["agent_trends"].items():
             if len(agent_data["changes"]) > 0:
                 inter_round_trends["summary"][agent_type] = {
-                    "total_change": agent_data["changes"][-1]
-                    if len(agent_data["changes"]) > 0
-                    else 0.0,
+                    "total_change": (
+                        agent_data["changes"][-1]
+                        if len(agent_data["changes"]) > 0
+                        else 0.0
+                    ),
                     "average_change": float(np.mean(agent_data["changes"])),
-                    "total_percentage_change": agent_data["percentage_changes"][-1]
-                    if len(agent_data["percentage_changes"]) > 0
-                    else 0.0,
+                    "total_percentage_change": (
+                        agent_data["percentage_changes"][-1]
+                        if len(agent_data["percentage_changes"]) > 0
+                        else 0.0
+                    ),
                     "average_percentage_change": float(
                         np.mean(agent_data["percentage_changes"])
                     ),
-                    "trend_direction": "increasing"
-                    if np.mean(agent_data["changes"]) > 0
-                    else "decreasing",
+                    "trend_direction": (
+                        "increasing"
+                        if np.mean(agent_data["changes"]) > 0
+                        else "decreasing"
+                    ),
                     "volatility": float(np.std(agent_data["changes"])),
                 }
 
@@ -947,9 +958,7 @@ class EntropyAnalyzer:
         for round_num, round_data in intra_round_trends.items():
             if "differences" in round_data:
                 for diff_key, diff_data in round_data["differences"].items():
-                    all_differences.append(
-                        abs(diff_data["absolute_difference"])
-                    )
+                    all_differences.append(abs(diff_data["absolute_difference"]))
 
         if all_differences:
             statistics["intra_round_stats"] = {
@@ -983,9 +992,9 @@ class EntropyAnalyzer:
                 "total_agents_analyzed": len(inter_round_trends["summary"]),
                 "agents_with_increasing_trend": num_increasing,
                 "agents_with_decreasing_trend": num_decreasing,
-                "dominant_trend": "increasing"
-                if num_increasing > num_decreasing
-                else "decreasing",
+                "dominant_trend": (
+                    "increasing" if num_increasing > num_decreasing else "decreasing"
+                ),
             }
 
         return statistics
