@@ -216,3 +216,7 @@ experiments/configs_exp/
 
 # Evaluation results
 evaluation/results
+
+# Data mining results
+data_mining/results
+data_mining/reports
