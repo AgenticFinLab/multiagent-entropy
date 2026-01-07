@@ -164,6 +164,8 @@ class HFEntropyInference(BaseEntropyInference):
         """
         # Softmax to get probabilities [B, L, V]
         # [B, L_g, V]
+        # logits have been processed by LogitsProcessor
+        # temperature, top_p, etc.
         probs = torch.softmax(logits, dim=-1)
 
         # Log probabilities (add small epsilon to avoid log(0))
