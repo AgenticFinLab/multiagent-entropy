@@ -92,9 +92,13 @@ class Aggregator:
                     agent_type = agent_entropy_data.get(
                         "agent_type", agent_key.split("_")[0]
                     )
+
                     execution_order = agent_entropy_data.get("execution_order", 0)
                     time_cost = agent_metrics.get("time_cost", 0)
                     avg_entropy = agent_metrics.get("average_entropy", 0)
+
+                    if architecture == "debate" and agent_type == "orchestrator":
+                        continue
 
                     record = {
                         "sample_id": sample_id,
@@ -248,6 +252,7 @@ class Aggregator:
             if not exp_metrics:
                 continue
 
+            architecture = exp_entropy.get("agent_architecture", "unknown")
             macro_stats = exp_entropy.get("macro_statistics", {})
             exp_level = macro_stats.get("experiment_level", {})
 
@@ -258,6 +263,9 @@ class Aggregator:
 
             for sample_id, sample_data in samples.items():
                 for agent_key, agent_data in sample_data.get("agents", {}).items():
+                    agent_type = agent_data.get("agent_type", agent_key.split("_")[0])
+                    if architecture == "debate" and agent_type == "orchestrator":
+                        continue
                     total_time += agent_data.get("time_cost", 0)
                 if sample_data.get("final_predicted_answer") is not None:
                     total_predictions += 1
