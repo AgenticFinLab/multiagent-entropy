@@ -131,6 +131,72 @@ class MetricsCalculator:
             return False
 
     @staticmethod
+    def is_code_correct(
+        predicted_code: Optional[str],
+        ground_truth_code: str,
+        test_cases: Optional[str] = None,
+    ) -> bool:
+        """Check if predicted code passes all test cases.
+
+        Args:
+            predicted_code: Predicted Python code string.
+            ground_truth_code: Ground truth code (for reference).
+            test_cases: Test cases to validate the code against.
+
+        Returns:
+            True if code passes all tests, False otherwise.
+        """
+        if not predicted_code:
+            return False
+
+        if not test_cases:
+            return False
+
+        try:
+            local_namespace = {}
+            exec(predicted_code, {}, local_namespace)
+
+            test_namespace = local_namespace.copy()
+            exec(test_cases, {}, test_namespace)
+
+            if 'check' in test_namespace:
+                for func_name, func in local_namespace.items():
+                    if callable(func) and not func_name.startswith('_'):
+                        try:
+                            test_namespace['check'](func)
+                        except AssertionError:
+                            return False
+                        except Exception:
+                            continue
+
+            return True
+        except Exception as e:
+            return False
+
+    @staticmethod
+    def is_answer_correct_by_task_type(
+        predicted: Optional[str],
+        ground_truth: str,
+        task_type: str = "math",
+        test_cases: Optional[str] = None,
+    ) -> bool:
+        """Check if predicted answer matches ground truth based on task type.
+
+        Args:
+            predicted: Predicted answer string.
+            ground_truth: Ground truth answer string.
+            task_type: Type of task ("math", "code", "option").
+            test_cases: Test cases for code tasks.
+
+        Returns:
+            True if answers match, False otherwise.
+        """
+        if task_type == "code":
+            return MetricsCalculator.is_code_correct(predicted, ground_truth, test_cases)
+        else:
+            return MetricsCalculator.is_answer_correct(predicted, ground_truth)
+
+    @staticmethod
     def calculate_time_cost(result: Dict[str, Any]) -> float:
         """Extract time cost from result dictionary.
 

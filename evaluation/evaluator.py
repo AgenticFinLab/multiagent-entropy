@@ -32,9 +32,9 @@ def main():
     parser.add_argument(
         "--task-type",
         type=str,
-        choices=["math", "code", "option"],
-        default="math",
-        help="Task type",
+        choices=["math", "code", "option", "auto"],
+        default="auto",
+        help="Task type (auto to infer from dataset)",
     )
     parser.add_argument(
         "--experiment",

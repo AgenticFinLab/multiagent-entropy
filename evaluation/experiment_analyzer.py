@@ -28,6 +28,24 @@ class ExperimentAnalyzer:
         self.data_loader = DataLoader(base_path)
         self.metrics_calculator = MetricsCalculator()
 
+    def _get_task_type_from_dataset(self, dataset: str) -> str:
+        """Determine task type from dataset name.
+
+        Args:
+            dataset: Dataset name.
+
+        Returns:
+            Task type ("math", "code", or "option").
+        """
+        dataset_task_map = {
+            "humaneval": "code",
+            "mmlu": "option",
+            "gsm8k": "math",
+            "aime2024": "math",
+            "math500": "math",
+        }
+        return dataset_task_map.get(dataset.lower(), "math")
+
     def analyze_experiment(
         self, dataset: str, experiment_name: str, task_type: str = "math"
     ) -> Dict[str, Any]:
@@ -37,10 +55,14 @@ class ExperimentAnalyzer:
             dataset: Dataset name (e.g., "gsm8k", "humaneval").
             experiment_name: Name of the experiment to analyze.
             task_type: Type of task (e.g., "math", "code", "option").
+                       If not provided or "auto", will be inferred from dataset.
 
         Returns:
             Dictionary containing experiment metrics and analysis results.
         """
+        if task_type == "auto" or task_type == "math":
+            task_type = self._get_task_type_from_dataset(dataset)
+
         config = self.data_loader.load_experiment_config(dataset, experiment_name)
         agent_architecture = config["agent_type"]
         num_rounds = config["round"]
@@ -79,6 +101,7 @@ class ExperimentAnalyzer:
                 agent_architecture,
                 dataset,
                 experiment_name,
+                task_type,
             )
             metrics["samples"][main_id] = sample_metrics
 
@@ -92,6 +115,7 @@ class ExperimentAnalyzer:
         agent_architecture: str,
         dataset: str,
         experiment_name: str,
+        task_type: str,
     ) -> Dict[str, Any]:
         """Analyze metrics for a single sample.
 
@@ -102,6 +126,7 @@ class ExperimentAnalyzer:
             agent_architecture: Type of agent architecture.
             dataset: Dataset name.
             experiment_name: Experiment name.
+            task_type: Type of task (e.g., "math", "code", "option").
 
         Returns:
             Dictionary containing sample-level metrics.
@@ -126,19 +151,32 @@ class ExperimentAnalyzer:
                 entropy_tensor
             )
 
-            if "final_answer" in result_data:
-                response = result_data["final_answer"]
-                predicted_answer = response
+            if task_type == "code":
+                if "final_answer" in result_data:
+                    response = result_data["final_answer"]
+                    predicted_answer = self.metrics_calculator.extract_code_answer(
+                        response
+                    )
+                else:
+                    response = result_data.get("response", "")
+                    predicted_answer = self.metrics_calculator.extract_code_answer(
+                        response
+                    )
             else:
-                response = result_data.get("response", "")
-                predicted_answer = self.metrics_calculator.extract_boxed_answer(
-                    response
-                )
+                if "final_answer" in result_data:
+                    response = result_data["final_answer"]
+                    predicted_answer = response
+                else:
+                    response = result_data.get("response", "")
+                    predicted_answer = self.metrics_calculator.extract_boxed_answer(
+                        response
+                    )
 
             is_correct = False
             if ground_truth and predicted_answer:
-                is_correct = self.metrics_calculator.is_answer_correct(
-                    predicted_answer, ground_truth["groundtruth"]
+                test_cases = ground_truth.get("test_cases") if ground_truth else None
+                is_correct = self.metrics_calculator.is_answer_correct_by_task_type(
+                    predicted_answer, ground_truth["groundtruth"], task_type, test_cases
                 )
 
             if agent_architecture == "single":
@@ -253,10 +291,14 @@ class ExperimentAnalyzer:
         Args:
             dataset: Dataset name (e.g., "gsm8k", "humaneval").
             task_type: Type of task (e.g., "math", "code", "option").
+                       If not provided or "auto", will be inferred from dataset.
 
         Returns:
             Dictionary containing metrics for all experiments.
         """
+        if task_type == "auto" or task_type == "math":
+            task_type = self._get_task_type_from_dataset(dataset)
+
         experiments = self.data_loader.get_experiments_by_dataset(dataset)
 
         all_metrics = {"dataset": dataset, "task_type": task_type, "experiments": {}}
