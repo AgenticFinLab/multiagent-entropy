@@ -8,12 +8,11 @@ scatter plots, heatmaps, and comprehensive dashboards.
 
 import warnings
 from pathlib import Path
-from typing import Optional
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import matplotlib.pyplot as plt
 
 warnings.filterwarnings("ignore")
 
@@ -418,7 +417,7 @@ class EntropyVisualizer:
         """Generate a heatmap showing correlations between entropy features.
 
         Creates a correlation matrix heatmap displaying the relationships
-        between all entropy features in the dataset.
+        between all entropy features and accuracy in the dataset.
         """
         print("Generating entropy feature heatmap...")
 
@@ -426,7 +425,9 @@ class EntropyVisualizer:
             col for col in self.data.columns if "entropy" in col.lower()
         ]
 
-        correlation_matrix = self.data[entropy_features].corr()
+        features_to_correlate = entropy_features + ["exp_accuracy"]
+
+        correlation_matrix = self.data[features_to_correlate].corr()
 
         fig, ax = plt.subplots(figsize=(16, 14))
 

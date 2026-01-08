@@ -7,9 +7,8 @@ aggregation at different levels: experiment, sample, agent, and round.
 
 import json
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
-import numpy as np
 import pandas as pd
 
 

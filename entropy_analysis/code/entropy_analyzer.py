@@ -8,13 +8,11 @@ architectures and collaboration patterns.
 """
 
 import warnings
+from typing import Dict
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 from scipy import stats
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
