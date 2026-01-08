@@ -128,7 +128,7 @@ class BaseAgents(ABC):
         self.agents_config = self.run_config["agents"]
 
         # Task type for dynamic prompt loading
-        self.task_type = self.run_config.get("task_type", "math")
+        self.task_type = self.run_config["task_type"]
 
         # Validate task_type
         self._validate_task_type()
