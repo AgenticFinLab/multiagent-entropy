@@ -369,12 +369,43 @@ def main():
             # Create dataset directory if it doesn't exist
             os.makedirs(f"experiments/results/aggregated/{dataset_name}", exist_ok=True)
 
-            # Save batch results summary
-            summary_path = f"experiments/results/aggregated/{dataset_name}/batch_results_{time.strftime('%Y%m%d_%H%M%S')}.yml"
-            with open(summary_path, "w", encoding="utf-8") as f:
+            # Save individual experiment results with matching timestamps
+            for result in results:
+                if result.get("status") == "completed":
+                    experiment_name = result.get("experiment_name", "")
+                    results_path = result.get("results_path", "")
+                    
+                    # Extract timestamp from results_path to match with raw experiment folder
+                    original_timestamp = time.strftime("%Y%m%d_%H%M%S")
+                    if results_path:
+                        folder_name = os.path.basename(results_path)
+                        # Format: {experiment_name}_{YYYYMMDD}_{HHMMSS}_{timestamp_ms}_{pid}
+                        parts = folder_name.split("_")
+                        if len(parts) >= 4:
+                            # Find the timestamp parts (YYYYMMDD and HHMMSS)
+                            for i in range(len(parts) - 3):
+                                try:
+                                    date_part = parts[i]
+                                    if len(date_part) == 8 and date_part.isdigit():
+                                        time_part = parts[i + 1]
+                                        if len(time_part) == 6 and time_part.isdigit():
+                                            original_timestamp = f"{date_part}_{time_part}"
+                                            break
+                                except (ValueError, IndexError):
+                                    continue
+                    
+                    # Save individual experiment results
+                    summary_path = f"experiments/results/aggregated/{dataset_name}/{experiment_name}_results_{original_timestamp}.yml"
+                    with open(summary_path, "w", encoding="utf-8") as f:
+                        yaml.dump(result, f, default_flow_style=False, allow_unicode=True)
+                    logger.info(f"Experiment results saved to: {summary_path}")
+
+            # Save batch results summary with current timestamp
+            batch_summary_path = f"experiments/results/aggregated/{dataset_name}/batch_results_{time.strftime('%Y%m%d_%H%M%S')}.yml"
+            with open(batch_summary_path, "w", encoding="utf-8") as f:
                 yaml.dump(results, f, default_flow_style=False, allow_unicode=True)
 
-            logger.info(f"Batch experiment summary saved to: {summary_path}")
+            logger.info(f"Batch experiment summary saved to: {batch_summary_path}")
 
     else:
         # Single experiment mode
@@ -402,10 +433,32 @@ def main():
             # Get dataset name from merged config
             dataset_name = merged_config["data"]["data_name"].lower()
 
+            # Extract timestamp from save_folder to match with raw experiment folder
+            save_folder = merged_config.get("save_folder", "")
+            original_timestamp = time.strftime("%Y%m%d_%H%M%S")
+            if save_folder:
+                folder_name = os.path.basename(save_folder)
+                # Format: {experiment_name}_{YYYYMMDD}_{HHMMSS}_{timestamp_ms}_{pid}
+                parts = folder_name.split("_")
+                if len(parts) >= 4:
+                    # Find the timestamp parts (YYYYMMDD and HHMMSS)
+                    # They are typically the 2nd and 3rd parts after experiment_name
+                    for i in range(len(parts) - 3):
+                        try:
+                            # Try to parse as date
+                            date_part = parts[i]
+                            if len(date_part) == 8 and date_part.isdigit():
+                                time_part = parts[i + 1]
+                                if len(time_part) == 6 and time_part.isdigit():
+                                    original_timestamp = f"{date_part}_{time_part}"
+                                    break
+                        except (ValueError, IndexError):
+                            continue
+
             # Create dataset directory if it doesn't exist
             os.makedirs(f"experiments/results/aggregated/{dataset_name}", exist_ok=True)
 
-            summary_path = f"experiments/results/aggregated/{dataset_name}/{args.experiment_name}_results_{time.strftime('%Y%m%d_%H%M%S')}.yml"
+            summary_path = f"experiments/results/aggregated/{dataset_name}/{args.experiment_name}_results_{original_timestamp}.yml"
             with open(summary_path, "w", encoding="utf-8") as f:
                 yaml.dump(result, f, default_flow_style=False, allow_unicode=True)
             logger.info(f"Experiment results saved to: {summary_path}")
