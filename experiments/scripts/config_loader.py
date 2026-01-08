@@ -170,8 +170,9 @@ def load_experiment_config(
         model_config = load_config(model_config_path)
         dataset_config = load_config(dataset_config_path)
 
-        # Get dataset name for path creation
+        # Get dataset name and model name for path creation
         dataset_name = dataset_config['data']['data_name'].lower()
+        model_name = model_config['lm_name'].split('/')[-1].lower().replace('-', '_')
         
         # Create experiment-specific config with timestamp and process ID to avoid conflicts
         import os as os_module
@@ -179,7 +180,7 @@ def load_experiment_config(
         timestamp_ms = int(time.time() * 1000) % 1000
         pid = os_module.getpid()
         experiment_config = {
-            "save_folder": f"experiments/results/raw/{dataset_name}/{experiment_name}_{timestamp}_{timestamp_ms}_{pid}"
+            "save_folder": f"experiments/results/raw/{dataset_name}/{model_name}/{experiment_name}_{timestamp}_{timestamp_ms}_{pid}"
         }
 
         # Get agent type - prioritize passed parameter, then base config, then default to single
