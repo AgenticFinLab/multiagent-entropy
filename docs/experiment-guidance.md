@@ -13,6 +13,7 @@ experiments/
 │   ├── dataset_specific/                   # Dataset-specific configuration files
 │   │   ├── gsm8k.yml                       # GSM8K dataset configuration
 │   │   ├── aime2024.yml                    # AIME2024 dataset configuration
+│   │   ├── math500.yml                     # Math500 dataset configuration
 │   │   ├── mmlu.yml                        # MMLU dataset configuration
 │   │   └── humaneval.yml                   # HumanEval dataset configuration
 │   ├── agent_specific/                     # Agent-specific configuration files
@@ -33,11 +34,12 @@ experiments/
 ├── results/                                # Experiment results
 │   ├── aggregated/                         # Aggregated results across experiments
 │   │   └── {dataset_name}/                 # Results organized by dataset
+│   │       └── {model_name}/               # Results organized by model
 │   └── raw/                                # Raw results from individual experiments
 │       └── {dataset_name}/                 # Results organized by dataset
+│           └── {model_name}/               # Results organized by model
 └── scripts/                                # Utility scripts
     ├── config_loader.py                    # Configuration loading and merging utilities
-    ├── result_aggregator.py                # Result aggregation and visualization utilities
     └── run_experiment.py                   # Experiment runner script
 ```
 
@@ -267,46 +269,17 @@ python experiments/scripts/run_experiment.py \
 ## Results Management
 
 ### Raw Results
-Raw experiment results are saved in `experiments/results/raw/<dataset_name>/<experiment_name>_<timestamp>/` directory, including:
+Raw experiment results are saved in `experiments/results/raw/<dataset_name>/<model_name>/<experiment_name>_<timestamp>/` directory, including:
 - Individual batch results (JSON format)
 - Combined final results (JSON format)
 - Tensor files (in traces/tensors directory)
 - Configuration files
 
 ### Aggregated Results
-Aggregated results are saved in `experiments/results/aggregated/<dataset_name>/` directory, including:
+Aggregated results are saved in `experiments/results/aggregated/<dataset_name>/<model_name>/` directory, including:
 - Experiment summaries (CSV/JSON format)
 - Batch results summaries (CSV/JSON format)
 - Visualizations (PNG files) with timestamps in filenames
-
-## Result Aggregation and Visualization
-
-The `result_aggregator.py` script provides functionality to:
-1. Load raw experiment results
-2. Extract key metrics (accuracy, entropy, etc.)
-3. Generate aggregated reports in CSV/JSON format
-4. Create visualizations (accuracy comparison, entropy comparison, etc.)
-
-### Usage Example
-
-```bash
-cd /home/yuxuanzhao/multiagent-entropy
-python experiments/scripts/result_aggregator.py \
-  --input-dir experiments/results/raw \
-  --output-dir experiments/results/aggregated \
-  --format all \
-  --visualize \
-  --metrics accuracy entropy_mean response_length_mean
-```
-
-### Command-Line Options
-
-- `-i, --input-dir`: Directory containing raw experiment results (default: experiments/results/raw)
-- `-o, --output-dir`: Directory to save aggregated results (default: experiments/results/aggregated)
-- `--format`: Output format for aggregated results (csv, json, or all; default: all)
-- `--visualize`: Generate visualizations of the results
-- `--metrics`: Metrics to extract and visualize (default: accuracy entropy_mean round)
-- `--experiment-names`: Specific experiment names to process (default: all experiments)
 
 ## Adding New Configurations
 
