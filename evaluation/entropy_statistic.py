@@ -15,7 +15,7 @@ from data_loader import DataLoader
 from utils import save_json
 
 
-class EntropyAnalyzer:
+class EntropyStatistic:
     """Analyzer for entropy statistics in multi-agent experiments.
 
     Provides methods to analyze entropy at multiple levels:
@@ -44,40 +44,51 @@ class EntropyAnalyzer:
 
         Returns:
             Dictionary containing entropy analysis results for all experiments,
-            organized by architecture and experiment name.
+            organized by model and architecture.
         """
-        experiments = self.data_loader.get_experiments_by_dataset(dataset)
+        experiments_by_model = self.data_loader.get_experiments_by_dataset(dataset)
 
         all_results = {
             "dataset": dataset,
+            "models": {},
             "architectures": defaultdict(list),
-            "experiments": {},
         }
 
-        for experiment_name in experiments:
-            try:
-                experiment_results = self.analyze_experiment_entropy(
-                    dataset, experiment_name
-                )
-                all_results["experiments"][experiment_name] = experiment_results
+        for model_name, experiments in experiments_by_model.items():
+            all_results["models"][model_name] = {"experiments": {}}
+            for experiment_name in experiments:
+                try:
+                    experiment_results = self.analyze_experiment_entropy(
+                        dataset, model_name, experiment_name
+                    )
+                    all_results["models"][model_name]["experiments"][
+                        experiment_name
+                    ] = experiment_results
 
-                arch = experiment_results["agent_architecture"]
-                all_results["architectures"][arch].append(experiment_name)
-            except Exception as e:
-                print(f"Error analyzing experiment {experiment_name}: {e}")
-                all_results["experiments"][experiment_name] = {"error": str(e)}
+                    arch = experiment_results["agent_architecture"]
+                    all_results["architectures"][arch].append(
+                        f"{model_name}/{experiment_name}"
+                    )
+                except Exception as e:
+                    print(
+                        f"Error analyzing experiment {model_name}/{experiment_name}: {e}"
+                    )
+                    all_results["models"][model_name]["experiments"][
+                        experiment_name
+                    ] = {"error": str(e)}
 
         all_results["architectures"] = dict(all_results["architectures"])
 
         return all_results
 
     def analyze_experiment_entropy(
-        self, dataset: str, experiment_name: str
+        self, dataset: str, model_name: str, experiment_name: str
     ) -> Dict[str, Any]:
         """Analyze entropy for a single experiment.
 
         Args:
             dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            model_name: Model name (e.g., "qwen3_4b").
             experiment_name: Name of the experiment.
 
         Returns:
@@ -87,9 +98,13 @@ class EntropyAnalyzer:
         agent_architecture = config.get("agent_type", "unknown")
         num_rounds = config.get("round", 1)
 
-        info = self.data_loader.load_result_store_info(dataset, experiment_name)
+        info = self.data_loader.load_result_store_info(
+            dataset, model_name, experiment_name
+        )
 
-        entropy_data = self._collect_entropy_data(dataset, experiment_name, info)
+        entropy_data = self._collect_entropy_data(
+            dataset, model_name, experiment_name, info
+        )
 
         macro_stats = self._calculate_macro_statistics(
             entropy_data, agent_architecture, num_rounds
@@ -101,9 +116,12 @@ class EntropyAnalyzer:
         results = {
             "experiment_name": experiment_name,
             "dataset": dataset,
+            "model_name": model_name,
             "agent_architecture": agent_architecture,
             "num_rounds": num_rounds,
-            "num_inferences": len(entropy_data),  # Number of unique sequences (main_id-agent_type-execution_order combinations)
+            "num_inferences": len(
+                entropy_data
+            ),  # Number of unique sequences (main_id-agent_type-execution_order combinations)
             "macro_statistics": macro_stats,
             "micro_statistics": micro_stats,
         }
@@ -111,12 +129,13 @@ class EntropyAnalyzer:
         return results
 
     def _collect_entropy_data(
-        self, dataset: str, experiment_name: str, info: Dict[str, Any]
+        self, dataset: str, model_name: str, experiment_name: str, info: Dict[str, Any]
     ) -> Dict[str, List[Dict[str, Any]]]:
         """Collect entropy tensors for all results in an experiment.
 
         Args:
             dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            model_name: Model name (e.g., "qwen3_4b").
             experiment_name: Name of the experiment.
             info: Result store information.
 
@@ -136,7 +155,7 @@ class EntropyAnalyzer:
                 sequence_id = f"{main_id}-{agent_type}-{execution_order}"
 
                 entropy_tensor = self.data_loader.load_entropy_tensor(
-                    dataset, experiment_name, result_id
+                    dataset, model_name, experiment_name, result_id
                 )
 
                 if entropy_tensor is not None:
@@ -170,7 +189,9 @@ class EntropyAnalyzer:
         """
         macro_stats = {
             "experiment_level": {},
-            "round_level": defaultdict(lambda: {"total_entropy": 0.0, "num_inferences": 0}),
+            "round_level": defaultdict(
+                lambda: {"total_entropy": 0.0, "num_inferences": 0}
+            ),
         }
 
         total_experiment_entropy = 0.0
@@ -213,7 +234,10 @@ class EntropyAnalyzer:
         return macro_stats
 
     def _calculate_micro_statistics(
-        self, entropy_data: Dict[str, List[Dict[str, Any]]], agent_architecture: str, num_rounds: int
+        self,
+        entropy_data: Dict[str, List[Dict[str, Any]]],
+        agent_architecture: str,
+        num_rounds: int,
     ) -> Dict[str, Any]:
         """Calculate micro-level entropy statistics.
 
@@ -257,7 +281,7 @@ class EntropyAnalyzer:
             sequence_min_entropy = 0.0
             sequence_token_count = 0
             sequence_sample_count = len(sample_entropies)
-            
+
             sequence_agent_type = None
             sequence_execution_order = None
 
@@ -265,7 +289,7 @@ class EntropyAnalyzer:
                 if sequence_agent_type is None:
                     sequence_agent_type = entropy_info["agent_type"]
                     sequence_execution_order = entropy_info["execution_order"]
-                
+
                 entropy_tensor = entropy_info["entropy_tensor"]
 
                 if isinstance(entropy_tensor, torch.Tensor):
@@ -377,7 +401,8 @@ class EntropyAnalyzer:
                     "total_entropy": sequence_total_entropy,
                     "max_entropy": sequence_max_entropy / sequence_sample_count,
                     "mean_entropy": sequence_mean_entropy / sequence_sample_count,
-                    "variance_entropy": sequence_variance_entropy / sequence_sample_count,
+                    "variance_entropy": sequence_variance_entropy
+                    / sequence_sample_count,
                     "median_entropy": sequence_median_entropy / sequence_sample_count,
                     "q1_entropy": sequence_q1_entropy / sequence_sample_count,
                     "q3_entropy": sequence_q3_entropy / sequence_sample_count,
@@ -400,9 +425,7 @@ class EntropyAnalyzer:
                 stats["variance_entropy"] = (
                     stats["variance_entropy"] / stats["num_agents"]
                 )
-                stats["median_entropy"] = (
-                    stats["median_entropy"] / stats["num_agents"]
-                )
+                stats["median_entropy"] = stats["median_entropy"] / stats["num_agents"]
                 stats["q1_entropy"] = stats["q1_entropy"] / stats["num_agents"]
                 stats["q3_entropy"] = stats["q3_entropy"] / stats["num_agents"]
                 stats["std_entropy"] = stats["std_entropy"] / stats["num_agents"]
@@ -510,12 +533,13 @@ class EntropyAnalyzer:
         save_json(results, output_path)
 
     def analyze_entropy_change_trends(
-        self, dataset: str, experiment_name: str
+        self, dataset: str, model_name: str, experiment_name: str
     ) -> Dict[str, Any]:
         """Analyze entropy change trends between agents across rounds.
 
         Args:
             dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            model_name: Model name (e.g., "qwen3_4b").
             experiment_name: Name of the experiment.
 
         Returns:
@@ -525,12 +549,17 @@ class EntropyAnalyzer:
         agent_architecture = config.get("agent_type", "unknown")
         num_rounds = config.get("round", 1)
 
-        info = self.data_loader.load_result_store_info(dataset, experiment_name)
-        entropy_data = self._collect_entropy_data(dataset, experiment_name, info)
+        info = self.data_loader.load_result_store_info(
+            dataset, model_name, experiment_name
+        )
+        entropy_data = self._collect_entropy_data(
+            dataset, model_name, experiment_name, info
+        )
 
         trend_results = {
             "experiment_name": experiment_name,
             "dataset": dataset,
+            "model_name": model_name,
             "agent_architecture": agent_architecture,
             "num_rounds": num_rounds,
             "entropy_by_round_agent": {},
