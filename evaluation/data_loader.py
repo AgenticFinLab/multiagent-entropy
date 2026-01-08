@@ -103,34 +103,42 @@ class DataLoader:
 
         return config
 
-    def get_experiments_by_dataset(self, dataset: str) -> List[str]:
-        """Get list of experiment names for a given dataset.
+    def get_experiments_by_dataset(self, dataset: str) -> Dict[str, List[str]]:
+        """Get list of experiment names for a given dataset, grouped by model.
 
         Args:
             dataset: Dataset name (e.g., "gsm8k", "humaneval").
 
         Returns:
-            Sorted list of experiment names.
+            Dictionary mapping model names to sorted lists of experiment names.
         """
         dataset_path = self.results_path / dataset.lower()
 
         if not dataset_path.exists():
-            return []
+            return {}
 
-        experiments = []
-        for exp_dir in dataset_path.iterdir():
-            if exp_dir.is_dir():
-                experiments.append(exp_dir.name)
+        experiments_by_model = {}
+        
+        for model_dir in dataset_path.iterdir():
+            if model_dir.is_dir():
+                model_name = model_dir.name
+                experiments = []
+                for exp_dir in model_dir.iterdir():
+                    if exp_dir.is_dir():
+                        experiments.append(exp_dir.name)
+                if experiments:
+                    experiments_by_model[model_name] = sorted(experiments)
 
-        return sorted(experiments)
+        return experiments_by_model
 
     def load_result_store_info(
-        self, dataset: str, experiment_name: str
+        self, dataset: str, model_name: str, experiment_name: str
     ) -> Dict[str, Any]:
         """Load result store information for an experiment.
 
         Args:
             dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            model_name: Model name (e.g., "qwen3_4b").
             experiment_name: Name of the experiment.
 
         Returns:
@@ -139,7 +147,7 @@ class DataLoader:
         Raises:
             FileNotFoundError: If result store info is not found.
         """
-        traces_path = self.results_path / dataset.lower() / experiment_name / "traces"
+        traces_path = self.results_path / dataset.lower() / model_name / experiment_name / "traces"
         info_file = traces_path / "Result-store-information.json"
 
         if not info_file.exists():
@@ -151,12 +159,13 @@ class DataLoader:
         return info
 
     def load_result_block(
-        self, dataset: str, experiment_name: str, block_name: str
+        self, dataset: str, model_name: str, experiment_name: str, block_name: str
     ) -> Dict[str, Any]:
         """Load a specific result block for an experiment.
 
         Args:
             dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            model_name: Model name (e.g., "qwen3_4b").
             experiment_name: Name of the experiment.
             block_name: Name of the result block.
 
@@ -166,7 +175,7 @@ class DataLoader:
         Raises:
             FileNotFoundError: If result block is not found.
         """
-        traces_path = self.results_path / dataset.lower() / experiment_name / "traces"
+        traces_path = self.results_path / dataset.lower() / model_name / experiment_name / "traces"
         block_file = traces_path / block_name
 
         if not block_file.exists():
@@ -178,19 +187,20 @@ class DataLoader:
         return data
 
     def load_entropy_tensor(
-        self, dataset: str, experiment_name: str, result_id: str
+        self, dataset: str, model_name: str, experiment_name: str, result_id: str
     ) -> Optional[torch.Tensor]:
         """Load entropy tensor for a specific result.
 
         Args:
             dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            model_name: Model name (e.g., "qwen3_4b").
             experiment_name: Name of the experiment.
             result_id: ID of the result.
 
         Returns:
             Entropy tensor or None if not found.
         """
-        traces_path = self.results_path / dataset.lower() / experiment_name / "traces"
+        traces_path = self.results_path / dataset.lower() / model_name / experiment_name / "traces"
         tensor_path = traces_path / "tensors" / f"{result_id}_extras_entropy.pt"
 
         if not tensor_path.exists():
@@ -198,21 +208,22 @@ class DataLoader:
 
         return torch.load(tensor_path)
 
-    def load_all_results(self, dataset: str, experiment_name: str) -> Dict[str, Any]:
+    def load_all_results(self, dataset: str, model_name: str, experiment_name: str) -> Dict[str, Any]:
         """Load all results for an experiment.
 
         Args:
             dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            model_name: Model name (e.g., "qwen3_4b").
             experiment_name: Name of the experiment.
 
         Returns:
             Dictionary containing all experiment results.
         """
-        info = self.load_result_store_info(dataset, experiment_name)
+        info = self.load_result_store_info(dataset, model_name, experiment_name)
         all_results = {}
 
         for block_name, block_info in info.items():
-            block_data = self.load_result_block(dataset, experiment_name, block_name)
+            block_data = self.load_result_block(dataset, model_name, experiment_name, block_name)
             all_results.update(block_data)
 
         return all_results

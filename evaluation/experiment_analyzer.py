@@ -47,12 +47,13 @@ class ExperimentAnalyzer:
         return dataset_task_map.get(dataset.lower(), "math")
 
     def analyze_experiment(
-        self, dataset: str, experiment_name: str, task_type: str = "math"
+        self, dataset: str, model_name: str, experiment_name: str, task_type: str = "math"
     ) -> Dict[str, Any]:
         """Analyze a single experiment.
 
         Args:
             dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            model_name: Model name (e.g., "qwen3_4b").
             experiment_name: Name of the experiment to analyze.
             task_type: Type of task (e.g., "math", "code", "option").
                        If not provided or "auto", will be inferred from dataset.
@@ -68,7 +69,7 @@ class ExperimentAnalyzer:
         num_rounds = config["round"]
 
         ground_truths = self.data_loader.load_ground_truth(dataset)
-        all_results = self.data_loader.load_all_results(dataset, experiment_name)
+        all_results = self.data_loader.load_all_results(dataset, model_name, experiment_name)
 
         results_by_sample = defaultdict(list)
         for result_id, result_data in all_results.items():
@@ -86,6 +87,7 @@ class ExperimentAnalyzer:
         metrics = {
             "experiment_name": experiment_name,
             "dataset": dataset,
+            "model_name": model_name,
             "task_type": task_type,
             "agent_architecture": agent_architecture,
             "num_rounds": num_rounds,
@@ -100,6 +102,7 @@ class ExperimentAnalyzer:
                 ground_truths.get(main_id),
                 agent_architecture,
                 dataset,
+                model_name,
                 experiment_name,
                 task_type,
             )
@@ -114,6 +117,7 @@ class ExperimentAnalyzer:
         ground_truth: Optional[Dict[str, Any]],
         agent_architecture: str,
         dataset: str,
+        model_name: str,
         experiment_name: str,
         task_type: str,
     ) -> Dict[str, Any]:
@@ -125,6 +129,7 @@ class ExperimentAnalyzer:
             ground_truth: Ground truth data for this sample.
             agent_architecture: Type of agent architecture.
             dataset: Dataset name.
+            model_name: Model name.
             experiment_name: Experiment name.
             task_type: Type of task (e.g., "math", "code", "option").
 
@@ -145,7 +150,7 @@ class ExperimentAnalyzer:
             time_cost = self.metrics_calculator.calculate_time_cost(result_data)
 
             entropy_tensor = self.data_loader.load_entropy_tensor(
-                dataset, experiment_name, result_id
+                dataset, model_name, experiment_name, result_id
             )
             avg_entropy = self.metrics_calculator.calculate_average_entropy(
                 entropy_tensor
@@ -294,22 +299,24 @@ class ExperimentAnalyzer:
                        If not provided or "auto", will be inferred from dataset.
 
         Returns:
-            Dictionary containing metrics for all experiments.
+            Dictionary containing metrics for all experiments, grouped by model.
         """
         if task_type == "auto" or task_type == "math":
             task_type = self._get_task_type_from_dataset(dataset)
 
-        experiments = self.data_loader.get_experiments_by_dataset(dataset)
+        experiments_by_model = self.data_loader.get_experiments_by_dataset(dataset)
 
-        all_metrics = {"dataset": dataset, "task_type": task_type, "experiments": {}}
+        all_metrics = {"dataset": dataset, "task_type": task_type, "models": {}}
 
-        for experiment_name in experiments:
-            try:
-                metrics = self.analyze_experiment(dataset, experiment_name, task_type)
-                all_metrics["experiments"][experiment_name] = metrics
-            except Exception as e:
-                print(f"Error analyzing experiment {experiment_name}: {e}")
-                all_metrics["experiments"][experiment_name] = {"error": str(e)}
+        for model_name, experiments in experiments_by_model.items():
+            all_metrics["models"][model_name] = {"experiments": {}}
+            for experiment_name in experiments:
+                try:
+                    metrics = self.analyze_experiment(dataset, model_name, experiment_name, task_type)
+                    all_metrics["models"][model_name]["experiments"][experiment_name] = metrics
+                except Exception as e:
+                    print(f"Error analyzing experiment {model_name}/{experiment_name}: {e}")
+                    all_metrics["models"][model_name]["experiments"][experiment_name] = {"error": str(e)}
 
         return all_metrics
 
@@ -322,15 +329,17 @@ class ExperimentAnalyzer:
         """
         metrics_copy = metrics.copy()
         
-        if "experiments" in metrics_copy:
-            for exp_name, exp_metrics in metrics_copy["experiments"].items():
-                if "samples" in exp_metrics:
-                    for sample_id, sample_data in exp_metrics["samples"].items():
-                        if "agents" in sample_data:
-                            for agent_key in sample_data["agents"]:
-                                if "predicted_answer" in sample_data["agents"][agent_key]:
-                                    del sample_data["agents"][agent_key]["predicted_answer"]
-                                if "is_correct" in sample_data["agents"][agent_key]:
-                                    del sample_data["agents"][agent_key]["is_correct"]
+        if "models" in metrics_copy:
+            for model_name, model_data in metrics_copy["models"].items():
+                if "experiments" in model_data:
+                    for exp_name, exp_metrics in model_data["experiments"].items():
+                        if "samples" in exp_metrics:
+                            for sample_id, sample_data in exp_metrics["samples"].items():
+                                if "agents" in sample_data:
+                                    for agent_key in sample_data["agents"]:
+                                        if "predicted_answer" in sample_data["agents"][agent_key]:
+                                            del sample_data["agents"][agent_key]["predicted_answer"]
+                                        if "is_correct" in sample_data["agents"][agent_key]:
+                                            del sample_data["agents"][agent_key]["is_correct"]
         
         save_json(metrics_copy, output_path)
