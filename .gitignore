@@ -218,5 +218,5 @@ experiments/configs_exp/
 evaluation/results
 
 # Data mining results
-data_mining/results
-data_mining/reports
+entropy_analysis/visualizations
+entropy_analysis/results
