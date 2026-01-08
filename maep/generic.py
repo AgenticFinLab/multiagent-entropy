@@ -151,14 +151,15 @@ class BaseAgents(ABC):
     def _load_from_module(self, import_path: str) -> Any:
         """
         Load an object (variable, class, function) from a string format "module.path:ObjectName".
-        If the object is a prompt template containing {identifier} placeholder, it will be
+        If the object is a dictionary, it will select the appropriate value based on task_type.
+        If the object is a string and contains {identifier} placeholder, it will be
         formatted with the task-specific identifier.
 
         Args:
             import_path: String in format "module.path:ObjectName"
 
         Returns:
-            The loaded object, with identifier placeholder replaced if applicable.
+            The loaded object, with task_type selection applied if applicable.
         """
         if ":" not in import_path:
             raise ValueError(
@@ -180,6 +181,15 @@ class BaseAgents(ABC):
 
         obj = getattr(module, obj_name)
 
+        # If the object is a dictionary, select the appropriate value based on task_type
+        if isinstance(obj, dict):
+            if self.task_type not in obj:
+                raise ValueError(
+                    f"Task type '{self.task_type}' not found in object '{obj_name}'. "
+                    f"Available task types: {list(obj.keys())}"
+                )
+            obj = obj[self.task_type]
+
         # If the object is a string and contains {identifier} placeholder, format it
         if isinstance(obj, str) and "{identifier}" in obj:
             # Try to get the identifier from the module if it has get_identifier function
@@ -196,11 +206,12 @@ class BaseAgents(ABC):
         Raises:
             ValueError: If task_type is not supported.
         """
-        supported_task_types = ["math", "code", "option"]
-        if self.task_type not in supported_task_types:
+        from maep.prompts import validate_task_type
+        
+        if not validate_task_type(self.task_type):
             raise ValueError(
                 f"Unsupported task_type: {self.task_type}. "
-                f"Must be one of {supported_task_types}"
+                f"Must be one of {list(TASK_IDENTIFIERS.keys()) if 'TASK_IDENTIFIERS' in dir() else ['math', 'code', 'option']}"
             )
 
     def define_agent_models(self):
