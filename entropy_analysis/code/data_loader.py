@@ -1,9 +1,6 @@
 """Unified data loading and analysis module for multi-agent system entropy analysis.
 
-This module provides comprehensive functionality for loading, preprocessing, and analyzing
-experimental data from multi-agent system evaluations. It supports data loading at multiple
-hierarchical levels (dataset, model, and experiment), enabling flexible multi-level analysis
-and cross-level comparisons.
+This module provides comprehensive functionality for loading, preprocessing, and analyzing experimental data from multi-agent system evaluations. It supports data loading at multiple hierarchical levels (dataset, model, and experiment), enabling flexible multi-level analysis and cross-level comparisons.
 
 Key Features:
 - Hierarchical data loading from dataset/model/experiment structure
@@ -15,7 +12,7 @@ Key Features:
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Tuple, Any
 
 import pandas as pd
 
@@ -23,7 +20,13 @@ from constants import ARCHITECTURES
 from error_handling import (
     DatasetNotFoundError,
     ModelNotFoundError,
+    ExperimentNotFoundError,
     FileNotFoundError,
+    DataFormatError,
+    MissingColumnError,
+    validate_file_exists,
+    validate_columns,
+    safe_load_csv,
     ErrorHandler,
 )
 from utils import (

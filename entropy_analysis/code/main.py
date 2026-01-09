@@ -253,7 +253,20 @@ def main() -> None:
         print("Step 6: Generate Visualization Charts")
         print("-" * 80)
         analysis_level = 'dataset' if args.model is None else 'model'
-        visualizer = EntropyVisualizer(processed_data, str(paths["visualizations"]), analysis_level=analysis_level)
+        
+        # Determine number of models for visualization purposes
+        num_models = 1
+        if analysis_level == 'dataset':
+            # Try to infer number of models from the data if at dataset level
+            if 'model_name' in processed_data.columns:
+                num_models = processed_data['model_name'].nunique()
+        
+        visualizer = EntropyVisualizer(
+            processed_data, 
+            str(paths["visualizations"]), 
+            analysis_level=analysis_level,
+            num_models=num_models
+        )
         visualizer.generate_all_visualizations()
         print()
 

@@ -1,20 +1,24 @@
-"""Visualization module for entropy analysis results.
+"""Visualization module for multi-agent system entropy analysis.
 
-This module provides comprehensive visualization capabilities for displaying
-entropy analysis results from multi-agent system performance evaluation. It
-includes methods for creating various types of plots including box plots,
-scatter plots, heatmaps, and comprehensive dashboards.
+This module provides classes and functions for generating various types of visualizations to analyze entropy patterns, correlations, and trends in multi-agent systems.
 """
 
+
+import argparse
 import warnings
 from pathlib import Path
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 from constants import ARCHITECTURES, MULTI_AGENT_ARCHITECTURES, SINGLE_AGENT_ARCHITECTURES
+from utils import get_feature_groups
 
 warnings.filterwarnings("ignore")
 
@@ -36,20 +40,21 @@ class EntropyVisualizer:
         analysis_level: Level of analysis ('dataset' or 'model').
     """
 
-    def __init__(self, data: pd.DataFrame, output_dir: str, analysis_level: str = 'model') -> None:
+    def __init__(self, data: pd.DataFrame, output_dir: str, analysis_level: str = 'model', num_models: int = 1) -> None:
         """Initialize the EntropyVisualizer with data and output directory.
 
         Args:
             data: DataFrame containing preprocessed experimental data.
             output_dir: Directory path where visualizations will be saved.
             analysis_level: Level of analysis ('dataset' or 'model').
+            num_models: Number of models in the dataset for visualization purposes.
         """
         self.data = data
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.architectures = ARCHITECTURES
         self.analysis_level = analysis_level
-        self.num_models = data['model_name'].nunique() if 'model_name' in data.columns else 1
+        self.num_models = num_models if num_models != 1 else (data['model_name'].nunique() if 'model_name' in data.columns else 1)
 
     def plot_architecture_entropy_comparison(self) -> None:
         """Generate box plots comparing entropy features across architectures.
@@ -70,55 +75,108 @@ class EntropyVisualizer:
             print("No entropy features found for comparison.")
             return
 
-        cols = min(2, num_features)
-        rows = (num_features + cols - 1) // cols
-
-        fig, axes = plt.subplots(rows, cols, figsize=(16, 12 * rows / 2))
-        if num_features == 1:
-            axes = np.array([[axes]])
-        elif rows == 1:
-            axes = axes.reshape(1, -1)
-
-        if self.analysis_level == 'dataset' and self.num_models > 1:
+        # If at dataset level with multiple models, create a 2xn grid layout where n is number of models
+        if self.analysis_level == 'dataset' and self.num_models > 1 and 'model_name' in self.data.columns:
+            unique_models = self.data['model_name'].unique()
+            num_models = len(unique_models)
+            
+            # Create 2 x num_models grid layout
+            rows = 2
+            cols = num_models
+            
+            fig, axes = plt.subplots(rows, cols, figsize=(6 * cols, 10))
+            if num_models == 1:
+                axes = np.array([[axes[0]], [axes[1]]])
+            
             fig.suptitle(
-                f"Dataset-Level Architecture Entropy Comparison ({self.num_models} Models)",
+                f"Architecture Entropy Comparison by Model ({self.num_models} Models)",
                 fontsize=16,
                 fontweight="bold",
             )
+
+            for col_idx, model in enumerate(unique_models):
+                model_data = self.data[self.data['model_name'] == model]
+                
+                for row_idx, feature in enumerate(entropy_features[:2]):  # Use first 2 features, or fewer if available
+                    ax = axes[row_idx, col_idx]
+                    
+                    data_to_plot = []
+                    labels = []
+                    for arch in self.architectures:
+                        arch_data = model_data[model_data["architecture"] == arch][
+                            feature
+                        ].dropna()
+                        data_to_plot.append(arch_data.values)
+                        labels.append(arch)
+
+                    bp = ax.boxplot(data_to_plot, labels=labels, patch_artist=True)
+
+                    colors = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7"]
+                    for patch, color in zip(bp["boxes"], colors):
+                        patch.set_facecolor(color)
+                        patch.set_alpha(0.7)
+
+                    ax.set_xlabel("Architecture Type", fontsize=10)
+                    ax.set_ylabel("Entropy Value", fontsize=10)
+                    ax.set_title(f"{feature.replace('_', ' ').title()}\nModel: {model}", fontsize=11)
+                    ax.grid(True, alpha=0.3)
+                    ax.tick_params(axis="x", rotation=45)
+                
+                # If we have more features, we can add more rows or handle differently
+                for remaining_row in range(len(entropy_features), 2):
+                    # Hide unused subplots
+                    if remaining_row < rows:
+                        fig.delaxes(axes[remaining_row, col_idx])
+            
+            # Add model names as column titles at the top
+            for col_idx, model in enumerate(unique_models):
+                axes[0, col_idx].set_title(f"{entropy_features[0].replace('_', ' ').title()}\nModel: {model}", fontsize=11)
+                if len(entropy_features) > 1:
+                    axes[1, col_idx].set_title(f"{entropy_features[1].replace('_', ' ').title()}\nModel: {model}", fontsize=11)
         else:
+            # Original behavior for non-dataset level or single model
+            cols = min(2, num_features)
+            rows = (num_features + cols - 1) // cols
+
+            fig, axes = plt.subplots(rows, cols, figsize=(16, 12 * rows / 2))
+            if num_features == 1:
+                axes = np.array([[axes]])
+            elif rows == 1:
+                axes = axes.reshape(1, -1)
+
             fig.suptitle(
                 "Architecture Entropy Comparison",
                 fontsize=16,
                 fontweight="bold",
             )
 
-        for idx, feature in enumerate(entropy_features):
-            ax = axes[idx // cols, idx % cols]
+            for idx, feature in enumerate(entropy_features):
+                ax = axes[idx // cols, idx % cols]
 
-            data_to_plot = []
-            labels = []
-            for arch in self.architectures:
-                arch_data = self.data[self.data["architecture"] == arch][
-                    feature
-                ].dropna()
-                data_to_plot.append(arch_data.values)
-                labels.append(arch)
+                data_to_plot = []
+                labels = []
+                for arch in self.architectures:
+                    arch_data = self.data[self.data["architecture"] == arch][
+                        feature
+                    ].dropna()
+                    data_to_plot.append(arch_data.values)
+                    labels.append(arch)
 
-            bp = ax.boxplot(data_to_plot, labels=labels, patch_artist=True)
+                bp = ax.boxplot(data_to_plot, labels=labels, patch_artist=True)
 
-            colors = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7"]
-            for patch, color in zip(bp["boxes"], colors):
-                patch.set_facecolor(color)
-                patch.set_alpha(0.7)
+                colors = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7"]
+                for patch, color in zip(bp["boxes"], colors):
+                    patch.set_facecolor(color)
+                    patch.set_alpha(0.7)
 
-            ax.set_xlabel("Architecture Type", fontsize=12)
-            ax.set_ylabel("Entropy Value", fontsize=12)
-            ax.set_title(feature.replace("_", " ").title(), fontsize=13)
-            ax.grid(True, alpha=0.3)
-            ax.tick_params(axis="x", rotation=45)
+                ax.set_xlabel("Architecture Type", fontsize=12)
+                ax.set_ylabel("Entropy Value", fontsize=12)
+                ax.set_title(feature.replace("_", " ").title(), fontsize=13)
+                ax.grid(True, alpha=0.3)
+                ax.tick_params(axis="x", rotation=45)
 
-        for idx in range(num_features, rows * cols):
-            fig.delaxes(axes[idx // cols, idx % cols])
+            for idx in range(num_features, rows * cols):
+                fig.delaxes(axes[idx // cols, idx % cols])
 
         plt.tight_layout()
         plt.savefig(
@@ -143,11 +201,25 @@ class EntropyVisualizer:
         ]
 
         fig, axes = plt.subplots(3, 3, figsize=(18, 15))
-        fig.suptitle(
-            "Correlation Analysis Between Entropy Features and Accuracy",
-            fontsize=16,
-            fontweight="bold",
-        )
+        
+        # Set title based on analysis level and number of models
+        if self.analysis_level == 'dataset' and self.num_models > 1:
+            fig.suptitle(
+                f"Correlation Analysis Between Entropy Features and Accuracy ({self.num_models} Models)",
+                fontsize=16,
+                fontweight="bold",
+            )
+        else:
+            fig.suptitle(
+                "Correlation Analysis Between Entropy Features and Accuracy",
+                fontsize=16,
+                fontweight="bold",
+            )
+
+        # Define markers for architectures and colors for models to enable dual classification
+        markers = ['o', 's', '^', 'v', '<', '>', 'D', 'p', '*', 'h']
+        max_models = max(len(self.data['model_name'].unique()) if 'model_name' in self.data.columns else 1, 10)
+        colors = plt.cm.tab10(np.linspace(0, 1, max_models))
 
         for idx, feature in enumerate(entropy_features[:9]):
             ax = axes[idx // 3, idx % 3]
@@ -155,42 +227,104 @@ class EntropyVisualizer:
             x = self.data[feature].dropna()
             y = self.data.loc[x.index, "exp_accuracy"]
 
-            valid_idx = ~(x.isna() | y.isna() | np.isinf(x) | np.isinf(y))
-            x = x[valid_idx]
-            y = y[valid_idx]
+            # If we have model information and are at dataset level, use dual classification (model=color, architecture-marker)
+            if self.analysis_level == 'dataset' and self.num_models > 1 and 'model_name' in self.data.columns:
+                model_data = self.data.loc[x.index].copy()
+                model_data = model_data[model_data["exp_accuracy"].notna() & x.notna()]
+                model_data = model_data[~np.isinf(model_data[feature]) & ~np.isinf(model_data["exp_accuracy"])]
 
-            if len(x) < 2:
-                ax.text(
-                    0.5,
-                    0.5,
-                    "Insufficient Data",
-                    ha="center",
-                    va="center",
-                    transform=ax.transAxes,
-                )
-                continue
+                if len(model_data) < 2:
+                    ax.text(
+                        0.5,
+                        0.5,
+                        "Insufficient Data",
+                        ha="center",
+                        va="center",
+                        transform=ax.transAxes,
+                    )
+                    continue
 
-            if x.std() == 0:
-                ax.text(
-                    0.5,
-                    0.5,
-                    "Zero Variance",
-                    ha="center",
-                    va="center",
-                    transform=ax.transAxes,
-                )
-                continue
+                # Create a color map for models and marker map for architectures
+                unique_models = model_data['model_name'].unique()
+                unique_archs = model_data['architecture'].unique()
+                
+                # Assign colors to models and markers to architectures
+                model_colors = {}
+                for i, model in enumerate(unique_models):
+                    model_colors[model] = colors[i % len(colors)]
+                
+                arch_markers = {}
+                for j, arch in enumerate(unique_archs):
+                    arch_markers[arch] = markers[j % len(markers)]
 
-            corr = x.corr(y)
+                # Plot each combination of model and architecture
+                for model in unique_models:
+                    for arch in unique_archs:
+                        subset = model_data[
+                            (model_data['model_name'] == model) & 
+                            (model_data['architecture'] == arch)
+                        ]
+                        if len(subset) > 0:
+                            ax.scatter(
+                                subset[feature], 
+                                subset["exp_accuracy"], 
+                                alpha=0.7, 
+                                s=50,
+                                label=f"{model}-{arch}",
+                                color=model_colors[model],
+                                marker=arch_markers[arch]
+                            )
 
-            ax.scatter(x, y, alpha=0.5, s=20)
+                ax.legend(title="Model-Architecture", bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
+                
+                # Calculate overall correlation
+                corr = model_data[feature].corr(model_data["exp_accuracy"])
+                
+                # Fit regression line to all data
+                try:
+                    z = np.polyfit(model_data[feature], model_data["exp_accuracy"], 1)
+                    p = np.poly1d(z)
+                    ax.plot(model_data[feature], p(model_data[feature]), "r--", alpha=0.8, linewidth=2, label="Overall Trend")
+                except Exception:
+                    pass
+            else:
+                # Original behavior for single model or non-dataset level
+                valid_idx = ~(x.isna() | y.isna() | np.isinf(x) | np.isinf(y))
+                x = x[valid_idx]
+                y = y[valid_idx]
 
-            try:
-                z = np.polyfit(x, y, 1)
-                p = np.poly1d(z)
-                ax.plot(x, p(x), "r--", alpha=0.8, linewidth=2)
-            except Exception:
-                pass
+                if len(x) < 2:
+                    ax.text(
+                        0.5,
+                        0.5,
+                        "Insufficient Data",
+                        ha="center",
+                        va="center",
+                        transform=ax.transAxes,
+                    )
+                    continue
+
+                if x.std() == 0:
+                    ax.text(
+                        0.5,
+                        0.5,
+                        "Zero Variance",
+                        ha="center",
+                        va="center",
+                        transform=ax.transAxes,
+                    )
+                    continue
+
+                corr = x.corr(y)
+
+                ax.scatter(x, y, alpha=0.5, s=20)
+
+                try:
+                    z = np.polyfit(x, y, 1)
+                    p = np.poly1d(z)
+                    ax.plot(x, p(x), "r--", alpha=0.8, linewidth=2)
+                except Exception:
+                    pass
 
             ax.set_xlabel(feature.replace("_", " ").title(), fontsize=10)
             ax.set_ylabel("Accuracy", fontsize=10)
@@ -492,62 +626,164 @@ class EntropyVisualizer:
         single_agent_data = self.data[self.data["architecture"].isin(SINGLE_AGENT_ARCHITECTURES)]
 
         ax = axes[0, 0]
-        accuracy_comparison = pd.DataFrame(
-            {
-                "Multi-Agent": [multi_agent_data["exp_accuracy"].mean()],
-                "Single-Agent": [single_agent_data["exp_accuracy"].mean()],
-            }
-        )
-        accuracy_comparison.plot(
-            kind="bar", ax=ax, color=["#4ECDC4", "#FF6B6B"], alpha=0.7
-        )
+        # If we have multiple models at dataset level, compare multi-agent vs single-agent for each model
+        if self.analysis_level == 'dataset' and self.num_models > 1 and 'model_name' in self.data.columns:
+            # Create comparison by model
+            comparison_data = []
+            for model in self.data['model_name'].unique():
+                model_data = self.data[self.data['model_name'] == model]
+                model_multi = model_data[model_data["architecture"].isin(MULTI_AGENT_ARCHITECTURES)]
+                model_single = model_data[model_data["architecture"].isin(SINGLE_AGENT_ARCHITECTURES)]
+                
+                if len(model_multi) > 0 and len(model_single) > 0:
+                    comparison_data.append({
+                        'Model': model,
+                        'Multi-Agent': model_multi["exp_accuracy"].mean(),
+                        'Single-Agent': model_single["exp_accuracy"].mean()
+                    })
+            
+            if comparison_data:
+                comparison_df = pd.DataFrame(comparison_data)
+                comparison_df.set_index('Model', inplace=True)
+                comparison_df.plot(kind="bar", ax=ax, alpha=0.7, width=0.8)
+            else:
+                # Fallback to overall comparison if no model-specific data
+                accuracy_comparison = pd.DataFrame(
+                    {
+                        "Multi-Agent": [multi_agent_data["exp_accuracy"].mean()],
+                        "Single-Agent": [single_agent_data["exp_accuracy"].mean()],
+                    }
+                )
+                accuracy_comparison.plot(
+                    kind="bar", ax=ax, color=["#4ECDC4", "#FF6B6B"], alpha=0.7
+                )
+        else:
+            accuracy_comparison = pd.DataFrame(
+                {
+                    "Multi-Agent": [multi_agent_data["exp_accuracy"].mean()],
+                    "Single-Agent": [single_agent_data["exp_accuracy"].mean()],
+                }
+            )
+            accuracy_comparison.plot(
+                kind="bar", ax=ax, color=["#4ECDC4", "#FF6B6B"], alpha=0.7
+            )
         ax.set_ylabel("Accuracy", fontsize=12)
-        ax.set_title("Average Accuracy Comparison", fontsize=13)
+        ax.set_title("Accuracy Comparison: Multi-Agent vs Single-Agent by Model", fontsize=13)
         ax.legend(fontsize=10)
         ax.grid(True, alpha=0.3, axis="y")
+        ax.tick_params(axis="x", rotation=45)
 
         ax = axes[0, 1]
-        entropy_comparison = pd.DataFrame(
-            {
-                "Multi-Agent": [multi_agent_data["sample_mean_entropy"].mean()],
-                "Single-Agent": [single_agent_data["sample_mean_entropy"].mean()],
-            }
-        )
-        entropy_comparison.plot(
-            kind="bar", ax=ax, color=["#4ECDC4", "#FF6B6B"], alpha=0.7
-        )
+        # Similar approach for entropy comparison
+        if self.analysis_level == 'dataset' and self.num_models > 1 and 'model_name' in self.data.columns:
+            # Create entropy comparison by model
+            entropy_comparison_data = []
+            for model in self.data['model_name'].unique():
+                model_data = self.data[self.data['model_name'] == model]
+                model_multi = model_data[model_data["architecture"].isin(MULTI_AGENT_ARCHITECTURES)]
+                model_single = model_data[model_data["architecture"].isin(SINGLE_AGENT_ARCHITECTURES)]
+                
+                if len(model_multi) > 0 and len(model_single) > 0:
+                    entropy_comparison_data.append({
+                        'Model': model,
+                        'Multi-Agent': model_multi["sample_mean_entropy"].mean(),
+                        'Single-Agent': model_single["sample_mean_entropy"].mean()
+                    })
+            
+            if entropy_comparison_data:
+                entropy_comparison_df = pd.DataFrame(entropy_comparison_data)
+                entropy_comparison_df.set_index('Model', inplace=True)
+                entropy_comparison_df.plot(kind="bar", ax=ax, alpha=0.7, width=0.8)
+            else:
+                # Fallback to overall comparison if no model-specific data
+                entropy_comparison = pd.DataFrame(
+                    {
+                        "Multi-Agent": [multi_agent_data["sample_mean_entropy"].mean()],
+                        "Single-Agent": [single_agent_data["sample_mean_entropy"].mean()],
+                    }
+                )
+                entropy_comparison.plot(
+                    kind="bar", ax=ax, color=["#4ECDC4", "#FF6B6B"], alpha=0.7
+                )
+        else:
+            entropy_comparison = pd.DataFrame(
+                {
+                    "Multi-Agent": [multi_agent_data["sample_mean_entropy"].mean()],
+                    "Single-Agent": [single_agent_data["sample_mean_entropy"].mean()],
+                }
+            )
+            entropy_comparison.plot(
+                kind="bar", ax=ax, color=["#4ECDC4", "#FF6B6B"], alpha=0.7
+            )
         ax.set_ylabel("Average Entropy", fontsize=12)
-        ax.set_title("Average Entropy Comparison", fontsize=13)
+        ax.set_title("Entropy Comparison: Multi-Agent vs Single-Agent by Model", fontsize=13)
         ax.legend(fontsize=10)
         ax.grid(True, alpha=0.3, axis="y")
+        ax.tick_params(axis="x", rotation=45)
 
         ax = axes[1, 0]
-        arch_accuracy = (
-            self.data.groupby("architecture")["exp_accuracy"]
-            .mean()
-            .sort_values(ascending=False)
-        )
-        arch_accuracy.plot(
-            kind="bar", ax=ax, color=plt.cm.Set3(range(len(arch_accuracy)))
-        )
-        ax.set_ylabel("Accuracy", fontsize=12)
-        ax.set_title("Architecture Accuracy Ranking", fontsize=13)
-        ax.tick_params(axis="x", rotation=45)
-        ax.grid(True, alpha=0.3, axis="y")
+        # Architecture accuracy ranking with model differentiation if at dataset level
+        if self.analysis_level == 'dataset' and self.num_models > 1 and 'model_name' in self.data.columns:
+            # Group by both architecture and model to see how each model performs on each architecture
+            arch_model_accuracy = (
+                self.data.groupby(["model_name", "architecture"])["exp_accuracy"]
+                .mean()
+                .unstack(level=1, fill_value=0)
+            )
+            arch_model_accuracy.plot(
+                kind="bar", ax=ax, 
+                color=plt.cm.Set3(range(len(arch_model_accuracy.columns)))
+            )
+            ax.set_ylabel("Accuracy", fontsize=12)
+            ax.set_title("Architecture Accuracy by Model", fontsize=13)
+            ax.legend(title="Architecture", bbox_to_anchor=(1.05, 1), loc='upper left')
+            ax.tick_params(axis="x", rotation=45)
+            ax.grid(True, alpha=0.3, axis="y")
+        else:
+            arch_accuracy = (
+                self.data.groupby("architecture")["exp_accuracy"]
+                .mean()
+                .sort_values(ascending=False)
+            )
+            arch_accuracy.plot(
+                kind="bar", ax=ax, color=plt.cm.Set3(range(len(arch_accuracy)))
+            )
+            ax.set_ylabel("Accuracy", fontsize=12)
+            ax.set_title("Architecture Accuracy Ranking", fontsize=13)
+            ax.tick_params(axis="x", rotation=45)
+            ax.grid(True, alpha=0.3, axis="y")
 
         ax = axes[1, 1]
-        arch_entropy = (
-            self.data.groupby("architecture")["sample_mean_entropy"]
-            .mean()
-            .sort_values(ascending=False)
-        )
-        arch_entropy.plot(
-            kind="bar", ax=ax, color=plt.cm.Set3(range(len(arch_entropy)))
-        )
-        ax.set_ylabel("Average Entropy", fontsize=12)
-        ax.set_title("Architecture Entropy Ranking", fontsize=13)
-        ax.tick_params(axis="x", rotation=45)
-        ax.grid(True, alpha=0.3, axis="y")
+        # Architecture entropy ranking with model differentiation if at dataset level
+        if self.analysis_level == 'dataset' and self.num_models > 1 and 'model_name' in self.data.columns:
+            # Group by both architecture and model to see how each model performs on each architecture
+            arch_model_entropy = (
+                self.data.groupby(["model_name", "architecture"])["sample_mean_entropy"]
+                .mean()
+                .unstack(level=1, fill_value=0)
+            )
+            arch_model_entropy.plot(
+                kind="bar", ax=ax, 
+                color=plt.cm.Set3(range(len(arch_model_entropy.columns)))
+            )
+            ax.set_ylabel("Average Entropy", fontsize=12)
+            ax.set_title("Architecture Entropy by Model", fontsize=13)
+            ax.legend(title="Architecture", bbox_to_anchor=(1.05, 1), loc='upper left')
+            ax.tick_params(axis="x", rotation=45)
+            ax.grid(True, alpha=0.3, axis="y")
+        else:
+            arch_entropy = (
+                self.data.groupby("architecture")["sample_mean_entropy"]
+                .mean()
+                .sort_values(ascending=False)
+            )
+            arch_entropy.plot(
+                kind="bar", ax=ax, color=plt.cm.Set3(range(len(arch_entropy)))
+            )
+            ax.set_ylabel("Average Entropy", fontsize=12)
+            ax.set_title("Architecture Entropy Ranking", fontsize=13)
+            ax.tick_params(axis="x", rotation=45)
+            ax.grid(True, alpha=0.3, axis="y")
 
         plt.tight_layout()
         plt.savefig(
@@ -573,18 +809,82 @@ class EntropyVisualizer:
 
         features_to_correlate = entropy_features + ["exp_accuracy"]
 
-        correlation_matrix = self.data[features_to_correlate].corr()
+        if self.analysis_level == 'dataset' and self.num_models > 1 and 'model_name' in self.data.columns:
+            # Create separate heatmaps for each model
+            unique_models = self.data['model_name'].unique()
+            num_models = len(unique_models)
+            
+            # Calculate the layout dimensions for subplots
+            cols = min(3, num_models)  # Maximum 3 columns
+            rows = (num_models + cols - 1) // cols  # Calculate required rows
+            
+            fig, axes = plt.subplots(rows, cols, figsize=(10 * cols, 8 * rows))
+            
+            if num_models == 1:
+                axes = [axes]
+            elif num_models == 2:
+                axes = axes.flatten()
+            else:
+                axes = axes.flatten() if hasattr(axes, 'flatten') else [axes] if not isinstance(axes, (list, np.ndarray)) else axes
 
-        fig, ax = plt.subplots(figsize=(16, 14))
-
-        if self.analysis_level == 'dataset' and self.num_models > 1:
-            ax.set_title(
-                f"Dataset-Level Entropy Feature Correlation Heatmap ({self.num_models} Models)",
+            fig.suptitle(
+                f"Dataset-Level Entropy Feature Correlation Heatmaps by Model ({self.num_models} Models)",
                 fontsize=16,
                 fontweight="bold",
-                pad=20,
             )
+
+            # Determine the global correlation range for consistent color scaling
+            all_corr_matrices = []
+            for model in unique_models:
+                model_data = self.data[self.data['model_name'] == model]
+                model_corr_matrix = model_data[features_to_correlate].corr()
+                all_corr_matrices.append(model_corr_matrix)
+            
+            # Get global min and max for consistent color scale
+            vmin = min([m.min().min() for m in all_corr_matrices])
+            vmax = max([m.max().max() for m in all_corr_matrices])
+
+            for idx, model in enumerate(unique_models):
+                model_data = self.data[self.data['model_name'] == model]
+                correlation_matrix = model_data[features_to_correlate].corr()
+                
+                # Create heatmap for this model
+                sns.heatmap(
+                    correlation_matrix,
+                    annot=True,
+                    fmt=".2f",
+                    cmap="coolwarm",
+                    center=0,
+                    square=True,
+                    linewidths=0.5,
+                    cbar_kws={"shrink": 0.8},
+                    ax=axes[idx],
+                    vmin=vmin,  # Use global min for consistent color scale
+                    vmax=vmax,   # Use global max for consistent color scale
+                    annot_kws={"fontsize": 6}  # Smaller font size for annotations
+                )
+
+                axes[idx].set_title(f"{model} - Correlation Heatmap", fontsize=10, fontweight="bold")
+                axes[idx].set_xticklabels(axes[idx].get_xticklabels(), rotation=45, ha="right", fontsize=7)
+                axes[idx].set_yticklabels(axes[idx].get_yticklabels(), rotation=0, fontsize=7)
+
+            # Hide any unused subplots
+            for idx in range(len(unique_models), len(axes)):
+                axes[idx].set_visible(False)
+
+            plt.tight_layout()
+            plt.savefig(
+                self.output_dir / "entropy_heatmap.png", dpi=300, bbox_inches="tight"
+            )
+            plt.close()
+
+            print(f"Saved: {self.output_dir / 'entropy_heatmap.png'}")
         else:
+            # Original behavior for non-dataset level or single model
+            correlation_matrix = self.data[features_to_correlate].corr()
+
+            fig, ax = plt.subplots(figsize=(18, 15))
+
             ax.set_title(
                 "Entropy Feature Correlation Heatmap",
                 fontsize=16,
@@ -592,28 +892,29 @@ class EntropyVisualizer:
                 pad=20,
             )
 
-        sns.heatmap(
-            correlation_matrix,
-            annot=True,
-            fmt=".2f",
-            cmap="coolwarm",
-            center=0,
-            square=True,
-            linewidths=0.5,
-            cbar_kws={"shrink": 0.8},
-            ax=ax,
-        )
+            sns.heatmap(
+                correlation_matrix,
+                annot=True,
+                fmt=".2f",
+                cmap="coolwarm",
+                center=0,
+                square=True,
+                linewidths=0.5,
+                cbar_kws={"shrink": 0.8},
+                ax=ax,
+                annot_kws={"fontsize": 8}  # Font size for annotations
+            )
 
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right", fontsize=10)
-        ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=10)
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right", fontsize=8)
+            ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=8)
 
-        plt.tight_layout()
-        plt.savefig(
-            self.output_dir / "entropy_heatmap.png", dpi=300, bbox_inches="tight"
-        )
-        plt.close()
+            plt.tight_layout()
+            plt.savefig(
+                self.output_dir / "entropy_heatmap.png", dpi=300, bbox_inches="tight"
+            )
+            plt.close()
 
-        print(f"Saved: {self.output_dir / 'entropy_heatmap.png'}")
+            print(f"Saved: {self.output_dir / 'entropy_heatmap.png'}")
 
     def plot_accuracy_entropy_scatter(self) -> None:
         """Generate scatter plots showing accuracy vs entropy relationships.
@@ -638,21 +939,35 @@ class EntropyVisualizer:
                 fontweight="bold",
             )
 
+        # Define markers for architectures and colors for models to enable dual classification
+        markers = ['o', 's', '^', 'v', '<', '>', 'D', 'p', '*', 'h']
+        colors = plt.cm.tab10(np.linspace(0, 1, max(len(self.data['model_name'].unique()) if 'model_name' in self.data.columns else 1, 10)))
+
         ax = axes[0, 0]
         if self.analysis_level == 'dataset' and self.num_models > 1 and 'model_name' in self.data.columns:
-            for model in self.data['model_name'].unique():
+            # Dual classification: model (color) and architecture (marker)
+            legend_elements = []
+            for i, model in enumerate(self.data['model_name'].unique()):
                 model_data = self.data[self.data['model_name'] == model]
-                ax.scatter(
-                    model_data["sample_mean_entropy"],
-                    model_data["exp_accuracy"],
-                    alpha=0.5,
-                    s=30,
-                    label=model,
-                )
+                for j, arch in enumerate(self.data['architecture'].unique()):
+                    arch_data = model_data[model_data['architecture'] == arch]
+                    if len(arch_data) > 0:
+                        marker = markers[j % len(markers)]
+                        color = colors[i % len(colors)]
+                        scatter = ax.scatter(
+                            arch_data["sample_mean_entropy"],
+                            arch_data["exp_accuracy"],
+                            alpha=0.7,
+                            s=50,
+                            label=f"{model}-{arch}",
+                            c=[color],
+                            marker=marker
+                        )
+                        
             ax.set_xlabel("Sample Mean Entropy", fontsize=12)
             ax.set_ylabel("Accuracy", fontsize=12)
-            ax.set_title("Sample Mean Entropy vs Accuracy by Model", fontsize=13)
-            ax.legend(fontsize=9)
+            ax.set_title("Sample Mean Entropy vs Accuracy (Model & Architecture)", fontsize=13)
+            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
             ax.grid(True, alpha=0.3)
         else:
             for arch in self.architectures:
@@ -672,19 +987,27 @@ class EntropyVisualizer:
 
         ax = axes[0, 1]
         if self.analysis_level == 'dataset' and self.num_models > 1 and 'model_name' in self.data.columns:
-            for model in self.data['model_name'].unique():
+            # Dual classification: model (color) and architecture (marker)
+            for i, model in enumerate(self.data['model_name'].unique()):
                 model_data = self.data[self.data['model_name'] == model]
-                ax.scatter(
-                    model_data["sample_std_entropy"],
-                    model_data["exp_accuracy"],
-                    alpha=0.5,
-                    s=30,
-                    label=model,
-                )
+                for j, arch in enumerate(self.data['architecture'].unique()):
+                    arch_data = model_data[model_data['architecture'] == arch]
+                    if len(arch_data) > 0:
+                        marker = markers[j % len(markers)]
+                        color = colors[i % len(colors)]
+                        ax.scatter(
+                            arch_data["sample_std_entropy"],
+                            arch_data["exp_accuracy"],
+                            alpha=0.7,
+                            s=50,
+                            label=f"{model}-{arch}",
+                            c=[color],
+                            marker=marker
+                        )
             ax.set_xlabel("Sample Entropy Std Dev", fontsize=12)
             ax.set_ylabel("Accuracy", fontsize=12)
-            ax.set_title("Sample Entropy Std Dev vs Accuracy by Model", fontsize=13)
-            ax.legend(fontsize=9)
+            ax.set_title("Sample Entropy Std Dev vs Accuracy (Model & Architecture)", fontsize=13)
+            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
             ax.grid(True, alpha=0.3)
         else:
             for arch in self.architectures:
@@ -704,19 +1027,27 @@ class EntropyVisualizer:
 
         ax = axes[1, 0]
         if self.analysis_level == 'dataset' and self.num_models > 1 and 'model_name' in self.data.columns:
-            for model in self.data['model_name'].unique():
+            # Dual classification: model (color) and architecture (marker)
+            for i, model in enumerate(self.data['model_name'].unique()):
                 model_data = self.data[self.data['model_name'] == model]
-                ax.scatter(
-                    model_data["sample_max_entropy"],
-                    model_data["exp_accuracy"],
-                    alpha=0.5,
-                    s=30,
-                    label=model,
-                )
+                for j, arch in enumerate(self.data['architecture'].unique()):
+                    arch_data = model_data[model_data['architecture'] == arch]
+                    if len(arch_data) > 0:
+                        marker = markers[j % len(markers)]
+                        color = colors[i % len(colors)]
+                        ax.scatter(
+                            arch_data["sample_max_entropy"],
+                            arch_data["exp_accuracy"],
+                            alpha=0.7,
+                            s=50,
+                            label=f"{model}-{arch}",
+                            c=[color],
+                            marker=marker
+                        )
             ax.set_xlabel("Sample Max Entropy", fontsize=12)
             ax.set_ylabel("Accuracy", fontsize=12)
-            ax.set_title("Sample Max Entropy vs Accuracy by Model", fontsize=13)
-            ax.legend(fontsize=9)
+            ax.set_title("Sample Max Entropy vs Accuracy (Model & Architecture)", fontsize=13)
+            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
             ax.grid(True, alpha=0.3)
         else:
             for arch in self.architectures:
@@ -736,19 +1067,27 @@ class EntropyVisualizer:
 
         ax = axes[1, 1]
         if self.analysis_level == 'dataset' and self.num_models > 1 and 'model_name' in self.data.columns:
-            for model in self.data['model_name'].unique():
+            # Dual classification: model (color) and architecture (marker)
+            for i, model in enumerate(self.data['model_name'].unique()):
                 model_data = self.data[self.data['model_name'] == model]
-                ax.scatter(
-                    model_data["sample_all_agents_token_count"],
-                    model_data["exp_accuracy"],
-                    alpha=0.5,
-                    s=30,
-                    label=model,
-                )
+                for j, arch in enumerate(self.data['architecture'].unique()):
+                    arch_data = model_data[model_data['architecture'] == arch]
+                    if len(arch_data) > 0:
+                        marker = markers[j % len(markers)]
+                        color = colors[i % len(colors)]
+                        ax.scatter(
+                            arch_data["sample_all_agents_token_count"],
+                            arch_data["exp_accuracy"],
+                            alpha=0.7,
+                            s=50,
+                            label=f"{model}-{arch}",
+                            c=[color],
+                            marker=marker
+                        )
             ax.set_xlabel("Total Token Count", fontsize=12)
             ax.set_ylabel("Accuracy", fontsize=12)
-            ax.set_title("Total Token Count vs Accuracy by Model", fontsize=13)
-            ax.legend(fontsize=9)
+            ax.set_title("Total Token Count vs Accuracy (Model & Architecture)", fontsize=13)
+            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
             ax.grid(True, alpha=0.3)
         else:
             for arch in self.architectures:
@@ -812,13 +1151,47 @@ class EntropyVisualizer:
             ax = axes[idx // 3, idx % 3]
 
             if self.analysis_level == 'dataset' and self.num_models > 1 and 'model_name' in self.data.columns:
-                for model in self.data['model_name'].unique():
-                    model_data = self.data[self.data['model_name'] == model][feature].dropna()
-                    ax.hist(model_data, bins=30, alpha=0.5, label=model, density=True)
+                # Implement dual classification visual encoding: different colors for models and architectures
+                unique_models = self.data['model_name'].unique()
+                unique_archs = self.data['architecture'].unique()
+                
+                # Create a color map for each unique combination of model and architecture
+                from itertools import product
+                combinations = list(product(unique_models, unique_archs))
+                
+                # Use a colormap to generate distinct colors
+                total_combinations = len(combinations)
+                colors = plt.cm.tab20(np.linspace(0, 1, total_combinations))
+                
+                # Create legend labels and color mapping
+                color_map = {}
+                for i, (model, arch) in enumerate(combinations):
+                    color_map[(model, arch)] = colors[i]
+                
+                # Plot each combination with its unique color
+                legend_elements = []
+                for model in unique_models:
+                    for arch in unique_archs:
+                        if (model, arch) in color_map:
+                            model_arch_data = self.data[
+                                (self.data['model_name'] == model) & 
+                                (self.data['architecture'] == arch)
+                            ][feature].dropna()
+                            
+                            if len(model_arch_data) > 0:
+                                ax.hist(
+                                    model_arch_data, 
+                                    bins=30, 
+                                    alpha=0.6, 
+                                    label=f"{model}-{arch}",
+                                    color=color_map[(model, arch)],
+                                    density=True
+                                )
+                
                 ax.set_xlabel(feature.replace("_", " ").title(), fontsize=10)
                 ax.set_ylabel("Density", fontsize=10)
                 ax.set_title(feature.replace("_", " ").title(), fontsize=11)
-                ax.legend(fontsize=8)
+                ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
                 ax.grid(True, alpha=0.3)
             else:
                 for arch in self.architectures:
@@ -843,279 +1216,82 @@ class EntropyVisualizer:
 
         print(f"Saved: {self.output_dir / 'distribution_comparison.png'}")
 
-    def plot_summary_dashboard(self) -> None:
-        """Generate a comprehensive dashboard summarizing key findings.
+    def plot_cross_model_architecture_comparison(self) -> None:
+        """Generate bar charts comparing architecture performance across different models.
 
-        Creates a multi-panel dashboard displaying architecture performance,
-        entropy-accuracy correlations, scatter plots, evolution patterns,
-        and summary statistics.
+        Creates side-by-side bar charts showing how each architecture performs
+        across different models for accuracy and entropy metrics.
         """
-        print("Generating summary dashboard...")
+        print("Generating cross-model architecture comparison...")
+        
+        if 'model_name' not in self.data.columns:
+            print("Cross-model architecture comparison skipped: No model data available")
+            return
 
-        fig = plt.figure(figsize=(20, 14))
-        gs = fig.add_gridspec(3, 4, hspace=0.3, wspace=0.3)
+        # Group by model and architecture to get average metrics
+        model_arch_data = self.data.groupby(['model_name', 'architecture']).agg({
+            'exp_accuracy': 'mean',
+            'sample_mean_entropy': 'mean',
+            'sample_std_entropy': 'mean'
+        }).reset_index()
 
-        if self.analysis_level == 'dataset' and self.num_models > 1:
-            fig.suptitle(
-                f"Dataset-Level Entropy Analysis Dashboard ({self.num_models} Models)",
-                fontsize=18,
-                fontweight="bold",
-                y=0.995,
-            )
+        unique_models = model_arch_data['model_name'].unique()
+        unique_architectures = model_arch_data['architecture'].unique()
 
-            ax1 = fig.add_subplot(gs[0, 0])
-            if 'model_name' in self.data.columns:
-                model_accuracy = (
-                    self.data.groupby("model_name")["exp_accuracy"]
-                    .mean()
-                    .sort_values(ascending=False)
-                )
-                model_accuracy.plot(
-                    kind="bar", ax=ax1, color=plt.cm.Set2(range(len(model_accuracy)))
-                )
-                ax1.set_title("Model Accuracy Comparison", fontsize=12, fontweight="bold")
-                ax1.set_ylabel("Accuracy")
-                ax1.tick_params(axis="x", rotation=45)
-            else:
-                ax1.text(0.5, 0.5, "No model data available", ha='center', va='center')
-                ax1.set_title("Model Accuracy Comparison", fontsize=12, fontweight="bold")
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        fig.suptitle(
+            f"Cross-Model Architecture Performance Comparison ({self.num_models} Models)",
+            fontsize=16,
+            fontweight="bold",
+        )
 
-            ax2 = fig.add_subplot(gs[0, 1])
-            if 'model_name' in self.data.columns:
-                model_entropy = (
-                    self.data.groupby("model_name")["sample_mean_entropy"]
-                    .mean()
-                    .sort_values(ascending=False)
-                )
-                model_entropy.plot(
-                    kind="bar", ax=ax2, color=plt.cm.Set2(range(len(model_entropy)))
-                )
-                ax2.set_title("Model Mean Entropy Comparison", fontsize=12, fontweight="bold")
-                ax2.set_ylabel("Mean Entropy")
-                ax2.tick_params(axis="x", rotation=45)
-            else:
-                ax2.text(0.5, 0.5, "No model data available", ha='center', va='center')
-                ax2.set_title("Model Mean Entropy Comparison", fontsize=12, fontweight="bold")
+        # Accuracy comparison
+        ax = axes[0, 0]
+        pivot_acc = model_arch_data.pivot(index='architecture', columns='model_name', values='exp_accuracy')
+        pivot_acc.plot(kind='bar', ax=ax, width=0.8)
+        ax.set_title("Accuracy by Architecture and Model")
+        ax.set_ylabel("Accuracy")
+        ax.legend(title="Models", bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.tick_params(axis='x', rotation=45)
+        ax.grid(True, alpha=0.3, axis='y')
 
-            ax3 = fig.add_subplot(gs[0, 2:])
-            if 'model_name' in self.data.columns:
-                model_comparison = []
-                for model in self.data['model_name'].unique():
-                    model_data = self.data[self.data['model_name'] == model]
-                    model_comparison.append({
-                        'model': model,
-                        'accuracy': model_data['exp_accuracy'].mean(),
-                        'mean_entropy': model_data['sample_mean_entropy'].mean(),
-                        'num_samples': model_data['sample_id'].nunique()
-                    })
-                model_df = pd.DataFrame(model_comparison)
-                ax3.scatter(model_df['mean_entropy'], model_df['accuracy'], 
-                           s=model_df['num_samples']/10, alpha=0.6)
-                for idx, row in model_df.iterrows():
-                    ax3.annotate(row['model'], (row['mean_entropy'], row['accuracy']),
-                               fontsize=8, alpha=0.7)
-                ax3.set_xlabel("Mean Entropy")
-                ax3.set_ylabel("Accuracy")
-                ax3.set_title("Model Performance: Entropy vs Accuracy", fontsize=12, fontweight="bold")
-                ax3.grid(True, alpha=0.3)
-            else:
-                ax3.text(0.5, 0.5, "No model data available", ha='center', va='center')
-                ax3.set_title("Model Performance: Entropy vs Accuracy", fontsize=12, fontweight="bold")
+        # Mean entropy comparison
+        ax = axes[0, 1]
+        pivot_ent = model_arch_data.pivot(index='architecture', columns='model_name', values='sample_mean_entropy')
+        pivot_ent.plot(kind='bar', ax=ax, width=0.8)
+        ax.set_title("Mean Entropy by Architecture and Model")
+        ax.set_ylabel("Mean Entropy")
+        ax.legend(title="Models", bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.tick_params(axis='x', rotation=45)
+        ax.grid(True, alpha=0.3, axis='y')
 
-            ax4 = fig.add_subplot(gs[1, :2])
-            if 'model_name' in self.data.columns:
-                for model in self.data['model_name'].unique():
-                    model_data = self.data[self.data['model_name'] == model]
-                    ax4.scatter(
-                        model_data["sample_mean_entropy"],
-                        model_data["exp_accuracy"],
-                        alpha=0.5,
-                        s=20,
-                        label=model,
-                    )
-                ax4.set_xlabel("Mean Entropy")
-                ax4.set_ylabel("Accuracy")
-                ax4.set_title("Sample-Level: Entropy vs Accuracy by Model", fontsize=12, fontweight="bold")
-                ax4.legend(fontsize=8)
-                ax4.grid(True, alpha=0.3)
-            else:
-                ax4.text(0.5, 0.5, "No model data available", ha='center', va='center')
-                ax4.set_title("Sample-Level: Entropy vs Accuracy by Model", fontsize=12, fontweight="bold")
+        # Std entropy comparison
+        ax = axes[1, 0]
+        pivot_std = model_arch_data.pivot(index='architecture', columns='model_name', values='sample_std_entropy')
+        pivot_std.plot(kind='bar', ax=ax, width=0.8)
+        ax.set_title("Std Entropy by Architecture and Model")
+        ax.set_ylabel("Std Entropy")
+        ax.legend(title="Models", bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.tick_params(axis='x', rotation=45)
+        ax.grid(True, alpha=0.3, axis='y')
 
-            ax5 = fig.add_subplot(gs[1, 2:])
-            if 'model_name' in self.data.columns:
-                round_data = (
-                    self.data.groupby(["model_name", "sample_id", "agent_round_number"])
-                    .agg({"round_avg_entropy": "first", "is_finally_correct": "first"})
-                    .reset_index()
-                )
-                for model in self.data['model_name'].unique():
-                    model_round_data = round_data[round_data['model_name'] == model]
-                    round_stats = model_round_data.groupby("agent_round_number")["round_avg_entropy"].mean()
-                    ax5.plot(round_stats.index, round_stats.values, marker='o', linewidth=2, markersize=6, label=model)
-                ax5.set_xlabel("Round")
-                ax5.set_ylabel("Average Entropy")
-                ax5.set_title("Round Entropy Evolution by Model", fontsize=12, fontweight="bold")
-                ax5.legend(fontsize=8)
-                ax5.grid(True, alpha=0.3)
-            else:
-                ax5.text(0.5, 0.5, "No model data available", ha='center', va='center')
-                ax5.set_title("Round Entropy Evolution by Model", fontsize=12, fontweight="bold")
+        # Architecture comparison stacked by model
+        ax = axes[1, 1]
+        acc_by_arch = self.data.groupby(['architecture', 'model_name'])['exp_accuracy'].mean().unstack(level=1, fill_value=0)
+        acc_by_arch.plot(kind='bar', ax=ax, stacked=False)
+        ax.set_title("Architecture Performance Stacked by Model")
+        ax.set_ylabel("Average Accuracy")
+        ax.legend(title="Models", bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.tick_params(axis='x', rotation=45)
+        ax.grid(True, alpha=0.3, axis='y')
 
-            ax6 = fig.add_subplot(gs[2, :])
-            if 'model_name' in self.data.columns:
-                summary_text = f"""
-                Dataset-Level Summary Statistics:
-                - Total Models: {self.num_models}
-                - Total Samples: {self.data['sample_id'].nunique()}
-                - Number of Experiments: {self.data['experiment_name'].nunique()}
-                - Architecture Types: {', '.join(self.architectures)}
-                - Overall Average Accuracy: {self.data['exp_accuracy'].mean():.3f}
-                - Overall Average Entropy: {self.data['sample_mean_entropy'].mean():.3f}
-                - Overall Average Token Count: {self.data['sample_all_agents_token_count'].mean():.0f}
-                - Best Performing Model: {model_accuracy.index[0]} ({model_accuracy.iloc[0]:.3f})
-                - Lowest Entropy Model: {model_entropy.index[-1]} ({model_entropy.iloc[-1]:.3f})
-                """
-            else:
-                summary_text = f"""
-                Dataset-Level Summary Statistics:
-                - Total Samples: {self.data['sample_id'].nunique()}
-                - Number of Experiments: {self.data['experiment_name'].nunique()}
-                - Architecture Types: {', '.join(self.architectures)}
-                - Average Accuracy: {self.data['exp_accuracy'].mean():.3f}
-                - Average Entropy: {self.data['sample_mean_entropy'].mean():.3f}
-                - Average Token Count: {self.data['sample_all_agents_token_count'].mean():.0f}
-                """
-            ax6.text(
-                0.1,
-                0.5,
-                summary_text,
-                fontsize=12,
-                verticalalignment="center",
-                bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
-            )
-            ax6.axis("off")
-            ax6.set_title("Dataset-Level Analysis Summary", fontsize=14, fontweight="bold")
-
-        else:
-            fig.suptitle(
-                f"Model-Level Entropy Analysis Dashboard",
-                fontsize=18,
-                fontweight="bold",
-                y=0.995,
-            )
-
-            ax1 = fig.add_subplot(gs[0, 0])
-            arch_accuracy = (
-                self.data.groupby("architecture")["exp_accuracy"]
-                .mean()
-                .sort_values(ascending=False)
-            )
-            arch_accuracy.plot(
-                kind="bar", ax=ax1, color=plt.cm.Set2(range(len(arch_accuracy)))
-            )
-            ax1.set_title("Architecture Accuracy", fontsize=12, fontweight="bold")
-            ax1.set_ylabel("Accuracy")
-            ax1.tick_params(axis="x", rotation=45)
-
-            ax2 = fig.add_subplot(gs[0, 1])
-            arch_entropy = (
-                self.data.groupby("architecture")["sample_mean_entropy"]
-                .mean()
-                .sort_values(ascending=False)
-            )
-            arch_entropy.plot(
-                kind="bar", ax=ax2, color=plt.cm.Set2(range(len(arch_entropy)))
-            )
-            ax2.set_title("Architecture Mean Entropy", fontsize=12, fontweight="bold")
-            ax2.set_ylabel("Mean Entropy")
-            ax2.tick_params(axis="x", rotation=45)
-
-            ax3 = fig.add_subplot(gs[0, 2:])
-            entropy_features = [
-                col for col in self.data.columns if "entropy" in col.lower()
-            ]
-            correlations = [
-                self.data[feature].corr(self.data["exp_accuracy"])
-                for feature in entropy_features[:10]
-            ]
-            ax3.barh(
-                range(len(correlations)),
-                correlations,
-                color=plt.cm.RdYlGn_r(np.array(correlations)),
-            )
-            ax3.set_yticks(range(len(correlations)))
-            ax3.set_yticklabels(
-                [f.replace("_", " ")[:20] for f in entropy_features[:10]], fontsize=8
-            )
-            ax3.set_xlabel("Correlation Coefficient")
-            ax3.set_title("Entropy-Accuracy Correlations", fontsize=12, fontweight="bold")
-            ax3.axvline(x=0, color="black", linestyle="--", linewidth=0.5)
-
-            ax4 = fig.add_subplot(gs[1, :2])
-            for arch in self.architectures:
-                arch_data = self.data[self.data["architecture"] == arch]
-                ax4.scatter(
-                    arch_data["sample_mean_entropy"],
-                    arch_data["exp_accuracy"],
-                    alpha=0.5,
-                    s=20,
-                    label=arch,
-                )
-            ax4.set_xlabel("Mean Entropy")
-            ax4.set_ylabel("Accuracy")
-            ax4.set_title(
-                "Entropy vs Accuracy Scatter Plot", fontsize=12, fontweight="bold"
-            )
-            ax4.legend(fontsize=8)
-            ax4.grid(True, alpha=0.3)
-
-            ax5 = fig.add_subplot(gs[1, 2:])
-            round_data = (
-                self.data.groupby(["sample_id", "agent_round_number"])
-                .agg({"round_avg_entropy": "first", "is_finally_correct": "first"})
-                .reset_index()
-            )
-            round_stats = round_data.groupby("agent_round_number")[
-                "round_avg_entropy"
-            ].mean()
-            ax5.plot(
-                round_stats.index, round_stats.values, marker="o", linewidth=2, markersize=8
-            )
-            ax5.set_xlabel("Round")
-            ax5.set_ylabel("Average Entropy")
-            ax5.set_title("Round Entropy Evolution", fontsize=12, fontweight="bold")
-            ax5.grid(True, alpha=0.3)
-
-            ax6 = fig.add_subplot(gs[2, :])
-            summary_text = f"""
-            Model-Level Summary Statistics:
-            - Total Samples: {self.data['sample_id'].nunique()}
-            - Number of Experiments: {self.data['experiment_name'].nunique()}
-            - Architecture Types: {', '.join(self.architectures)}
-            - Average Accuracy: {self.data['exp_accuracy'].mean():.3f}
-            - Average Entropy: {self.data['sample_mean_entropy'].mean():.3f}
-            - Average Token Count: {self.data['sample_all_agents_token_count'].mean():.0f}
-            - Highest Accuracy Architecture: {arch_accuracy.index[0]} ({arch_accuracy.iloc[0]:.3f})
-            - Lowest Entropy Architecture: {arch_entropy.index[-1]} ({arch_entropy.iloc[-1]:.3f})
-            """
-            ax6.text(
-                0.1,
-                0.5,
-                summary_text,
-                fontsize=12,
-                verticalalignment="center",
-                bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
-            )
-            ax6.axis("off")
-            ax6.set_title("Model-Level Analysis Summary", fontsize=14, fontweight="bold")
-
+        plt.tight_layout()
         plt.savefig(
-            self.output_dir / "summary_dashboard.png", dpi=300, bbox_inches="tight"
+            self.output_dir / "cross_model_architecture_comparison.png", dpi=300, bbox_inches="tight"
         )
         plt.close()
 
-        print(f"Saved: {self.output_dir / 'summary_dashboard.png'}")
+        print(f"Saved: {self.output_dir / 'cross_model_architecture_comparison.png'}")
 
     def generate_all_visualizations(self) -> None:
         """Generate all visualization plots for the entropy analysis.
@@ -1132,6 +1308,9 @@ class EntropyVisualizer:
         self.plot_entropy_heatmap()
         self.plot_accuracy_entropy_scatter()
         self.plot_distribution_comparison()
-        self.plot_summary_dashboard()
+        
+        # Additional hierarchical visualizations
+        if self.analysis_level == 'dataset' and 'model_name' in self.data.columns:
+            self.plot_cross_model_architecture_comparison()
 
         print(f"Visualization charts saved to: {self.output_dir}")
