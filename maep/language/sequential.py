@@ -42,7 +42,7 @@ class SequentialAgents(BaseAgents):
         # History aggregation flag
         self.aggregate_history = run_config.get("aggregate_history", True)
         # History optimization settings
-        self.max_history_chars = run_config.get("max_history_chars", 10000)
+        self.max_history_chars = run_config.get("max_history_chars", 0)
         self.max_history_rounds = run_config.get("max_history_rounds", 0)
 
     def define_agent_models(self):
@@ -165,7 +165,6 @@ class SequentialAgents(BaseAgents):
                     f"{history}"
                     f"Please consider the previous attempts above and provide your {current_agent_name} output."
                 )
-
 
         return base_prompt.format(question=question)
 

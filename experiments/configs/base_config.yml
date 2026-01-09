@@ -5,7 +5,7 @@
 # agent_type: "single"
 
 # Number of rounds for single and sequential agents
-# Default: 3 rounds
+# Default: 2 rounds
 round: 2
 
 # History aggregation configuration
@@ -16,7 +16,7 @@ aggregate_history: true
 # History aggregation optimization settings
 # Maximum number of characters to include in aggregated history (0 for no limit)
 # Helps manage memory and token usage
-max_history_chars: 10000
+max_history_chars: 0
 
 # Maximum number of previous rounds to include in history (0 for all rounds)
 # Helps limit context window size
