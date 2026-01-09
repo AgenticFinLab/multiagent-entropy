@@ -20,13 +20,7 @@ from constants import ARCHITECTURES
 from error_handling import (
     DatasetNotFoundError,
     ModelNotFoundError,
-    ExperimentNotFoundError,
     FileNotFoundError,
-    DataFormatError,
-    MissingColumnError,
-    validate_file_exists,
-    validate_columns,
-    safe_load_csv,
     ErrorHandler,
 )
 from utils import (
@@ -299,7 +293,7 @@ class DataLoader:
 
         datasets = []
         for item in self.base_path.iterdir():
-            if item.is_dir() and not item.name.startswith('.'):
+            if item.is_dir() and not item.name.startswith("."):
                 datasets.append(item.name)
 
         return sorted(datasets)
@@ -330,14 +324,12 @@ class DataLoader:
 
         models = []
         for item in dataset_path.iterdir():
-            if item.is_dir() and not item.name.startswith('.'):
+            if item.is_dir() and not item.name.startswith("."):
                 models.append(item.name)
 
         return sorted(models)
 
-    def get_available_experiments(
-        self, dataset: str, model: str
-    ) -> List[str]:
+    def get_available_experiments(self, dataset: str, model: str) -> List[str]:
         """Get list of available experiments for a specific dataset and model.
 
         Args:
@@ -356,7 +348,11 @@ class DataLoader:
 
         experiments = []
         for item in model_path.iterdir():
-            if item.is_file() and item.suffix == '.csv' and item.name != 'aggregated_data.csv':
+            if (
+                item.is_file()
+                and item.suffix == ".csv"
+                and item.name != "aggregated_data.csv"
+            ):
                 experiments.append(item.stem)
 
         return sorted(experiments)
@@ -390,13 +386,11 @@ class DataLoader:
         df = pd.read_csv(csv_path)
 
         if include_models:
-            df = df[df['model_name'].isin(include_models)]
+            df = df[df["model_name"].isin(include_models)]
 
         return df
 
-    def load_model_level_data(
-        self, dataset: str, model: str
-    ) -> pd.DataFrame:
+    def load_model_level_data(self, dataset: str, model: str) -> pd.DataFrame:
         """Load model-level aggregated data.
 
         Args:
@@ -447,9 +441,7 @@ class DataLoader:
 
         csv_path = model_path / f"{experiment}.csv"
         if not csv_path.exists():
-            raise FileNotFoundError(
-                f"Experiment data not found at {csv_path}"
-            )
+            raise FileNotFoundError(f"Experiment data not found at {csv_path}")
 
         return pd.read_csv(csv_path)
 
@@ -472,11 +464,9 @@ class DataLoader:
 
         json_path = dataset_path / "all_metrics.json"
         if not json_path.exists():
-            raise FileNotFoundError(
-                f"Dataset-level metrics not found at {json_path}"
-            )
+            raise FileNotFoundError(f"Dataset-level metrics not found at {json_path}")
 
-        with open(json_path, 'r', encoding='utf-8') as f:
+        with open(json_path, "r", encoding="utf-8") as f:
             return json.load(f)
 
     def load_dataset_entropy_results(self, dataset: str) -> Dict:
@@ -502,14 +492,14 @@ class DataLoader:
                 f"Dataset-level entropy results not found at {json_path}"
             )
 
-        with open(json_path, 'r', encoding='utf-8') as f:
+        with open(json_path, "r", encoding="utf-8") as f:
             return json.load(f)
 
     def load_all_levels(
         self,
         dataset: str,
         model: Optional[str] = None,
-        experiment: Optional[str] = None
+        experiment: Optional[str] = None,
     ) -> Dict[str, Union[pd.DataFrame, Dict]]:
         """Load data at multiple levels based on provided parameters.
 
@@ -530,23 +520,23 @@ class DataLoader:
             ValueError: If any of the specified levels do not exist.
         """
         result = {
-            'dataset': dataset,
-            'model': model,
-            'experiment': experiment,
-            'data': None,
-            'metrics': None,
-            'entropy_results': None
+            "dataset": dataset,
+            "model": model,
+            "experiment": experiment,
+            "data": None,
+            "metrics": None,
+            "entropy_results": None,
         }
 
         if experiment and model:
-            result['data'] = self.load_experiment_level_data(dataset, model, experiment)
+            result["data"] = self.load_experiment_level_data(dataset, model, experiment)
         elif model:
-            result['data'] = self.load_model_level_data(dataset, model)
+            result["data"] = self.load_model_level_data(dataset, model)
         else:
-            result['data'] = self.load_dataset_level_data(dataset)
+            result["data"] = self.load_dataset_level_data(dataset)
             try:
-                result['metrics'] = self.load_dataset_metrics(dataset)
-                result['entropy_results'] = self.load_dataset_entropy_results(dataset)
+                result["metrics"] = self.load_dataset_metrics(dataset)
+                result["entropy_results"] = self.load_dataset_entropy_results(dataset)
             except FileNotFoundError:
                 pass
 
@@ -567,21 +557,17 @@ class DataLoader:
             if dataset not in self._discover_datasets():
                 raise ValueError(f"Dataset '{dataset}' does not exist")
 
-            info[dataset] = {
-                'models': {}
-            }
+            info[dataset] = {"models": {}}
             for model in self.get_available_models(dataset):
-                info[dataset]['models'][model] = {
-                    'experiments': self.get_available_experiments(dataset, model)
+                info[dataset]["models"][model] = {
+                    "experiments": self.get_available_experiments(dataset, model)
                 }
         else:
             for ds in self._discover_datasets():
-                info[ds] = {
-                    'models': {}
-                }
+                info[ds] = {"models": {}}
                 for model in self.get_available_models(ds):
-                    info[ds]['models'][model] = {
-                        'experiments': self.get_available_experiments(ds, model)
+                    info[ds]["models"][model] = {
+                        "experiments": self.get_available_experiments(ds, model)
                     }
 
         return info
@@ -616,7 +602,9 @@ class DataLoader:
                 print(f"Warning: Model-level data not found for model '{model}'")
 
         if not dfs:
-            raise ValueError(f"No valid data found for any model in dataset '{dataset}'")
+            raise ValueError(
+                f"No valid data found for any model in dataset '{dataset}'"
+            )
 
         return pd.concat(dfs, ignore_index=True)
 
@@ -650,7 +638,9 @@ class DataLoader:
                 df = self.load_experiment_level_data(dataset, model, experiment)
                 dfs.append(df)
             except FileNotFoundError:
-                print(f"Warning: Experiment data not found for experiment '{experiment}'")
+                print(
+                    f"Warning: Experiment data not found for experiment '{experiment}'"
+                )
 
         if not dfs:
             raise ValueError(
