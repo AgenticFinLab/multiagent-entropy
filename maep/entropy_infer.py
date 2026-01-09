@@ -158,6 +158,44 @@ class HFEntropyInference(BaseEntropyInference):
 
         return prompts, input_ids, attention_mask, tokens_batch
 
+    def calculate_entropy(self, logits: Any) -> Any:
+        """
+        Compute the entropy for each token position from the logits.
+
+        Entropy H(x) = - Σ p(x) * log(p(x))
+
+        This method can handle two input shapes:
+        - Single token: [B, V] -> returns [B]
+        - Multiple tokens: [B, L_g, V] -> returns [B, L_g]
+
+        Args:
+            logits: Logits tensor.
+                    Shape: [B, V] or [B, L_g, V]
+
+        Returns:
+            Entropy tensor.
+            Shape: [B] (if input is [B, V]) or [B, L_g] (if input is [B, L_g, V])
+
+        Dimensions:
+            B   : Batch size
+            L_g : Generated sequence length (optional)
+            V   : Vocabulary size
+        """
+        # Softmax to get probabilities
+        # Input can be [B, V] or [B, L_g, V]
+        # Output will be same shape as input
+        probs = torch.softmax(logits, dim=-1)
+
+        # Log probabilities (add small epsilon to avoid log(0))
+        log_probs = torch.log(probs + 1e-12)
+
+        # Calculate entropy: -sum(p * log(p)) along vocabulary dimension
+        # If input is [B, V], output is [B]
+        # If input is [B, L_g, V], output is [B, L_g]
+        entropy = -torch.sum(probs * log_probs, dim=-1)
+
+        return entropy
+
     def infer_entropy_hf(
         self, input_ids: Any, attention_mask: Any = None
     ) -> Tuple[Any, Any]:
@@ -206,18 +244,9 @@ class HFEntropyInference(BaseEntropyInference):
             
             for score in outputs.scores:
                 # score shape: [B, V]
-                # Compute entropy for this token position
-                probs = torch.softmax(score, dim=-1)
-                # Add small epsilon to avoid log(0)
-                log_probs = torch.log(probs + 1e-12)
-                # Calculate entropy: -sum(p * log(p)) along vocabulary dimension
-                # [B]
-                entropy = -torch.sum(probs * log_probs, dim=-1)
-                # [B]
+                # Compute entropy for this token position using calculate_entropy
+                entropy = self.calculate_entropy(score)
                 entropy_list.append(entropy)
-                
-                # Explicitly clear intermediate tensors
-                del probs, log_probs
             
             # Stack entropy tensors: [L_g, B] -> [B, L_g]
             entropy = torch.stack(entropy_list, dim=1)
