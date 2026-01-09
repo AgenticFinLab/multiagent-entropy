@@ -46,6 +46,8 @@ inference_config:
   # device_map: None forces model to load on the specified device only
   # device_map: "auto" would distribute model across all available GPUs
   device_map: "auto"
+  # Enable gradient checkpointing for memory optimization (reduces memory usage at the cost of slightly slower inference)
+  use_gradient_checkpointing: true
   
 # Entropy base configuration
 entropy_config: ""

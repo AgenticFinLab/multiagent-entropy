@@ -44,6 +44,9 @@ class HFEntropyInference(BaseEntropyInference):
         # device_map can be "auto", "balanced", or a custom dict mapping layers to devices
         device_map = self.inference_config.get("device_map", None)
 
+        # Enable gradient checkpointing for memory optimization
+        use_gradient_checkpointing = self.inference_config.get("use_gradient_checkpointing", True)
+
         if device_map:
             # Multi-GPU mode: use device_map for parallel inference
             self.model = AutoModelForCausalLM.from_pretrained(
@@ -62,6 +65,11 @@ class HFEntropyInference(BaseEntropyInference):
                 **model_kwargs,
             )
             self.model.to(self.device)
+
+        # Enable gradient checkpointing for memory optimization
+        if use_gradient_checkpointing:
+            self.model.gradient_checkpointing_enable()
+            print(f"[HFEntropyInference] Gradient checkpointing enabled")
 
         self.model.eval()
 
@@ -150,34 +158,6 @@ class HFEntropyInference(BaseEntropyInference):
 
         return prompts, input_ids, attention_mask, tokens_batch
 
-    def calculate_entropy(self, logits: Any) -> Any:
-        """
-        Compute the entropy for each token position from the logits.
-
-        Entropy H(x) = - Σ p(x) * log(p(x))
-
-        Args:
-            logits: Logits tensor [B, L_g, V].
-
-        Returns:
-            Entropy tensor [B, L_g].
-        """
-        # Softmax to get probabilities [B, L, V]
-        # [B, L_g, V]
-        # logits have been processed by LogitsProcessor
-        # temperature, top_p, etc.
-        probs = torch.softmax(logits, dim=-1)
-
-        # Log probabilities (add small epsilon to avoid log(0))
-        # [B, L_g, V]
-        log_probs = torch.log(probs + 1e-12)
-
-        # Calculate entropy: -sum(p * log(p)) along vocabulary dimension
-        # [B, L_g]
-        entropy = -torch.sum(probs * log_probs, dim=-1)
-
-        return entropy
-
     def infer_entropy_hf(
         self, input_ids: Any, attention_mask: Any = None
     ) -> Tuple[Any, Any]:
@@ -219,13 +199,31 @@ class HFEntropyInference(BaseEntropyInference):
                 **self.generation_config,
             )
 
-            # Extract logits from outputs
-            # scores: tuple of [B, V] tensors -> convert to [B, L_g, V]
-            logits = torch.stack(outputs.scores, dim=1)
-
-            # Compute entropy from logits
-            # [B, L_g]
-            entropy = self.calculate_entropy(logits)
+            # Extract logits from outputs and compute entropy incrementally
+            # to avoid stacking all logits at once which causes OOM
+            # scores: tuple of [B, V] tensors
+            entropy_list = []
+            
+            for score in outputs.scores:
+                # score shape: [B, V]
+                # Compute entropy for this token position
+                probs = torch.softmax(score, dim=-1)
+                # Add small epsilon to avoid log(0)
+                log_probs = torch.log(probs + 1e-12)
+                # Calculate entropy: -sum(p * log(p)) along vocabulary dimension
+                # [B]
+                entropy = -torch.sum(probs * log_probs, dim=-1)
+                # [B]
+                entropy_list.append(entropy)
+                
+                # Explicitly clear intermediate tensors
+                del probs, log_probs
+            
+            # Stack entropy tensors: [L_g, B] -> [B, L_g]
+            entropy = torch.stack(entropy_list, dim=1)
+            
+            # Clear the entropy_list to free memory
+            del entropy_list
 
         return outputs, entropy
 
@@ -270,6 +268,14 @@ class HFEntropyInference(BaseEntropyInference):
         # logits = torch.stack(hf_outputs.scores, dim=1)
         # logits_cpu = logits.detach().cpu()
         entropy_cpu = entropy.detach().cpu()
+
+        # Clear GPU memory after moving to CPU
+        del entropy
+        del input_ids
+        del attention_mask
+        del generated_ids
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         # 4. Package results
         infer_outputs = []
