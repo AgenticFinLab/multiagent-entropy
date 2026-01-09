@@ -4,18 +4,13 @@ This module provides classes and functions for generating various types of visua
 """
 
 
-import argparse
 import warnings
 from pathlib import Path
-from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 
 from constants import ARCHITECTURES, MULTI_AGENT_ARCHITECTURES, SINGLE_AGENT_ARCHITECTURES
 from utils import get_feature_groups
