@@ -119,7 +119,7 @@ def resolve_agent_placeholders(
 
     # Replace placeholders with actual values
     resolved_agent["lm_name"] = model_config["lm_name"]
-    
+
     # Determine inference_config priority: model_config > base_config
     if "inference_config" in model_config:
         resolved_agent["inference_config"] = model_config["inference_config"]
@@ -130,14 +130,13 @@ def resolve_agent_placeholders(
         resolved_agent["inference_config"] = {
             "device": "cuda",
             "torch_dtype": "float16",
-            "device_map": "auto"
-        }    
+            "device_map": "auto",
+        }
     # Determine generation_config priority: dataset_config > base_config
     # If dataset_config has generation_config, merge it with base_config to ensure all fields are present
     if dataset_config and "generation_config" in dataset_config:
         resolved_agent["generation_config"] = merge_dicts(
-            base_config["generation_config"],
-            dataset_config["generation_config"]
+            base_config["generation_config"], dataset_config["generation_config"]
         )
     else:
         resolved_agent["generation_config"] = base_config["generation_config"]
@@ -171,11 +170,18 @@ def load_experiment_config(
         dataset_config = load_config(dataset_config_path)
 
         # Get dataset name and model name for path creation
-        dataset_name = dataset_config['data']['data_name'].lower()
-        model_name = model_config['lm_name'].split('/')[-1].lower().replace('-', '_')
-        
+        dataset_name = dataset_config["data"]["data_name"].lower()
+        model_name = (
+            model_config["lm_name"]
+            .split("/")[-1]
+            .lower()
+            .replace("-", "_")
+            .replace(".", "_")
+        )
+
         # Create experiment-specific config with timestamp and process ID to avoid conflicts
         import os as os_module
+
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         timestamp_ms = int(time.time() * 1000) % 1000
         pid = os_module.getpid()
@@ -187,7 +193,15 @@ def load_experiment_config(
         agent_type = agent_type or base_config.get("agent_type", "single")
 
         # Validate agent type
-        valid_agent_types = ["single", "sequential", "centralized", "decentralized", "full_decentralized", "debate", "hybrid"]
+        valid_agent_types = [
+            "single",
+            "sequential",
+            "centralized",
+            "decentralized",
+            "full_decentralized",
+            "debate",
+            "hybrid",
+        ]
         if agent_type not in valid_agent_types:
             raise ValueError(
                 f"Invalid agent_type: {agent_type}. Valid types are: {valid_agent_types}"
@@ -302,7 +316,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agent-type",
         type=str,
-        choices=["single", "sequential", "centralized", "decentralized", "full_decentralized", "debate", "hybrid"],
+        choices=[
+            "single",
+            "sequential",
+            "centralized",
+            "decentralized",
+            "full_decentralized",
+            "debate",
+            "hybrid",
+        ],
         default="single",
         help="Agent type to test",
     )

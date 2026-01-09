@@ -329,7 +329,16 @@ def run_batch_experiments(
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             timestamp_ms = int(time.time() * 1000) % 1000
             pid = os.getpid()
-            config_save_path = f"experiments/configs_exp/{merged_config['data']['data_name'].lower()}/{exp['name']}_{timestamp}_{timestamp_ms}_{pid}.yml"
+            model_name = (
+                merged_config["agents"][list(merged_config["agents"].keys())[0]][
+                    "lm_name"
+                ]
+                .split("/")[-1]
+                .lower()
+                .replace("-", "_")
+                .replace(".", "_")
+            )
+            config_save_path = f"experiments/configs_exp/{merged_config['data']['data_name'].lower()}/{model_name}/{exp['name']}_{timestamp}_{timestamp_ms}_{pid}.yml"
             save_config(merged_config, config_save_path)
             logger.info(f"Saved merged configuration to: {config_save_path}")
 
@@ -365,21 +374,30 @@ def main():
             with open(first_exp["dataset_config"], "r", encoding="utf-8") as f:
                 dataset_config = yaml.safe_load(f)
             dataset_name = dataset_config["data"]["data_name"].lower()
-            
+
             # Extract model name from model config
             with open(first_exp["model_config"], "r", encoding="utf-8") as f:
                 model_config = yaml.safe_load(f)
-            model_name = model_config['lm_name'].split('/')[-1].lower().replace('-', '_')
+            model_name = (
+                model_config["lm_name"]
+                .split("/")[-1]
+                .lower()
+                .replace("-", "_")
+                .replace(".", "_")
+            )
 
             # Create dataset/model directory if it doesn't exist
-            os.makedirs(f"experiments/results/aggregated/{dataset_name}/{model_name}", exist_ok=True)
+            os.makedirs(
+                f"experiments/results/aggregated/{dataset_name}/{model_name}",
+                exist_ok=True,
+            )
 
             # Save individual experiment results with matching timestamps
             for result in results:
                 if result.get("status") == "completed":
                     experiment_name = result.get("experiment_name", "")
                     results_path = result.get("results_path", "")
-                    
+
                     # Extract timestamp from results_path to match with raw experiment folder
                     original_timestamp = time.strftime("%Y%m%d_%H%M%S")
                     if results_path:
@@ -394,15 +412,19 @@ def main():
                                     if len(date_part) == 8 and date_part.isdigit():
                                         time_part = parts[i + 1]
                                         if len(time_part) == 6 and time_part.isdigit():
-                                            original_timestamp = f"{date_part}_{time_part}"
+                                            original_timestamp = (
+                                                f"{date_part}_{time_part}"
+                                            )
                                             break
                                 except (ValueError, IndexError):
                                     continue
-                    
+
                     # Save individual experiment results
                     summary_path = f"experiments/results/aggregated/{dataset_name}/{model_name}/{experiment_name}_results_{original_timestamp}.yml"
                     with open(summary_path, "w", encoding="utf-8") as f:
-                        yaml.dump(result, f, default_flow_style=False, allow_unicode=True)
+                        yaml.dump(
+                            result, f, default_flow_style=False, allow_unicode=True
+                        )
                     logger.info(f"Experiment results saved to: {summary_path}")
 
             # Save batch results summary with current timestamp
@@ -426,7 +448,16 @@ def main():
         # Save merged configuration if requested
         if args.save_config:
             dataset_name = merged_config["data"]["data_name"].lower()
-            config_save_path = f"experiments/configs_exp/{dataset_name}/{args.experiment_name}_{time.strftime('%Y%m%d_%H%M%S')}.yml"
+            model_name = (
+                merged_config["agents"][list(merged_config["agents"].keys())[0]][
+                    "lm_name"
+                ]
+                .split("/")[-1]
+                .lower()
+                .replace("-", "_")
+                .replace(".", "_")
+            )
+            config_save_path = f"experiments/configs_exp/{dataset_name}/{model_name}/{args.experiment_name}_{time.strftime('%Y%m%d_%H%M%S')}.yml"
             save_config(merged_config, config_save_path)
             logger.info(f"Saved merged configuration to: {config_save_path}")
 
@@ -437,7 +468,15 @@ def main():
         if not args.dry_run:
             # Get dataset name and model name from merged config
             dataset_name = merged_config["data"]["data_name"].lower()
-            model_name = merged_config["agents"][list(merged_config["agents"].keys())[0]]["lm_name"].split('/')[-1].lower().replace('-', '_')
+            model_name = (
+                merged_config["agents"][list(merged_config["agents"].keys())[0]][
+                    "lm_name"
+                ]
+                .split("/")[-1]
+                .lower()
+                .replace("-", "_")
+                .replace(".", "_")
+            )
 
             # Extract timestamp from save_folder to match with raw experiment folder
             save_folder = merged_config.get("save_folder", "")
@@ -462,7 +501,10 @@ def main():
                             continue
 
             # Create dataset/model directory if it doesn't exist
-            os.makedirs(f"experiments/results/aggregated/{dataset_name}/{model_name}", exist_ok=True)
+            os.makedirs(
+                f"experiments/results/aggregated/{dataset_name}/{model_name}",
+                exist_ok=True,
+            )
 
             summary_path = f"experiments/results/aggregated/{dataset_name}/{model_name}/{args.experiment_name}_results_{original_timestamp}.yml"
             with open(summary_path, "w", encoding="utf-8") as f:
