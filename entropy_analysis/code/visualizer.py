@@ -14,6 +14,8 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+from constants import ARCHITECTURES, MULTI_AGENT_ARCHITECTURES, SINGLE_AGENT_ARCHITECTURES
+
 warnings.filterwarnings("ignore")
 
 plt.rcParams["font.sans-serif"] = ["DejaVu Sans"]
@@ -31,19 +33,23 @@ class EntropyVisualizer:
         data: DataFrame containing the preprocessed experimental data.
         output_dir: Path to the directory where visualizations will be saved.
         architectures: List of available architecture types.
+        analysis_level: Level of analysis ('dataset' or 'model').
     """
 
-    def __init__(self, data: pd.DataFrame, output_dir: str) -> None:
+    def __init__(self, data: pd.DataFrame, output_dir: str, analysis_level: str = 'model') -> None:
         """Initialize the EntropyVisualizer with data and output directory.
 
         Args:
             data: DataFrame containing preprocessed experimental data.
             output_dir: Directory path where visualizations will be saved.
+            analysis_level: Level of analysis ('dataset' or 'model').
         """
         self.data = data
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.architectures = ["centralized", "debate", "hybrid", "sequential", "single"]
+        self.architectures = ARCHITECTURES
+        self.analysis_level = analysis_level
+        self.num_models = data['model_name'].nunique() if 'model_name' in data.columns else 1
 
     def plot_architecture_entropy_comparison(self) -> None:
         """Generate box plots comparing entropy features across architectures.
@@ -73,11 +79,18 @@ class EntropyVisualizer:
         elif rows == 1:
             axes = axes.reshape(1, -1)
 
-        fig.suptitle(
-            "Entropy Feature Comparison Across Architectures",
-            fontsize=16,
-            fontweight="bold",
-        )
+        if self.analysis_level == 'dataset' and self.num_models > 1:
+            fig.suptitle(
+                f"Dataset-Level Architecture Entropy Comparison ({self.num_models} Models)",
+                fontsize=16,
+                fontweight="bold",
+            )
+        else:
+            fig.suptitle(
+                "Architecture Entropy Comparison",
+                fontsize=16,
+                fontweight="bold",
+            )
 
         for idx, feature in enumerate(entropy_features):
             ax = axes[idx // cols, idx % cols]
@@ -203,117 +216,244 @@ class EntropyVisualizer:
         """
         print("Generating round entropy evolution plots...")
 
-        round_data = (
-            self.data.groupby(["sample_id", "agent_round_number", "architecture"])
-            .agg(
-                {
-                    "round_total_entropy": "first",
-                    "round_avg_entropy": "first",
-                    "is_finally_correct": "first",
-                }
+        if self.analysis_level == 'dataset' and self.num_models > 1:
+            round_data = (
+                self.data.groupby(["model_name", "sample_id", "agent_round_number", "architecture"])
+                .agg(
+                    {
+                        "round_total_entropy": "first",
+                        "round_avg_entropy": "first",
+                        "is_finally_correct": "first",
+                    }
+                )
+                .reset_index()
             )
-            .reset_index()
-        )
+        else:
+            round_data = (
+                self.data.groupby(["sample_id", "agent_round_number", "architecture"])
+                .agg(
+                    {
+                        "round_total_entropy": "first",
+                        "round_avg_entropy": "first",
+                        "is_finally_correct": "first",
+                    }
+                )
+                .reset_index()
+            )
 
         fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-        fig.suptitle(
-            "Entropy Evolution Patterns Across Processing Rounds",
-            fontsize=16,
-            fontweight="bold",
-        )
+        
+        if self.analysis_level == 'dataset' and self.num_models > 1:
+            fig.suptitle(
+                f"Dataset-Level Round Entropy Evolution ({self.num_models} Models)",
+                fontsize=16,
+                fontweight="bold",
+            )
+        else:
+            fig.suptitle(
+                "Round Entropy Evolution Patterns",
+                fontsize=16,
+                fontweight="bold",
+            )
 
-        round_stats = round_data.groupby("agent_round_number").agg(
-            {
-                "round_total_entropy": ["mean", "std"],
-                "round_avg_entropy": ["mean", "std"],
-            }
-        )
+        if self.analysis_level == 'dataset' and self.num_models > 1:
+            round_stats = round_data.groupby("agent_round_number").agg(
+                {
+                    "round_total_entropy": ["mean", "std"],
+                    "round_avg_entropy": ["mean", "std"],
+                }
+            )
 
-        ax = axes[0, 0]
-        ax.errorbar(
-            round_stats.index,
-            round_stats[("round_total_entropy", "mean")],
-            yerr=round_stats[("round_total_entropy", "std")],
-            marker="o",
-            linewidth=2,
-            markersize=8,
-            capsize=5,
-        )
-        ax.set_xlabel("Round", fontsize=12)
-        ax.set_ylabel("Total Entropy", fontsize=12)
-        ax.set_title("Total Entropy Change Across Rounds", fontsize=13)
-        ax.grid(True, alpha=0.3)
-
-        ax = axes[0, 1]
-        ax.errorbar(
-            round_stats.index,
-            round_stats[("round_avg_entropy", "mean")],
-            yerr=round_stats[("round_avg_entropy", "std")],
-            marker="s",
-            linewidth=2,
-            markersize=8,
-            capsize=5,
-            color="orange",
-        )
-        ax.set_xlabel("Round", fontsize=12)
-        ax.set_ylabel("Average Entropy", fontsize=12)
-        ax.set_title("Average Entropy Change Across Rounds", fontsize=13)
-        ax.grid(True, alpha=0.3)
-
-        correct_data = round_data[round_data["is_finally_correct"] == True]
-        incorrect_data = round_data[round_data["is_finally_correct"] == False]
-
-        correct_stats = correct_data.groupby("agent_round_number")[
-            "round_avg_entropy"
-        ].mean()
-        incorrect_stats = incorrect_data.groupby("agent_round_number")[
-            "round_avg_entropy"
-        ].mean()
-
-        ax = axes[1, 0]
-        ax.plot(
-            correct_stats.index,
-            correct_stats.values,
-            marker="o",
-            linewidth=2,
-            markersize=8,
-            label="Correct Samples",
-            color="green",
-        )
-        ax.plot(
-            incorrect_stats.index,
-            incorrect_stats.values,
-            marker="s",
-            linewidth=2,
-            markersize=8,
-            label="Incorrect Samples",
-            color="red",
-        )
-        ax.set_xlabel("Round", fontsize=12)
-        ax.set_ylabel("Average Entropy", fontsize=12)
-        ax.set_title("Entropy Evolution Comparison: Correct vs Incorrect", fontsize=13)
-        ax.legend(fontsize=10)
-        ax.grid(True, alpha=0.3)
-
-        ax = axes[1, 1]
-        for arch in self.architectures:
-            arch_data = round_data[round_data["architecture"] == arch]
-            arch_stats = arch_data.groupby("agent_round_number")[
-                "round_avg_entropy"
-            ].mean()
-            ax.plot(
-                arch_stats.index,
-                arch_stats.values,
+            ax = axes[0, 0]
+            ax.errorbar(
+                round_stats.index,
+                round_stats[("round_total_entropy", "mean")],
+                yerr=round_stats[("round_total_entropy", "std")],
                 marker="o",
                 linewidth=2,
-                markersize=6,
-                label=arch,
+                markersize=8,
+                capsize=5,
             )
-        ax.set_xlabel("Round", fontsize=12)
-        ax.set_ylabel("Average Entropy", fontsize=12)
-        ax.set_title("Entropy Evolution Comparison Across Architectures", fontsize=13)
-        ax.legend(fontsize=9)
-        ax.grid(True, alpha=0.3)
+            ax.set_xlabel("Round", fontsize=12)
+            ax.set_ylabel("Total Entropy", fontsize=12)
+            ax.set_title("Total Entropy Change Across Rounds", fontsize=13)
+            ax.grid(True, alpha=0.3)
+
+            ax = axes[0, 1]
+            ax.errorbar(
+                round_stats.index,
+                round_stats[("round_avg_entropy", "mean")],
+                yerr=round_stats[("round_avg_entropy", "std")],
+                marker="s",
+                linewidth=2,
+                markersize=8,
+                capsize=5,
+                color="orange",
+            )
+            ax.set_xlabel("Round", fontsize=12)
+            ax.set_ylabel("Average Entropy", fontsize=12)
+            ax.set_title("Average Entropy Change Across Rounds", fontsize=13)
+            ax.grid(True, alpha=0.3)
+
+            correct_data = round_data[round_data["is_finally_correct"] == True]
+            incorrect_data = round_data[round_data["is_finally_correct"] == False]
+
+            correct_stats = correct_data.groupby("agent_round_number")["round_avg_entropy"].mean()
+            incorrect_stats = incorrect_data.groupby("agent_round_number")["round_avg_entropy"].mean()
+
+            ax = axes[1, 0]
+            ax.plot(
+                correct_stats.index,
+                correct_stats.values,
+                marker="o",
+                linewidth=2,
+                markersize=8,
+                label="Correct Samples",
+                color="green",
+            )
+            ax.plot(
+                incorrect_stats.index,
+                incorrect_stats.values,
+                marker="s",
+                linewidth=2,
+                markersize=8,
+                label="Incorrect Samples",
+                color="red",
+            )
+            ax.set_xlabel("Round", fontsize=12)
+            ax.set_ylabel("Average Entropy", fontsize=12)
+            ax.set_title("Entropy Evolution: Correct vs Incorrect", fontsize=13)
+            ax.legend(fontsize=10)
+            ax.grid(True, alpha=0.3)
+
+            ax = axes[1, 1]
+            if 'model_name' in round_data.columns:
+                for model in round_data['model_name'].unique():
+                    model_round_data = round_data[round_data['model_name'] == model]
+                    model_stats = model_round_data.groupby("agent_round_number")["round_avg_entropy"].mean()
+                    ax.plot(
+                        model_stats.index,
+                        model_stats.values,
+                        marker="o",
+                        linewidth=2,
+                        markersize=6,
+                        label=model,
+                    )
+                ax.set_xlabel("Round", fontsize=12)
+                ax.set_ylabel("Average Entropy", fontsize=12)
+                ax.set_title("Round Entropy Evolution by Model", fontsize=13)
+                ax.legend(fontsize=9)
+                ax.grid(True, alpha=0.3)
+            else:
+                for arch in self.architectures:
+                    arch_data = round_data[round_data["architecture"] == arch]
+                    arch_stats = arch_data.groupby("agent_round_number")["round_avg_entropy"].mean()
+                    ax.plot(
+                        arch_stats.index,
+                        arch_stats.values,
+                        marker="o",
+                        linewidth=2,
+                        markersize=6,
+                        label=arch,
+                    )
+                ax.set_xlabel("Round", fontsize=12)
+                ax.set_ylabel("Average Entropy", fontsize=12)
+                ax.set_title("Entropy Evolution Across Architectures", fontsize=13)
+                ax.legend(fontsize=9)
+                ax.grid(True, alpha=0.3)
+        else:
+            round_stats = round_data.groupby("agent_round_number").agg(
+                {
+                    "round_total_entropy": ["mean", "std"],
+                    "round_avg_entropy": ["mean", "std"],
+                }
+            )
+
+            ax = axes[0, 0]
+            ax.errorbar(
+                round_stats.index,
+                round_stats[("round_total_entropy", "mean")],
+                yerr=round_stats[("round_total_entropy", "std")],
+                marker="o",
+                linewidth=2,
+                markersize=8,
+                capsize=5,
+            )
+            ax.set_xlabel("Round", fontsize=12)
+            ax.set_ylabel("Total Entropy", fontsize=12)
+            ax.set_title("Total Entropy Change Across Rounds", fontsize=13)
+            ax.grid(True, alpha=0.3)
+
+            ax = axes[0, 1]
+            ax.errorbar(
+                round_stats.index,
+                round_stats[("round_avg_entropy", "mean")],
+                yerr=round_stats[("round_avg_entropy", "std")],
+                marker="s",
+                linewidth=2,
+                markersize=8,
+                capsize=5,
+                color="orange",
+            )
+            ax.set_xlabel("Round", fontsize=12)
+            ax.set_ylabel("Average Entropy", fontsize=12)
+            ax.set_title("Average Entropy Change Across Rounds", fontsize=13)
+            ax.grid(True, alpha=0.3)
+
+            correct_data = round_data[round_data["is_finally_correct"] == True]
+            incorrect_data = round_data[round_data["is_finally_correct"] == False]
+
+            correct_stats = correct_data.groupby("agent_round_number")[
+                "round_avg_entropy"
+            ].mean()
+            incorrect_stats = incorrect_data.groupby("agent_round_number")[
+                "round_avg_entropy"
+            ].mean()
+
+            ax = axes[1, 0]
+            ax.plot(
+                correct_stats.index,
+                correct_stats.values,
+                marker="o",
+                linewidth=2,
+                markersize=8,
+                label="Correct Samples",
+                color="green",
+            )
+            ax.plot(
+                incorrect_stats.index,
+                incorrect_stats.values,
+                marker="s",
+                linewidth=2,
+                markersize=8,
+                label="Incorrect Samples",
+                color="red",
+            )
+            ax.set_xlabel("Round", fontsize=12)
+            ax.set_ylabel("Average Entropy", fontsize=12)
+            ax.set_title("Entropy Evolution Comparison: Correct vs Incorrect", fontsize=13)
+            ax.legend(fontsize=10)
+            ax.grid(True, alpha=0.3)
+
+            ax = axes[1, 1]
+            for arch in self.architectures:
+                arch_data = round_data[round_data["architecture"] == arch]
+                arch_stats = arch_data.groupby("agent_round_number")[
+                    "round_avg_entropy"
+                ].mean()
+                ax.plot(
+                    arch_stats.index,
+                    arch_stats.values,
+                    marker="o",
+                    linewidth=2,
+                    markersize=6,
+                    label=arch,
+                )
+            ax.set_xlabel("Round", fontsize=12)
+            ax.set_ylabel("Average Entropy", fontsize=12)
+            ax.set_title("Entropy Evolution Comparison Across Architectures", fontsize=13)
+            ax.legend(fontsize=9)
+            ax.grid(True, alpha=0.3)
 
         plt.tight_layout()
         plt.savefig(
@@ -333,17 +473,23 @@ class EntropyVisualizer:
         """
         print("Generating collaboration pattern comparison plots...")
 
-        multi_agent_archs = ["centralized", "debate", "hybrid", "sequential"]
-
         fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-        fig.suptitle(
-            "Multi-Agent vs Single-Agent System Comparison",
-            fontsize=16,
-            fontweight="bold",
-        )
+        
+        if self.analysis_level == 'dataset' and self.num_models > 1:
+            fig.suptitle(
+                f"Dataset-Level Multi-Agent vs Single-Agent Comparison ({self.num_models} Models)",
+                fontsize=16,
+                fontweight="bold",
+            )
+        else:
+            fig.suptitle(
+                "Multi-Agent vs Single-Agent System Comparison",
+                fontsize=16,
+                fontweight="bold",
+            )
 
-        multi_agent_data = self.data[self.data["architecture"].isin(multi_agent_archs)]
-        single_agent_data = self.data[self.data["architecture"] == "single"]
+        multi_agent_data = self.data[self.data["architecture"].isin(MULTI_AGENT_ARCHITECTURES)]
+        single_agent_data = self.data[self.data["architecture"].isin(SINGLE_AGENT_ARCHITECTURES)]
 
         ax = axes[0, 0]
         accuracy_comparison = pd.DataFrame(
@@ -431,6 +577,21 @@ class EntropyVisualizer:
 
         fig, ax = plt.subplots(figsize=(16, 14))
 
+        if self.analysis_level == 'dataset' and self.num_models > 1:
+            ax.set_title(
+                f"Dataset-Level Entropy Feature Correlation Heatmap ({self.num_models} Models)",
+                fontsize=16,
+                fontweight="bold",
+                pad=20,
+            )
+        else:
+            ax.set_title(
+                "Entropy Feature Correlation Heatmap",
+                fontsize=16,
+                fontweight="bold",
+                pad=20,
+            )
+
         sns.heatmap(
             correlation_matrix,
             annot=True,
@@ -443,12 +604,6 @@ class EntropyVisualizer:
             ax=ax,
         )
 
-        ax.set_title(
-            "Entropy Feature Correlation Heatmap",
-            fontsize=16,
-            fontweight="bold",
-            pad=20,
-        )
         ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right", fontsize=10)
         ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=10)
 
@@ -469,75 +624,147 @@ class EntropyVisualizer:
         print("Generating accuracy-entropy scatter plots...")
 
         fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-        fig.suptitle(
-            "Relationship Between Accuracy and Entropy Metrics",
-            fontsize=16,
-            fontweight="bold",
-        )
+        
+        if self.analysis_level == 'dataset' and self.num_models > 1:
+            fig.suptitle(
+                f"Dataset-Level Accuracy vs Entropy Relationships ({self.num_models} Models)",
+                fontsize=16,
+                fontweight="bold",
+            )
+        else:
+            fig.suptitle(
+                "Relationship Between Accuracy and Entropy Metrics",
+                fontsize=16,
+                fontweight="bold",
+            )
 
         ax = axes[0, 0]
-        for arch in self.architectures:
-            arch_data = self.data[self.data["architecture"] == arch]
-            ax.scatter(
-                arch_data["sample_mean_entropy"],
-                arch_data["exp_accuracy"],
-                alpha=0.5,
-                s=30,
-                label=arch,
-            )
-        ax.set_xlabel("Sample Mean Entropy", fontsize=12)
-        ax.set_ylabel("Accuracy", fontsize=12)
-        ax.set_title("Sample Mean Entropy vs Accuracy", fontsize=13)
-        ax.legend(fontsize=9)
-        ax.grid(True, alpha=0.3)
+        if self.analysis_level == 'dataset' and self.num_models > 1 and 'model_name' in self.data.columns:
+            for model in self.data['model_name'].unique():
+                model_data = self.data[self.data['model_name'] == model]
+                ax.scatter(
+                    model_data["sample_mean_entropy"],
+                    model_data["exp_accuracy"],
+                    alpha=0.5,
+                    s=30,
+                    label=model,
+                )
+            ax.set_xlabel("Sample Mean Entropy", fontsize=12)
+            ax.set_ylabel("Accuracy", fontsize=12)
+            ax.set_title("Sample Mean Entropy vs Accuracy by Model", fontsize=13)
+            ax.legend(fontsize=9)
+            ax.grid(True, alpha=0.3)
+        else:
+            for arch in self.architectures:
+                arch_data = self.data[self.data["architecture"] == arch]
+                ax.scatter(
+                    arch_data["sample_mean_entropy"],
+                    arch_data["exp_accuracy"],
+                    alpha=0.5,
+                    s=30,
+                    label=arch,
+                )
+            ax.set_xlabel("Sample Mean Entropy", fontsize=12)
+            ax.set_ylabel("Accuracy", fontsize=12)
+            ax.set_title("Sample Mean Entropy vs Accuracy", fontsize=13)
+            ax.legend(fontsize=9)
+            ax.grid(True, alpha=0.3)
 
         ax = axes[0, 1]
-        for arch in self.architectures:
-            arch_data = self.data[self.data["architecture"] == arch]
-            ax.scatter(
-                arch_data["sample_std_entropy"],
-                arch_data["exp_accuracy"],
-                alpha=0.5,
-                s=30,
-                label=arch,
-            )
-        ax.set_xlabel("Sample Entropy Std Dev", fontsize=12)
-        ax.set_ylabel("Accuracy", fontsize=12)
-        ax.set_title("Sample Entropy Std Dev vs Accuracy", fontsize=13)
-        ax.legend(fontsize=9)
-        ax.grid(True, alpha=0.3)
+        if self.analysis_level == 'dataset' and self.num_models > 1 and 'model_name' in self.data.columns:
+            for model in self.data['model_name'].unique():
+                model_data = self.data[self.data['model_name'] == model]
+                ax.scatter(
+                    model_data["sample_std_entropy"],
+                    model_data["exp_accuracy"],
+                    alpha=0.5,
+                    s=30,
+                    label=model,
+                )
+            ax.set_xlabel("Sample Entropy Std Dev", fontsize=12)
+            ax.set_ylabel("Accuracy", fontsize=12)
+            ax.set_title("Sample Entropy Std Dev vs Accuracy by Model", fontsize=13)
+            ax.legend(fontsize=9)
+            ax.grid(True, alpha=0.3)
+        else:
+            for arch in self.architectures:
+                arch_data = self.data[self.data["architecture"] == arch]
+                ax.scatter(
+                    arch_data["sample_std_entropy"],
+                    arch_data["exp_accuracy"],
+                    alpha=0.5,
+                    s=30,
+                    label=arch,
+                )
+            ax.set_xlabel("Sample Entropy Std Dev", fontsize=12)
+            ax.set_ylabel("Accuracy", fontsize=12)
+            ax.set_title("Sample Entropy Std Dev vs Accuracy", fontsize=13)
+            ax.legend(fontsize=9)
+            ax.grid(True, alpha=0.3)
 
         ax = axes[1, 0]
-        for arch in self.architectures:
-            arch_data = self.data[self.data["architecture"] == arch]
-            ax.scatter(
-                arch_data["sample_max_entropy"],
-                arch_data["exp_accuracy"],
-                alpha=0.5,
-                s=30,
-                label=arch,
-            )
-        ax.set_xlabel("Sample Max Entropy", fontsize=12)
-        ax.set_ylabel("Accuracy", fontsize=12)
-        ax.set_title("Sample Max Entropy vs Accuracy", fontsize=13)
-        ax.legend(fontsize=9)
-        ax.grid(True, alpha=0.3)
+        if self.analysis_level == 'dataset' and self.num_models > 1 and 'model_name' in self.data.columns:
+            for model in self.data['model_name'].unique():
+                model_data = self.data[self.data['model_name'] == model]
+                ax.scatter(
+                    model_data["sample_max_entropy"],
+                    model_data["exp_accuracy"],
+                    alpha=0.5,
+                    s=30,
+                    label=model,
+                )
+            ax.set_xlabel("Sample Max Entropy", fontsize=12)
+            ax.set_ylabel("Accuracy", fontsize=12)
+            ax.set_title("Sample Max Entropy vs Accuracy by Model", fontsize=13)
+            ax.legend(fontsize=9)
+            ax.grid(True, alpha=0.3)
+        else:
+            for arch in self.architectures:
+                arch_data = self.data[self.data["architecture"] == arch]
+                ax.scatter(
+                    arch_data["sample_max_entropy"],
+                    arch_data["exp_accuracy"],
+                    alpha=0.5,
+                    s=30,
+                    label=arch,
+                )
+            ax.set_xlabel("Sample Max Entropy", fontsize=12)
+            ax.set_ylabel("Accuracy", fontsize=12)
+            ax.set_title("Sample Max Entropy vs Accuracy", fontsize=13)
+            ax.legend(fontsize=9)
+            ax.grid(True, alpha=0.3)
 
         ax = axes[1, 1]
-        for arch in self.architectures:
-            arch_data = self.data[self.data["architecture"] == arch]
-            ax.scatter(
-                arch_data["sample_all_agents_token_count"],
-                arch_data["exp_accuracy"],
-                alpha=0.5,
-                s=30,
-                label=arch,
-            )
-        ax.set_xlabel("Total Token Count", fontsize=12)
-        ax.set_ylabel("Accuracy", fontsize=12)
-        ax.set_title("Total Token Count vs Accuracy", fontsize=13)
-        ax.legend(fontsize=9)
-        ax.grid(True, alpha=0.3)
+        if self.analysis_level == 'dataset' and self.num_models > 1 and 'model_name' in self.data.columns:
+            for model in self.data['model_name'].unique():
+                model_data = self.data[self.data['model_name'] == model]
+                ax.scatter(
+                    model_data["sample_all_agents_token_count"],
+                    model_data["exp_accuracy"],
+                    alpha=0.5,
+                    s=30,
+                    label=model,
+                )
+            ax.set_xlabel("Total Token Count", fontsize=12)
+            ax.set_ylabel("Accuracy", fontsize=12)
+            ax.set_title("Total Token Count vs Accuracy by Model", fontsize=13)
+            ax.legend(fontsize=9)
+            ax.grid(True, alpha=0.3)
+        else:
+            for arch in self.architectures:
+                arch_data = self.data[self.data["architecture"] == arch]
+                ax.scatter(
+                    arch_data["sample_all_agents_token_count"],
+                    arch_data["exp_accuracy"],
+                    alpha=0.5,
+                    s=30,
+                    label=arch,
+                )
+            ax.set_xlabel("Total Token Count", fontsize=12)
+            ax.set_ylabel("Accuracy", fontsize=12)
+            ax.set_title("Total Token Count vs Accuracy", fontsize=13)
+            ax.legend(fontsize=9)
+            ax.grid(True, alpha=0.3)
 
         plt.tight_layout()
         plt.savefig(
@@ -558,11 +785,19 @@ class EntropyVisualizer:
         print("Generating distribution comparison plots...")
 
         fig, axes = plt.subplots(2, 3, figsize=(18, 12))
-        fig.suptitle(
-            "Entropy Distribution Comparison Across Architectures",
-            fontsize=16,
-            fontweight="bold",
-        )
+        
+        if self.analysis_level == 'dataset' and self.num_models > 1:
+            fig.suptitle(
+                f"Dataset-Level Entropy Distribution Comparison ({self.num_models} Models)",
+                fontsize=16,
+                fontweight="bold",
+            )
+        else:
+            fig.suptitle(
+                "Entropy Distribution Comparison Across Architectures",
+                fontsize=16,
+                fontweight="bold",
+            )
 
         features = [
             "sample_mean_entropy",
@@ -576,17 +811,27 @@ class EntropyVisualizer:
         for idx, feature in enumerate(features):
             ax = axes[idx // 3, idx % 3]
 
-            for arch in self.architectures:
-                arch_data = self.data[self.data["architecture"] == arch][
-                    feature
-                ].dropna()
-                ax.hist(arch_data, bins=30, alpha=0.5, label=arch, density=True)
+            if self.analysis_level == 'dataset' and self.num_models > 1 and 'model_name' in self.data.columns:
+                for model in self.data['model_name'].unique():
+                    model_data = self.data[self.data['model_name'] == model][feature].dropna()
+                    ax.hist(model_data, bins=30, alpha=0.5, label=model, density=True)
+                ax.set_xlabel(feature.replace("_", " ").title(), fontsize=10)
+                ax.set_ylabel("Density", fontsize=10)
+                ax.set_title(feature.replace("_", " ").title(), fontsize=11)
+                ax.legend(fontsize=8)
+                ax.grid(True, alpha=0.3)
+            else:
+                for arch in self.architectures:
+                    arch_data = self.data[self.data["architecture"] == arch][
+                        feature
+                    ].dropna()
+                    ax.hist(arch_data, bins=30, alpha=0.5, label=arch, density=True)
 
-            ax.set_xlabel(feature.replace("_", " ").title(), fontsize=10)
-            ax.set_ylabel("Density", fontsize=10)
-            ax.set_title(feature.replace("_", " ").title(), fontsize=11)
-            ax.legend(fontsize=8)
-            ax.grid(True, alpha=0.3)
+                ax.set_xlabel(feature.replace("_", " ").title(), fontsize=10)
+                ax.set_ylabel("Density", fontsize=10)
+                ax.set_title(feature.replace("_", " ").title(), fontsize=11)
+                ax.legend(fontsize=8)
+                ax.grid(True, alpha=0.3)
 
         plt.tight_layout()
         plt.savefig(
@@ -610,117 +855,261 @@ class EntropyVisualizer:
         fig = plt.figure(figsize=(20, 14))
         gs = fig.add_gridspec(3, 4, hspace=0.3, wspace=0.3)
 
-        ax1 = fig.add_subplot(gs[0, 0])
-        arch_accuracy = (
-            self.data.groupby("architecture")["exp_accuracy"]
-            .mean()
-            .sort_values(ascending=False)
-        )
-        arch_accuracy.plot(
-            kind="bar", ax=ax1, color=plt.cm.Set2(range(len(arch_accuracy)))
-        )
-        ax1.set_title("Architecture Accuracy", fontsize=12, fontweight="bold")
-        ax1.set_ylabel("Accuracy")
-        ax1.tick_params(axis="x", rotation=45)
-
-        ax2 = fig.add_subplot(gs[0, 1])
-        arch_entropy = (
-            self.data.groupby("architecture")["sample_mean_entropy"]
-            .mean()
-            .sort_values(ascending=False)
-        )
-        arch_entropy.plot(
-            kind="bar", ax=ax2, color=plt.cm.Set2(range(len(arch_entropy)))
-        )
-        ax2.set_title("Architecture Mean Entropy", fontsize=12, fontweight="bold")
-        ax2.set_ylabel("Mean Entropy")
-        ax2.tick_params(axis="x", rotation=45)
-
-        ax3 = fig.add_subplot(gs[0, 2:])
-        entropy_features = [
-            col for col in self.data.columns if "entropy" in col.lower()
-        ]
-        correlations = [
-            self.data[feature].corr(self.data["exp_accuracy"])
-            for feature in entropy_features[:10]
-        ]
-        ax3.barh(
-            range(len(correlations)),
-            correlations,
-            color=plt.cm.RdYlGn_r(np.array(correlations)),
-        )
-        ax3.set_yticks(range(len(correlations)))
-        ax3.set_yticklabels(
-            [f.replace("_", " ")[:20] for f in entropy_features[:10]], fontsize=8
-        )
-        ax3.set_xlabel("Correlation Coefficient")
-        ax3.set_title("Entropy-Accuracy Correlations", fontsize=12, fontweight="bold")
-        ax3.axvline(x=0, color="black", linestyle="--", linewidth=0.5)
-
-        ax4 = fig.add_subplot(gs[1, :2])
-        for arch in self.architectures:
-            arch_data = self.data[self.data["architecture"] == arch]
-            ax4.scatter(
-                arch_data["sample_mean_entropy"],
-                arch_data["exp_accuracy"],
-                alpha=0.5,
-                s=20,
-                label=arch,
+        if self.analysis_level == 'dataset' and self.num_models > 1:
+            fig.suptitle(
+                f"Dataset-Level Entropy Analysis Dashboard ({self.num_models} Models)",
+                fontsize=18,
+                fontweight="bold",
+                y=0.995,
             )
-        ax4.set_xlabel("Mean Entropy")
-        ax4.set_ylabel("Accuracy")
-        ax4.set_title(
-            "Entropy vs Accuracy Scatter Plot", fontsize=12, fontweight="bold"
-        )
-        ax4.legend(fontsize=8)
-        ax4.grid(True, alpha=0.3)
 
-        ax5 = fig.add_subplot(gs[1, 2:])
-        round_data = (
-            self.data.groupby(["sample_id", "agent_round_number"])
-            .agg({"round_avg_entropy": "first", "is_finally_correct": "first"})
-            .reset_index()
-        )
-        round_stats = round_data.groupby("agent_round_number")[
-            "round_avg_entropy"
-        ].mean()
-        ax5.plot(
-            round_stats.index, round_stats.values, marker="o", linewidth=2, markersize=8
-        )
-        ax5.set_xlabel("Round")
-        ax5.set_ylabel("Average Entropy")
-        ax5.set_title("Round Entropy Evolution", fontsize=12, fontweight="bold")
-        ax5.grid(True, alpha=0.3)
+            ax1 = fig.add_subplot(gs[0, 0])
+            if 'model_name' in self.data.columns:
+                model_accuracy = (
+                    self.data.groupby("model_name")["exp_accuracy"]
+                    .mean()
+                    .sort_values(ascending=False)
+                )
+                model_accuracy.plot(
+                    kind="bar", ax=ax1, color=plt.cm.Set2(range(len(model_accuracy)))
+                )
+                ax1.set_title("Model Accuracy Comparison", fontsize=12, fontweight="bold")
+                ax1.set_ylabel("Accuracy")
+                ax1.tick_params(axis="x", rotation=45)
+            else:
+                ax1.text(0.5, 0.5, "No model data available", ha='center', va='center')
+                ax1.set_title("Model Accuracy Comparison", fontsize=12, fontweight="bold")
 
-        ax6 = fig.add_subplot(gs[2, :])
-        summary_text = f"""
-        Dataset Summary Statistics:
-        - Total Samples: {self.data['sample_id'].nunique()}
-        - Number of Experiments: {self.data['experiment_name'].nunique()}
-        - Architecture Types: {', '.join(self.architectures)}
-        - Average Accuracy: {self.data['exp_accuracy'].mean():.3f}
-        - Average Entropy: {self.data['sample_mean_entropy'].mean():.3f}
-        - Average Token Count: {self.data['sample_all_agents_token_count'].mean():.0f}
-        - Highest Accuracy Architecture: {arch_accuracy.index[0]} ({arch_accuracy.iloc[0]:.3f})
-        - Lowest Entropy Architecture: {arch_entropy.index[-1]} ({arch_entropy.iloc[-1]:.3f})
-        """
-        ax6.text(
-            0.1,
-            0.5,
-            summary_text,
-            fontsize=12,
-            verticalalignment="center",
-            bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
-        )
-        ax6.axis("off")
-        ax6.set_title("Analysis Summary", fontsize=14, fontweight="bold")
+            ax2 = fig.add_subplot(gs[0, 1])
+            if 'model_name' in self.data.columns:
+                model_entropy = (
+                    self.data.groupby("model_name")["sample_mean_entropy"]
+                    .mean()
+                    .sort_values(ascending=False)
+                )
+                model_entropy.plot(
+                    kind="bar", ax=ax2, color=plt.cm.Set2(range(len(model_entropy)))
+                )
+                ax2.set_title("Model Mean Entropy Comparison", fontsize=12, fontweight="bold")
+                ax2.set_ylabel("Mean Entropy")
+                ax2.tick_params(axis="x", rotation=45)
+            else:
+                ax2.text(0.5, 0.5, "No model data available", ha='center', va='center')
+                ax2.set_title("Model Mean Entropy Comparison", fontsize=12, fontweight="bold")
 
-        fig.suptitle(
-            "Multi-Agent System Entropy Analysis Summary Dashboard",
-            fontsize=18,
-            fontweight="bold",
-            y=0.995,
-        )
+            ax3 = fig.add_subplot(gs[0, 2:])
+            if 'model_name' in self.data.columns:
+                model_comparison = []
+                for model in self.data['model_name'].unique():
+                    model_data = self.data[self.data['model_name'] == model]
+                    model_comparison.append({
+                        'model': model,
+                        'accuracy': model_data['exp_accuracy'].mean(),
+                        'mean_entropy': model_data['sample_mean_entropy'].mean(),
+                        'num_samples': model_data['sample_id'].nunique()
+                    })
+                model_df = pd.DataFrame(model_comparison)
+                ax3.scatter(model_df['mean_entropy'], model_df['accuracy'], 
+                           s=model_df['num_samples']/10, alpha=0.6)
+                for idx, row in model_df.iterrows():
+                    ax3.annotate(row['model'], (row['mean_entropy'], row['accuracy']),
+                               fontsize=8, alpha=0.7)
+                ax3.set_xlabel("Mean Entropy")
+                ax3.set_ylabel("Accuracy")
+                ax3.set_title("Model Performance: Entropy vs Accuracy", fontsize=12, fontweight="bold")
+                ax3.grid(True, alpha=0.3)
+            else:
+                ax3.text(0.5, 0.5, "No model data available", ha='center', va='center')
+                ax3.set_title("Model Performance: Entropy vs Accuracy", fontsize=12, fontweight="bold")
+
+            ax4 = fig.add_subplot(gs[1, :2])
+            if 'model_name' in self.data.columns:
+                for model in self.data['model_name'].unique():
+                    model_data = self.data[self.data['model_name'] == model]
+                    ax4.scatter(
+                        model_data["sample_mean_entropy"],
+                        model_data["exp_accuracy"],
+                        alpha=0.5,
+                        s=20,
+                        label=model,
+                    )
+                ax4.set_xlabel("Mean Entropy")
+                ax4.set_ylabel("Accuracy")
+                ax4.set_title("Sample-Level: Entropy vs Accuracy by Model", fontsize=12, fontweight="bold")
+                ax4.legend(fontsize=8)
+                ax4.grid(True, alpha=0.3)
+            else:
+                ax4.text(0.5, 0.5, "No model data available", ha='center', va='center')
+                ax4.set_title("Sample-Level: Entropy vs Accuracy by Model", fontsize=12, fontweight="bold")
+
+            ax5 = fig.add_subplot(gs[1, 2:])
+            if 'model_name' in self.data.columns:
+                round_data = (
+                    self.data.groupby(["model_name", "sample_id", "agent_round_number"])
+                    .agg({"round_avg_entropy": "first", "is_finally_correct": "first"})
+                    .reset_index()
+                )
+                for model in self.data['model_name'].unique():
+                    model_round_data = round_data[round_data['model_name'] == model]
+                    round_stats = model_round_data.groupby("agent_round_number")["round_avg_entropy"].mean()
+                    ax5.plot(round_stats.index, round_stats.values, marker='o', linewidth=2, markersize=6, label=model)
+                ax5.set_xlabel("Round")
+                ax5.set_ylabel("Average Entropy")
+                ax5.set_title("Round Entropy Evolution by Model", fontsize=12, fontweight="bold")
+                ax5.legend(fontsize=8)
+                ax5.grid(True, alpha=0.3)
+            else:
+                ax5.text(0.5, 0.5, "No model data available", ha='center', va='center')
+                ax5.set_title("Round Entropy Evolution by Model", fontsize=12, fontweight="bold")
+
+            ax6 = fig.add_subplot(gs[2, :])
+            if 'model_name' in self.data.columns:
+                summary_text = f"""
+                Dataset-Level Summary Statistics:
+                - Total Models: {self.num_models}
+                - Total Samples: {self.data['sample_id'].nunique()}
+                - Number of Experiments: {self.data['experiment_name'].nunique()}
+                - Architecture Types: {', '.join(self.architectures)}
+                - Overall Average Accuracy: {self.data['exp_accuracy'].mean():.3f}
+                - Overall Average Entropy: {self.data['sample_mean_entropy'].mean():.3f}
+                - Overall Average Token Count: {self.data['sample_all_agents_token_count'].mean():.0f}
+                - Best Performing Model: {model_accuracy.index[0]} ({model_accuracy.iloc[0]:.3f})
+                - Lowest Entropy Model: {model_entropy.index[-1]} ({model_entropy.iloc[-1]:.3f})
+                """
+            else:
+                summary_text = f"""
+                Dataset-Level Summary Statistics:
+                - Total Samples: {self.data['sample_id'].nunique()}
+                - Number of Experiments: {self.data['experiment_name'].nunique()}
+                - Architecture Types: {', '.join(self.architectures)}
+                - Average Accuracy: {self.data['exp_accuracy'].mean():.3f}
+                - Average Entropy: {self.data['sample_mean_entropy'].mean():.3f}
+                - Average Token Count: {self.data['sample_all_agents_token_count'].mean():.0f}
+                """
+            ax6.text(
+                0.1,
+                0.5,
+                summary_text,
+                fontsize=12,
+                verticalalignment="center",
+                bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
+            )
+            ax6.axis("off")
+            ax6.set_title("Dataset-Level Analysis Summary", fontsize=14, fontweight="bold")
+
+        else:
+            fig.suptitle(
+                f"Model-Level Entropy Analysis Dashboard",
+                fontsize=18,
+                fontweight="bold",
+                y=0.995,
+            )
+
+            ax1 = fig.add_subplot(gs[0, 0])
+            arch_accuracy = (
+                self.data.groupby("architecture")["exp_accuracy"]
+                .mean()
+                .sort_values(ascending=False)
+            )
+            arch_accuracy.plot(
+                kind="bar", ax=ax1, color=plt.cm.Set2(range(len(arch_accuracy)))
+            )
+            ax1.set_title("Architecture Accuracy", fontsize=12, fontweight="bold")
+            ax1.set_ylabel("Accuracy")
+            ax1.tick_params(axis="x", rotation=45)
+
+            ax2 = fig.add_subplot(gs[0, 1])
+            arch_entropy = (
+                self.data.groupby("architecture")["sample_mean_entropy"]
+                .mean()
+                .sort_values(ascending=False)
+            )
+            arch_entropy.plot(
+                kind="bar", ax=ax2, color=plt.cm.Set2(range(len(arch_entropy)))
+            )
+            ax2.set_title("Architecture Mean Entropy", fontsize=12, fontweight="bold")
+            ax2.set_ylabel("Mean Entropy")
+            ax2.tick_params(axis="x", rotation=45)
+
+            ax3 = fig.add_subplot(gs[0, 2:])
+            entropy_features = [
+                col for col in self.data.columns if "entropy" in col.lower()
+            ]
+            correlations = [
+                self.data[feature].corr(self.data["exp_accuracy"])
+                for feature in entropy_features[:10]
+            ]
+            ax3.barh(
+                range(len(correlations)),
+                correlations,
+                color=plt.cm.RdYlGn_r(np.array(correlations)),
+            )
+            ax3.set_yticks(range(len(correlations)))
+            ax3.set_yticklabels(
+                [f.replace("_", " ")[:20] for f in entropy_features[:10]], fontsize=8
+            )
+            ax3.set_xlabel("Correlation Coefficient")
+            ax3.set_title("Entropy-Accuracy Correlations", fontsize=12, fontweight="bold")
+            ax3.axvline(x=0, color="black", linestyle="--", linewidth=0.5)
+
+            ax4 = fig.add_subplot(gs[1, :2])
+            for arch in self.architectures:
+                arch_data = self.data[self.data["architecture"] == arch]
+                ax4.scatter(
+                    arch_data["sample_mean_entropy"],
+                    arch_data["exp_accuracy"],
+                    alpha=0.5,
+                    s=20,
+                    label=arch,
+                )
+            ax4.set_xlabel("Mean Entropy")
+            ax4.set_ylabel("Accuracy")
+            ax4.set_title(
+                "Entropy vs Accuracy Scatter Plot", fontsize=12, fontweight="bold"
+            )
+            ax4.legend(fontsize=8)
+            ax4.grid(True, alpha=0.3)
+
+            ax5 = fig.add_subplot(gs[1, 2:])
+            round_data = (
+                self.data.groupby(["sample_id", "agent_round_number"])
+                .agg({"round_avg_entropy": "first", "is_finally_correct": "first"})
+                .reset_index()
+            )
+            round_stats = round_data.groupby("agent_round_number")[
+                "round_avg_entropy"
+            ].mean()
+            ax5.plot(
+                round_stats.index, round_stats.values, marker="o", linewidth=2, markersize=8
+            )
+            ax5.set_xlabel("Round")
+            ax5.set_ylabel("Average Entropy")
+            ax5.set_title("Round Entropy Evolution", fontsize=12, fontweight="bold")
+            ax5.grid(True, alpha=0.3)
+
+            ax6 = fig.add_subplot(gs[2, :])
+            summary_text = f"""
+            Model-Level Summary Statistics:
+            - Total Samples: {self.data['sample_id'].nunique()}
+            - Number of Experiments: {self.data['experiment_name'].nunique()}
+            - Architecture Types: {', '.join(self.architectures)}
+            - Average Accuracy: {self.data['exp_accuracy'].mean():.3f}
+            - Average Entropy: {self.data['sample_mean_entropy'].mean():.3f}
+            - Average Token Count: {self.data['sample_all_agents_token_count'].mean():.0f}
+            - Highest Accuracy Architecture: {arch_accuracy.index[0]} ({arch_accuracy.iloc[0]:.3f})
+            - Lowest Entropy Architecture: {arch_entropy.index[-1]} ({arch_entropy.iloc[-1]:.3f})
+            """
+            ax6.text(
+                0.1,
+                0.5,
+                summary_text,
+                fontsize=12,
+                verticalalignment="center",
+                bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
+            )
+            ax6.axis("off")
+            ax6.set_title("Model-Level Analysis Summary", fontsize=14, fontweight="bold")
+
         plt.savefig(
             self.output_dir / "summary_dashboard.png", dpi=300, bbox_inches="tight"
         )
@@ -745,24 +1134,4 @@ class EntropyVisualizer:
         self.plot_distribution_comparison()
         self.plot_summary_dashboard()
 
-        print("\nAll visualization plots generated successfully!")
-        print(f"Plots saved in: {self.output_dir}")
-
-
-if __name__ == "__main__":
-    from data_loader import DataLoader
-
-    data_path = (
-        "/home/yuxuanzhao/multiagent-entropy/evaluation/results/gsm8k/aggregated/"
-        "aggregated_data.csv"
-    )
-
-    loader = DataLoader(data_path)
-    processed_data = loader.preprocess_data()
-
-    visualizer = EntropyVisualizer(
-        processed_data,
-        "/home/yuxuanzhao/multiagent-entropy/entropy_analysis/visualizations/",
-    )
-
-    visualizer.generate_all_visualizations()
+        print(f"Visualization charts saved to: {self.output_dir}")

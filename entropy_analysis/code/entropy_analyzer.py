@@ -18,6 +18,8 @@ from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
+from constants import ARCHITECTURES, MULTI_AGENT_ARCHITECTURES, SINGLE_AGENT_ARCHITECTURES
+
 warnings.filterwarnings("ignore")
 
 
@@ -43,7 +45,7 @@ class EntropyAnalyzer:
         """
         self.data = data
         self.results = {}
-        self.architectures = ["centralized", "debate", "hybrid", "sequential", "single"]
+        self.architectures = ARCHITECTURES
 
     def analyze_architecture_differences(self) -> Dict[str, pd.DataFrame]:
         """Analyze differences in entropy features across different architectures.
@@ -190,11 +192,8 @@ class EntropyAnalyzer:
         """
         print("Comparing entropy characteristics across collaboration patterns...")
 
-        multi_agent_archs = ["centralized", "debate", "hybrid", "sequential"]
-        single_agent_arch = ["single"]
-
-        multi_agent_data = self.data[self.data["architecture"].isin(multi_agent_archs)]
-        single_agent_data = self.data[self.data["architecture"].isin(single_agent_arch)]
+        multi_agent_data = self.data[self.data["architecture"].isin(MULTI_AGENT_ARCHITECTURES)]
+        single_agent_data = self.data[self.data["architecture"].isin(SINGLE_AGENT_ARCHITECTURES)]
 
         entropy_features = [
             col for col in self.data.columns if "entropy" in col.lower()
@@ -220,7 +219,7 @@ class EntropyAnalyzer:
         comparison_df = pd.DataFrame(comparison).T
 
         arch_comparison = {}
-        for arch in multi_agent_archs:
+        for arch in MULTI_AGENT_ARCHITECTURES:
             arch_data = self.data[self.data["architecture"] == arch]
             arch_comparison[arch] = {
                 "mean_entropy": arch_data["sample_mean_entropy"].mean(),
@@ -439,41 +438,3 @@ class EntropyAnalyzer:
                 value.to_csv(output_dir / f"{key}.csv", index=True)
 
         print(f"Analysis results saved to: {output_dir}")
-
-
-if __name__ == "__main__":
-    from data_loader import DataLoader
-
-    data_path = (
-        "/home/yuxuanzhao/multiagent-entropy/evaluation/results/gsm8k/aggregated/"
-        "aggregated_data.csv"
-    )
-
-    loader = DataLoader(data_path)
-    processed_data = loader.preprocess_data()
-
-    analyzer = EntropyAnalyzer(processed_data)
-
-    report = analyzer.generate_comprehensive_report()
-
-    analyzer.save_results(
-        "/home/yuxuanzhao/multiagent-entropy/entropy_analysis/results/"
-    )
-
-    print("\nAnalysis completed!")
-    print("Key findings:")
-    print(
-        f"1. Architecture differences: "
-        f"{len(report['architecture_differences']['anova'])} features show "
-        f"significant differences"
-    )
-    print(
-        f"2. Entropy-accuracy correlation: "
-        f"{len(report['entropy_accuracy_correlation']['significant_features'])} "
-        f"significantly correlated features"
-    )
-    print(
-        f"3. Round entropy evolution: "
-        f"Analyzed {len(report['round_entropy_evolution']['overall_stats'])} rounds"
-    )
-    print("4. Collaboration patterns: Compared multi-agent vs single-agent systems")
