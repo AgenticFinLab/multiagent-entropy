@@ -32,7 +32,7 @@ def main():
     parser.add_argument(
         "--model",
         type=str,
-        default="qwen3_4b",
+        default="",
         help="Model name. If not provided, analyze all models",
     )
     parser.add_argument(

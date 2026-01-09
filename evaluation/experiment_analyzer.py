@@ -64,7 +64,7 @@ class ExperimentAnalyzer:
         if task_type == "auto" or task_type == "math":
             task_type = self._get_task_type_from_dataset(dataset)
 
-        config = self.data_loader.load_experiment_config(dataset, experiment_name)
+        config = self.data_loader.load_experiment_config(dataset, experiment_name, model_name)
         agent_architecture = config["agent_type"]
         num_rounds = config["round"]
 

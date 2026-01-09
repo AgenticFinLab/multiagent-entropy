@@ -64,13 +64,14 @@ class DataLoader:
         return {str(item["main_id"]): item for item in data}
 
     def load_experiment_config(
-        self, dataset: str, experiment_name: str
+        self, dataset: str, experiment_name: str, model_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """Load experiment configuration from YAML file.
 
         Args:
             dataset: Dataset name (e.g., "gsm8k", "humaneval").
             experiment_name: Name of the experiment.
+            model_name: Model name (e.g., "qwen3_4b"). Optional but helps with config lookup.
 
         Returns:
             Dictionary containing experiment configuration.
@@ -82,16 +83,24 @@ class DataLoader:
 
         if not config_file.exists():
             config_file = None
-            for f in self.configs_path.glob(f"{dataset}/*.yml"):
-                if experiment_name.startswith(f.stem):
-                    config_file = f
-                    break
+            
+            search_paths = []
+            
+            if model_name:
+                search_paths.append(self.configs_path / f"{dataset}" / model_name)
+            
+            search_paths.append(self.configs_path / f"{dataset}")
+            search_paths.append(self.configs_path)
 
-            if config_file is None:
-                for f in self.configs_path.glob("*.yml"):
-                    if experiment_name.startswith(f.stem):
-                        config_file = f
-                        break
+            for search_path in search_paths:
+                if config_file is not None:
+                    break
+                    
+                if search_path.exists() and search_path.is_dir():
+                    for f in search_path.glob("*.yml"):
+                        if experiment_name.startswith(f.stem):
+                            config_file = f
+                            break
 
             if config_file is None:
                 raise FileNotFoundError(
