@@ -10,7 +10,7 @@ round: 2
 
 # History aggregation configuration
 # When true, aggregates all previous round interactions, outputs, and context into the next round's prompt
-# Default: false (disabled)
+# Default: true (enabled)
 aggregate_history: true
 
 # History aggregation optimization settings

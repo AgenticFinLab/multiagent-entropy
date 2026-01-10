@@ -1,0 +1,20 @@
+# Dataset-specific configuration for AIME2024
+
+data:
+  data_name: AIME2025
+  data_path: experiments/data/AIME2025
+  # The subset of AIME2025 to use, 'all' for both AIME2025-I and AIME2025-II
+  # 'i' for AIME2025-I subset, 'ii' for AIME2025-II subset
+  subset: all
+  split: test
+  # The number of samples to be tested, -1 for all
+  data_num: -1
+  # The number of samples for one inference
+  batch_size: 1
+
+task_type: "math"
+
+# Generation configuration (overrides base_config.yml)
+# AIME2025 problems require longer reasoning chains
+generation_config:
+  max_new_tokens: 8192
