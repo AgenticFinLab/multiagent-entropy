@@ -20,7 +20,13 @@ from maep.language.single import SingleAgent
 from maep.language.hybrid import OrchestratorHybrid
 from lmbase.dataset import registry as data_registry
 from maep.language.sequential import SequentialAgents
-from config_loader import load_experiment_config, save_config
+from config_loader import (
+    load_experiment_config,
+    save_config,
+    is_aime25_all_subset,
+    prepare_aime25_merged_dataset,
+    map_aime25_subset,
+)
 from maep.language.centralized import OrchestratorCentralized
 from maep.language.decentralized import OrchestratorDecentralized
 from maep.language.full_decentralized import OrchestratorFullDecentralized
@@ -158,6 +164,14 @@ def run_single_experiment(
         }
 
     try:
+        # Check if dataset is AIME2025 with subset='all' and prepare merged dataset
+        if is_aime25_all_subset(config):
+            logger.info(
+                "Detected dataset with subset='all', preparing merged dataset..."
+            )
+            merged_dataset_path = prepare_aime25_merged_dataset(config)
+            logger.info(f"Using merged dataset from: {merged_dataset_path}")
+
         # Initialize agent based on agent_type
         if agent_type == "single":
             agent = SingleAgent(run_config=config)
@@ -178,7 +192,38 @@ def run_single_experiment(
 
         # Load dataset
         data_cfg = config["data"]
-        dataset = data_registry.get(config=data_cfg, split=data_cfg["split"])
+        merged_dataset_path = None
+
+        # Check if using merged AIME2025 dataset
+        if is_aime25_all_subset(config):
+            merged_dataset_path = os.path.join(
+                data_cfg["data_path"], f"{data_cfg['split']}-all-samples.json"
+            )
+            if os.path.exists(merged_dataset_path):
+                logger.info(
+                    f"Loading merged dataset from: {merged_dataset_path}"
+                )
+                with open(merged_dataset_path, "r", encoding="utf-8") as f:
+                    all_samples = json.load(f)
+                # Convert list of dicts to dict of lists for consistency
+                if isinstance(all_samples, list) and len(all_samples) > 0:
+                    dataset = {key: [sample[key] for sample in all_samples] for key in all_samples[0].keys()}
+                else:
+                    dataset = all_samples
+            else:
+                logger.warning(
+                    f"Merged dataset not found at {merged_dataset_path}, falling back to standard loading"
+                )
+                dataset = data_registry.get(config=data_cfg, split=data_cfg["split"])
+        else:
+            # Map subset value for AIME2025 dataset if needed
+            if data_cfg.get("data_name", "").lower() == "aime2025":
+                original_subset = data_cfg.get("subset", "")
+                mapped_subset = map_aime25_subset(original_subset)
+                if mapped_subset != original_subset:
+                    logger.info(f"Mapped subset '{original_subset}' to '{mapped_subset}'")
+                    data_cfg["subset"] = mapped_subset
+            dataset = data_registry.get(config=data_cfg, split=data_cfg["split"])
 
         # Save all samples to local disk
         data_save_dir = f"experiments/data/{data_cfg['data_name']}"
@@ -187,15 +232,30 @@ def run_single_experiment(
             data_save_dir,
             f"{data_cfg['split']}-all-samples.json",
         )
-        all_samples = [dataset[i] for i in range(len(dataset))]
-        with open(dataset_save_path, "w", encoding="utf-8") as f:
-            json.dump(all_samples, f, ensure_ascii=False, indent=2)
+
+        # Only save samples if not already using merged dataset
+        if not (
+            is_aime25_all_subset(config)
+            and merged_dataset_path
+            and os.path.exists(merged_dataset_path)
+        ):
+            all_samples = [dataset[i] for i in range(len(dataset))]
+            with open(dataset_save_path, "w", encoding="utf-8") as f:
+                json.dump(all_samples, f, ensure_ascii=False, indent=2)
 
         # Determine total samples to process
+        # Handle both HuggingFace Dataset objects and dict-of-lists format
+        if isinstance(dataset, dict):
+            # For dict-of-lists format, get length from first value list
+            dataset_len = len(next(iter(dataset.values()))) if dataset else 0
+        else:
+            # For HuggingFace Dataset objects
+            dataset_len = len(dataset)
+        
         total_samples = (
-            len(dataset)
+            dataset_len
             if data_cfg["data_num"] == -1
-            else min(data_cfg["data_num"], len(dataset))
+            else min(data_cfg["data_num"], dataset_len)
         )
 
         batch_size = data_cfg["batch_size"]
@@ -209,7 +269,13 @@ def run_single_experiment(
         # Process in batches
         for start_idx in range(0, total_samples, batch_size):
             end_idx = min(start_idx + batch_size, total_samples)
-            batch_samples = dataset[start_idx:end_idx]
+            # Handle both HuggingFace Dataset objects and dict-of-lists format
+            if isinstance(dataset, dict):
+                # For dict-of-lists format, extract the slice manually
+                batch_samples = {key: values[start_idx:end_idx] for key, values in dataset.items()}
+            else:
+                # For HuggingFace Dataset objects, use direct slicing
+                batch_samples = dataset[start_idx:end_idx]
             batch_num = start_idx // batch_size + 1
 
             logger.info(

@@ -27,8 +27,11 @@ Usage:
 import os
 import yaml
 import time
+import json
 import logging
 from typing import Dict, Any, List
+
+from lmbase.dataset import registry as data_registry
 
 # Ensure log directory exists
 os.makedirs("experiments/logs", exist_ok=True)
@@ -306,6 +309,121 @@ def save_config(config: Dict[str, Any], save_path: str) -> None:
         yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
 
     logger.info(f"Saved configuration to: {save_path}")
+
+
+def is_aime25_all_subset(dataset_config: Dict[str, Any]) -> bool:
+    """Check if the dataset is AIME2025 with subset='all'.
+
+    Args:
+        dataset_config (Dict[str, Any]): Dataset configuration dictionary.
+
+    Returns:
+        bool: True if dataset is AIME2025 with subset='all', False otherwise.
+    """
+    data_name = dataset_config.get("data", {}).get("data_name", "")
+    subset = dataset_config.get("data", {}).get("subset", "")
+    return data_name.lower() == "aime2025" and subset.lower() == "all"
+
+
+def map_aime25_subset(subset: str) -> str:
+    """Map AIME2025 subset values to the format expected by data_registry.
+
+    Args:
+        subset (str): Subset value from config ('all', 'i', 'ii', 'AIME2025-I', 'AIME2025-II')
+
+    Returns:
+        str: Mapped subset value ('AIME2025-I', 'AIME2025-II', or original value)
+    """
+    subset_lower = subset.lower()
+    if subset_lower == "i":
+        return "AIME2025-I"
+    elif subset_lower == "ii":
+        return "AIME2025-II"
+    return subset
+
+
+def prepare_aime25_merged_dataset(dataset_config: Dict[str, Any]) -> str:
+    """Prepare merged AIME2025 dataset by combining AIME2025-I and AIME2025-II subsets.
+
+    Args:
+        dataset_config (Dict[str, Any]): Dataset configuration dictionary.
+
+    Returns:
+        str: Path to the saved merged dataset file.
+    """
+
+    data_cfg = dataset_config["data"]
+    data_path = data_cfg["data_path"]
+    split = data_cfg["split"]
+
+    # Load AIME2025-I subset
+    ds_i = data_registry.get(
+        {
+            "data_name": "aime2025",
+            "data_path": data_path,
+            "subset": "AIME2025-I",
+        },
+        split,
+    )
+
+    # Load AIME2025-II subset
+    ds_ii = data_registry.get(
+        {
+            "data_name": "aime2025",
+            "data_path": data_path,
+            "subset": "AIME2025-II",
+        },
+        split,
+    )
+
+    # Merge the two subsets
+    merged_samples = []
+    
+    # Add samples from AIME2025-I
+    for i in range(len(ds_i)):
+        merged_samples.append(ds_i[i])
+    
+    # Find the last main_id from AIME2025-I
+    last_main_id = None
+    if len(merged_samples) > 0:
+        last_main_id = merged_samples[-1].get("main_id", "")
+    
+    # Extract the numeric part from the last main_id
+    last_id_num = 0
+    if last_main_id and last_main_id.startswith("ID"):
+        try:
+            last_id_num = int(last_main_id[2:])
+        except ValueError:
+            last_id_num = len(merged_samples)
+    
+    # Add samples from AIME2025-II with renumbered main_id
+    for i in range(len(ds_ii)):
+        sample = ds_ii[i]
+        last_id_num += 1
+        sample["main_id"] = f"ID{last_id_num}"
+        merged_samples.append(sample)
+
+    logger.info(
+        f"Merged {len(ds_i)} samples from AIME2025-I and {len(ds_ii)} samples from AIME2025-II"
+    )
+    logger.info(f"Renumbered AIME2025-II samples starting from ID{last_id_num - len(ds_ii) + 1}")
+
+    # Convert list of dicts to dict of lists for consistency with HuggingFace Dataset format
+    if len(merged_samples) > 0:
+        merged_samples_dict = {key: [sample[key] for sample in merged_samples] for key in merged_samples[0].keys()}
+    else:
+        merged_samples_dict = {}
+
+    # Save merged dataset
+    save_dir = f"experiments/data/AIME2025"
+    os.makedirs(save_dir, exist_ok=True)
+    save_path = os.path.join(save_dir, f"{split}-all-samples.json")
+
+    with open(save_path, "w", encoding="utf-8") as f:
+        json.dump(merged_samples_dict, f, ensure_ascii=False, indent=2)
+
+    logger.info(f"Saved merged AIME2025 dataset to: {save_path}")
+    return save_path
 
 
 if __name__ == "__main__":
