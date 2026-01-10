@@ -134,7 +134,7 @@ def main() -> None:
     parser.add_argument(
         "--model",
         type=str,
-        default=None,
+        default="qwen3_4b",
         help="Name of the model to analyze. If not provided, performs dataset-level analysis",
     )
     parser.add_argument(
@@ -252,20 +252,20 @@ def main() -> None:
 
         print("Step 6: Generate Visualization Charts")
         print("-" * 80)
-        analysis_level = 'dataset' if args.model is None else 'model'
-        
+        analysis_level = "dataset" if args.model is None else "model"
+
         # Determine number of models for visualization purposes
         num_models = 1
-        if analysis_level == 'dataset':
+        if analysis_level == "dataset":
             # Try to infer number of models from the data if at dataset level
-            if 'model_name' in processed_data.columns:
-                num_models = processed_data['model_name'].nunique()
-        
+            if "model_name" in processed_data.columns:
+                num_models = processed_data["model_name"].nunique()
+
         visualizer = EntropyVisualizer(
-            processed_data, 
-            str(paths["visualizations"]), 
+            processed_data,
+            str(paths["visualizations"]),
             analysis_level=analysis_level,
-            num_models=num_models
+            num_models=num_models,
         )
         visualizer.generate_all_visualizations()
         print()
