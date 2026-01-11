@@ -32,10 +32,12 @@ class MetricsCalculator:
         pattern = r"\\boxed\{([^}]*)\}"
         matches = re.findall(pattern, text)
         if matches:
-            if matches[-1].startswith("{") and matches[-1].endswith("}"):
-                return matches[-1][1:-1], True  
+            if matches[-1].startswith("{"):
+                return matches[-1][1:], True
+            elif matches[-1].endswith("}"):
+                return matches[-1][:-1], True
             elif matches[-1].startswith("(") and matches[-1].endswith(")"):
-                return matches[-1][1:-1], True  
+                return matches[-1][1:-1], True
             else:
                 return matches[-1], True
 
@@ -159,11 +161,11 @@ class MetricsCalculator:
             test_namespace = local_namespace.copy()
             exec(test_cases, {}, test_namespace)
 
-            if 'check' in test_namespace:
+            if "check" in test_namespace:
                 for func_name, func in local_namespace.items():
-                    if callable(func) and not func_name.startswith('_'):
+                    if callable(func) and not func_name.startswith("_"):
                         try:
-                            test_namespace['check'](func)
+                            test_namespace["check"](func)
                         except AssertionError:
                             return False
                         except Exception:
@@ -192,7 +194,9 @@ class MetricsCalculator:
             True if answers match, False otherwise.
         """
         if task_type == "code":
-            return MetricsCalculator.is_code_correct(predicted, ground_truth, test_cases)
+            return MetricsCalculator.is_code_correct(
+                predicted, ground_truth, test_cases
+            )
         else:
             return MetricsCalculator.is_answer_correct(predicted, ground_truth)
 
