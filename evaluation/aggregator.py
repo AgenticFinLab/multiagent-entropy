@@ -87,6 +87,18 @@ class Aggregator:
                         "final_format_compliance", False
                     )
 
+                    base_model_predicted_answer = ""
+                    base_model_is_finally_correct = False
+                    base_model_format_compliance = False
+
+                    if architecture == "single":
+                        for agent_key, agent_metrics in sample_metrics.get("agents", {}).items():
+                            if agent_key.endswith("_round_1"):
+                                base_model_predicted_answer = agent_metrics["predicted_answer"]
+                                base_model_is_finally_correct = agent_metrics["is_correct"]
+                                base_model_format_compliance = agent_metrics["format_compliance"]
+                                break
+
                     for agent_key, agent_metrics in sample_metrics.get(
                         "agents", {}
                     ).items():
@@ -119,6 +131,9 @@ class Aggregator:
                             "final_predicted_answer": final_predicted_answer,
                             "is_finally_correct": is_finally_correct,
                             "final_format_compliance": final_format_compliance,
+                            "base_model_predicted_answer": base_model_predicted_answer,
+                            "base_model_is_finally_correct": base_model_is_finally_correct,
+                            "base_model_format_compliance": base_model_format_compliance,
                             "sample_total_entropy": sample_entropy.get(
                                 "total_entropy", 0
                             ),
@@ -289,6 +304,10 @@ class Aggregator:
                 total_predictions = 0
                 total_time = 0
 
+                base_model_correct = 0
+                base_model_format_compliant = 0
+                base_model_predictions = 0
+
                 for sample_id, sample_data in samples.items():
                     for agent_key, agent_data in sample_data.get("agents", {}).items():
                         agent_type = agent_data.get(
@@ -304,13 +323,34 @@ class Aggregator:
                         if sample_data.get("final_format_compliance", False):
                             total_format_compliance += 1
 
-
+                    if architecture == "single":
+                        for agent_key, agent_data in sample_data.get("agents", {}).items():
+                            if agent_key.endswith("_round_1"):
+                                base_model_predictions += 1
+                                if agent_data.get("is_correct", False):
+                                    base_model_correct += 1
+                                if agent_data.get("format_compliance", False):
+                                    base_model_format_compliant += 1
+                                break
 
                 accuracy = (
                     total_correct / total_predictions if total_predictions > 0 else 0
                 )
-                format_compliance = (
-                    total_format_compliance / total_predictions if total_predictions > 0 else 0
+                format_compliance_rate = (
+                    total_format_compliance / total_predictions
+                    if total_predictions > 0
+                    else 0
+                )
+
+                base_model_accuracy = (
+                    base_model_correct / base_model_predictions
+                    if base_model_predictions > 0
+                    else 0
+                )
+                base_model_format_compliance_rate = (
+                    base_model_format_compliant / base_model_predictions
+                    if base_model_predictions > 0
+                    else 0
                 )
 
                 exp_stats[exp_name] = {
@@ -320,8 +360,10 @@ class Aggregator:
                     ),
                     "exp_num_inferences": exp_entropy.get("num_inferences", 0),
                     "exp_accuracy": accuracy,
-                    "exp_format_compliance": format_compliance,
+                    "exp_format_compliance_rate": format_compliance_rate,
                     "exp_total_time": total_time,
+                    "base_model_accuracy": base_model_accuracy,
+                    "base_model_format_compliance_rate": base_model_format_compliance_rate,
                 }
 
         return exp_stats
@@ -429,20 +471,3 @@ class Aggregator:
             self.output_dir = original_output_dir
 
         return merged_records
-
-
-def main():
-    """Main function to run the converter."""
-    base_path = Path("/home/yuxuanzhao/multiagent-entropy/evaluation/results/gsm8k")
-
-    entropy_file = base_path / "all_entropy_results.json"
-    metrics_file = base_path / "all_metrics.json"
-    output_dir = base_path
-
-    aggregator = Aggregator(str(entropy_file), str(metrics_file), str(output_dir))
-
-    aggregator.generate_aggregated_csvs()
-
-
-if __name__ == "__main__":
-    main()

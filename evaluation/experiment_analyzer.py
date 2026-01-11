@@ -366,33 +366,7 @@ class ExperimentAnalyzer:
                             ].items():
                                 if "agents" in sample_data:
                                     for agent_key in sample_data["agents"]:
-                                        if (
-                                            "predicted_answer"
-                                            in sample_data["agents"][agent_key]
-                                        ):
-                                            del sample_data["agents"][agent_key][
-                                                "predicted_answer"
-                                            ]
-                                        if (
-                                            "is_correct"
-                                            in sample_data["agents"][agent_key]
-                                        ):
-                                            del sample_data["agents"][agent_key][
-                                                "is_correct"
-                                            ]
-                                        if (
-                                            "response"
-                                            in sample_data["agents"][agent_key]
-                                        ):
-                                            del sample_data["agents"][agent_key][
-                                                "response"
-                                            ]
-                                        if (
-                                            "format_compliance"
-                                            in sample_data["agents"][agent_key]
-                                        ):
-                                            del sample_data["agents"][agent_key][
-                                                "format_compliance"
-                                            ]
+                                        if "response" in sample_data["agents"][agent_key]:
+                                            del sample_data["agents"][agent_key]["response"]
 
         save_json(metrics_copy, output_path)
