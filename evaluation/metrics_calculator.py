@@ -19,29 +19,25 @@ class MetricsCalculator:
     """
 
     @staticmethod
-    def extract_boxed_answer(text: str) -> Optional[str]:
+    def extract_boxed_answer(text: str) -> tuple[Optional[str], bool]:
         """Extract answer from boxed format in text.
 
         Args:
             text: Input text containing potential boxed answer.
 
         Returns:
-            Extracted answer string or None if not found.
+            Tuple of (extracted_answer_string, format_compliance_bool).
+            Returns (None, False) if no valid format found.
         """
         pattern = r"\\boxed\{([^}]*)\}"
         matches = re.findall(pattern, text)
         if matches:
             if matches[-1].startswith("{"):
-                return matches[-1][1:]
+                return matches[-1][1:], True
             else:
-                return matches[-1]
+                return matches[-1], True
 
-        pattern = r"(?:the\s+correct\s+answer\s+is|answer\s*[:=]\s*|final\s+answer\s*[:=]\s*)\s*(\d+(?:\.\d+)?)"
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        if matches:
-            return matches[-1]
-
-        return None
+        return None, False
 
     @staticmethod
     def has_valid_format(text: str) -> bool:
@@ -53,23 +49,25 @@ class MetricsCalculator:
         Returns:
             True if valid format found, False otherwise.
         """
-        return MetricsCalculator.extract_boxed_answer(text) is not None
+        _, format_compliance = MetricsCalculator.extract_boxed_answer(text)
+        return format_compliance
 
     @staticmethod
-    def extract_code_answer(text: str) -> Optional[str]:
+    def extract_code_answer(text: str) -> tuple[Optional[str], bool]:
         """Extract Python code block from text.
 
         Args:
             text: Input text containing potential code block.
 
         Returns:
-            Extracted code string or None if not found.
+            Tuple of (extracted_code_string, format_compliance_bool).
+            Returns (None, False) if no valid format found.
         """
         pattern = r"```python\s*(.*?)\s*```"
         matches = re.findall(pattern, text, re.DOTALL)
         if matches:
-            return matches[-1]
-        return None
+            return matches[-1], True
+        return None, False
 
     @staticmethod
     def normalize_answer(answer: str) -> str:
@@ -268,7 +266,7 @@ class MetricsCalculator:
             if use_final_answer and "final_answer" in result:
                 predicted = result["final_answer"]
             else:
-                predicted = MetricsCalculator.extract_boxed_answer(
+                predicted, _ = MetricsCalculator.extract_boxed_answer(
                     result.get("response", "")
                 )
 

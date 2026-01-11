@@ -159,26 +159,29 @@ class ExperimentAnalyzer:
             if task_type == "code":
                 if "final_answer" in result_data:
                     response = result_data["final_answer"]
-                    predicted_answer = self.metrics_calculator.extract_code_answer(
+                    predicted_answer, format_compliance = self.metrics_calculator.extract_code_answer(
                         response
                     )
                 else:
                     response = result_data.get("response", "")
-                    predicted_answer = self.metrics_calculator.extract_code_answer(
+                    predicted_answer, format_compliance = self.metrics_calculator.extract_code_answer(
                         response
                     )
             else:
                 if "final_answer" in result_data:
                     response = result_data["final_answer"]
                     predicted_answer = response
+                    _, format_compliance = self.metrics_calculator.extract_boxed_answer(
+                        response
+                    )
                 else:
                     response = result_data.get("response", "")
-                    predicted_answer = self.metrics_calculator.extract_boxed_answer(
+                    predicted_answer, format_compliance = self.metrics_calculator.extract_boxed_answer(
                         response
                     )
 
             is_correct = False
-            if ground_truth and predicted_answer:
+            if ground_truth and predicted_answer and format_compliance:
                 test_cases = ground_truth.get("test_cases") if ground_truth else None
                 is_correct = self.metrics_calculator.is_answer_correct_by_task_type(
                     predicted_answer, ground_truth["groundtruth"], task_type, test_cases
@@ -204,6 +207,8 @@ class ExperimentAnalyzer:
                 "average_entropy": avg_entropy,
                 "predicted_answer": predicted_answer,
                 "is_correct": is_correct,
+                "response": response,
+                "format_compliance": format_compliance,
             }
 
         final_agent_key = self._get_final_agent_key(
@@ -215,9 +220,13 @@ class ExperimentAnalyzer:
                 "predicted_answer"
             ]
             sample_metrics["is_finally_correct"] = final_agent_data["is_correct"]
+            sample_metrics["final_format_compliance"] = final_agent_data[
+                "format_compliance"
+            ]
         else:
             sample_metrics["final_predicted_answer"] = None
             sample_metrics["is_finally_correct"] = False
+            sample_metrics["final_format_compliance"] = False
 
         sample_metrics["agents"] = sample_metrics.pop("agents")
 
@@ -341,5 +350,9 @@ class ExperimentAnalyzer:
                                             del sample_data["agents"][agent_key]["predicted_answer"]
                                         if "is_correct" in sample_data["agents"][agent_key]:
                                             del sample_data["agents"][agent_key]["is_correct"]
+                                        if "response" in sample_data["agents"][agent_key]:
+                                            del sample_data["agents"][agent_key]["response"]
+                                        if "format_compliance" in sample_data["agents"][agent_key]:
+                                            del sample_data["agents"][agent_key]["format_compliance"]
         
         save_json(metrics_copy, output_path)
