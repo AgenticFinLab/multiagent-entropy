@@ -83,6 +83,9 @@ class Aggregator:
                         "final_predicted_answer", ""
                     )
                     is_finally_correct = sample_metrics.get("is_finally_correct", False)
+                    final_format_compliance = sample_metrics.get(
+                        "final_format_compliance", False
+                    )
 
                     for agent_key, agent_metrics in sample_metrics.get(
                         "agents", {}
@@ -115,6 +118,7 @@ class Aggregator:
                             "time_cost": time_cost,
                             "final_predicted_answer": final_predicted_answer,
                             "is_finally_correct": is_finally_correct,
+                            "final_format_compliance": final_format_compliance,
                             "sample_total_entropy": sample_entropy.get(
                                 "total_entropy", 0
                             ),
@@ -281,6 +285,7 @@ class Aggregator:
 
                 samples = exp_metrics.get("samples", {})
                 total_correct = 0
+                total_format_compliance = 0
                 total_predictions = 0
                 total_time = 0
 
@@ -296,9 +301,16 @@ class Aggregator:
                         total_predictions += 1
                         if sample_data.get("is_finally_correct", False):
                             total_correct += 1
+                        if sample_data.get("final_format_compliance", False):
+                            total_format_compliance += 1
+
+
 
                 accuracy = (
                     total_correct / total_predictions if total_predictions > 0 else 0
+                )
+                format_compliance = (
+                    total_format_compliance / total_predictions if total_predictions > 0 else 0
                 )
 
                 exp_stats[exp_name] = {
@@ -308,6 +320,7 @@ class Aggregator:
                     ),
                     "exp_num_inferences": exp_entropy.get("num_inferences", 0),
                     "exp_accuracy": accuracy,
+                    "exp_format_compliance": format_compliance,
                     "exp_total_time": total_time,
                 }
 
