@@ -41,6 +41,90 @@ class Aggregator:
 
         return entropy_data, metrics_data
 
+    def _extract_base_model_data(self, metrics_data: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+        """Extract base model data from metrics for each model.
+
+        Base model is defined as the first round agent in single agent architecture.
+        This data is shared across all architectures for the same dataset and model.
+
+        Args:
+            metrics_data: Performance metrics
+
+        Returns:
+            Dictionary mapping model_name to sample_id to base model data
+        """
+        base_model_data = {}
+
+        for model_name, model_metrics in metrics_data.get("models", {}).items():
+            model_base_data = {}
+            for exp_name, exp_metrics in model_metrics.get("experiments", {}).items():
+                architecture = exp_metrics.get("agent_architecture", "unknown")
+                if architecture == "single":
+                    samples = exp_metrics.get("samples", {})
+                    for sample_id, sample_data in samples.items():
+                        for agent_key, agent_data in sample_data.get("agents", {}).items():
+                            if agent_key.endswith("_round_1"):
+                                model_base_data[sample_id] = {
+                                    "predicted_answer": agent_data["predicted_answer"],
+                                    "is_correct": agent_data["is_correct"],
+                                    "format_compliance": agent_data["format_compliance"],
+                                }
+                                break
+            base_model_data[model_name] = model_base_data
+
+        return base_model_data
+
+    def _calculate_base_model_stats(self, metrics_data: Dict[str, Any]) -> Dict[str, Dict[str, float]]:
+        """Calculate base model statistics across all samples for each model.
+
+        Base model is defined as the first round agent in single agent architecture.
+        These statistics are shared across all architectures for the same dataset and model.
+
+        Args:
+            metrics_data: Performance metrics
+
+        Returns:
+            Dictionary mapping model_name to base model statistics
+        """
+        base_model_stats = {}
+
+        for model_name, model_metrics in metrics_data.get("models", {}).items():
+            base_model_correct = 0
+            base_model_format_compliant = 0
+            base_model_predictions = 0
+
+            for exp_name, exp_metrics in model_metrics.get("experiments", {}).items():
+                architecture = exp_metrics.get("agent_architecture", "unknown")
+                if architecture == "single":
+                    samples = exp_metrics.get("samples", {})
+                    for sample_id, sample_data in samples.items():
+                        for agent_key, agent_data in sample_data.get("agents", {}).items():
+                            if agent_key.endswith("_round_1"):
+                                base_model_predictions += 1
+                                if agent_data["is_correct"]:
+                                    base_model_correct += 1
+                                if agent_data["format_compliance"]:
+                                    base_model_format_compliant += 1
+                                break
+
+            accuracy = (
+                base_model_correct / base_model_predictions
+                if base_model_predictions > 0
+                else 0
+            )
+            format_compliance_rate = (
+                base_model_format_compliant / base_model_predictions
+                if base_model_predictions > 0
+                else 0
+            )
+
+            base_model_stats[model_name] = {
+                "accuracy": accuracy,
+                "format_compliance_rate": format_compliance_rate,
+            }
+
+        return base_model_stats
+
     def extract_sample_level_data(
         self, entropy_data: Dict[str, Any], metrics_data: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
@@ -54,6 +138,8 @@ class Aggregator:
             List of dictionaries containing sample-level data
         """
         records = []
+
+        base_model_data = self._extract_base_model_data(metrics_data)
 
         for model_name, model_entropy in entropy_data.get("models", {}).items():
             for exp_name, exp_entropy in model_entropy.get("experiments", {}).items():
@@ -87,17 +173,16 @@ class Aggregator:
                         "final_format_compliance", False
                     )
 
-                    base_model_predicted_answer = ""
-                    base_model_is_finally_correct = False
-                    base_model_format_compliance = False
-
-                    if architecture == "single":
-                        for agent_key, agent_metrics in sample_metrics.get("agents", {}).items():
-                            if agent_key.endswith("_round_1"):
-                                base_model_predicted_answer = agent_metrics["predicted_answer"]
-                                base_model_is_finally_correct = agent_metrics["is_correct"]
-                                base_model_format_compliance = agent_metrics["format_compliance"]
-                                break
+                    base_model_sample_data = base_model_data.get(model_name, {}).get(sample_id, {})
+                    base_model_predicted_answer = base_model_sample_data.get(
+                        "predicted_answer", ""
+                    )
+                    base_model_is_finally_correct = base_model_sample_data.get(
+                        "is_correct", False
+                    )
+                    base_model_format_compliance = base_model_sample_data.get(
+                        "format_compliance", False
+                    )
 
                     for agent_key, agent_metrics in sample_metrics.get(
                         "agents", {}
@@ -284,6 +369,8 @@ class Aggregator:
         """
         exp_stats = {}
 
+        base_model_stats = self._calculate_base_model_stats(metrics_data)
+
         for model_name, model_entropy in entropy_data.get("models", {}).items():
             for exp_name, exp_entropy in model_entropy.get("experiments", {}).items():
                 if "error" in exp_entropy:
@@ -304,10 +391,6 @@ class Aggregator:
                 total_predictions = 0
                 total_time = 0
 
-                base_model_correct = 0
-                base_model_format_compliant = 0
-                base_model_predictions = 0
-
                 for sample_id, sample_data in samples.items():
                     for agent_key, agent_data in sample_data.get("agents", {}).items():
                         agent_type = agent_data.get(
@@ -323,16 +406,6 @@ class Aggregator:
                         if sample_data.get("final_format_compliance", False):
                             total_format_compliance += 1
 
-                    if architecture == "single":
-                        for agent_key, agent_data in sample_data.get("agents", {}).items():
-                            if agent_key.endswith("_round_1"):
-                                base_model_predictions += 1
-                                if agent_data.get("is_correct", False):
-                                    base_model_correct += 1
-                                if agent_data.get("format_compliance", False):
-                                    base_model_format_compliant += 1
-                                break
-
                 accuracy = (
                     total_correct / total_predictions if total_predictions > 0 else 0
                 )
@@ -342,17 +415,7 @@ class Aggregator:
                     else 0
                 )
 
-                base_model_accuracy = (
-                    base_model_correct / base_model_predictions
-                    if base_model_predictions > 0
-                    else 0
-                )
-                base_model_format_compliance_rate = (
-                    base_model_format_compliant / base_model_predictions
-                    if base_model_predictions > 0
-                    else 0
-                )
-
+                model_base_stats = base_model_stats.get(model_name, {})
                 exp_stats[exp_name] = {
                     "exp_total_entropy": exp_level.get("total_entropy", 0),
                     "exp_infer_average_entropy": exp_level.get(
@@ -362,8 +425,10 @@ class Aggregator:
                     "exp_accuracy": accuracy,
                     "exp_format_compliance_rate": format_compliance_rate,
                     "exp_total_time": total_time,
-                    "base_model_accuracy": base_model_accuracy,
-                    "base_model_format_compliance_rate": base_model_format_compliance_rate,
+                    "base_model_accuracy": model_base_stats.get("accuracy", 0),
+                    "base_model_format_compliance_rate": model_base_stats.get(
+                        "format_compliance_rate", 0
+                    ),
                 }
 
         return exp_stats
