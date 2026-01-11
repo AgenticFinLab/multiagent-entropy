@@ -47,7 +47,11 @@ class ExperimentAnalyzer:
         return dataset_task_map.get(dataset.lower(), "math")
 
     def analyze_experiment(
-        self, dataset: str, model_name: str, experiment_name: str, task_type: str = "math"
+        self,
+        dataset: str,
+        model_name: str,
+        experiment_name: str,
+        task_type: str = "math",
     ) -> Dict[str, Any]:
         """Analyze a single experiment.
 
@@ -64,12 +68,16 @@ class ExperimentAnalyzer:
         if task_type == "auto" or task_type == "math":
             task_type = self._get_task_type_from_dataset(dataset)
 
-        config = self.data_loader.load_experiment_config(dataset, experiment_name, model_name)
+        config = self.data_loader.load_experiment_config(
+            dataset, experiment_name, model_name
+        )
         agent_architecture = config["agent_type"]
         num_rounds = config["round"]
 
         ground_truths = self.data_loader.load_ground_truth(dataset)
-        all_results = self.data_loader.load_all_results(dataset, model_name, experiment_name)
+        all_results = self.data_loader.load_all_results(
+            dataset, model_name, experiment_name
+        )
 
         results_by_sample = defaultdict(list)
         for result_id, result_data in all_results.items():
@@ -159,25 +167,27 @@ class ExperimentAnalyzer:
             if task_type == "code":
                 if "final_answer" in result_data:
                     response = result_data["final_answer"]
-                    predicted_answer, format_compliance = self.metrics_calculator.extract_code_answer(
-                        response
+                    response_formatted = "```python\n" + response + "\n```"
+                    predicted_answer, format_compliance = (
+                        self.metrics_calculator.extract_code_answer(response_formatted)
                     )
                 else:
                     response = result_data.get("response", "")
-                    predicted_answer, format_compliance = self.metrics_calculator.extract_code_answer(
-                        response
+                    predicted_answer, format_compliance = (
+                        self.metrics_calculator.extract_code_answer(response)
                     )
             else:
                 if "final_answer" in result_data:
                     response = result_data["final_answer"]
                     predicted_answer = response
+                    response_formatted = "\\boxed{" + response + "}"
                     _, format_compliance = self.metrics_calculator.extract_boxed_answer(
-                        response
+                        response_formatted
                     )
                 else:
                     response = result_data.get("response", "")
-                    predicted_answer, format_compliance = self.metrics_calculator.extract_boxed_answer(
-                        response
+                    predicted_answer, format_compliance = (
+                        self.metrics_calculator.extract_boxed_answer(response)
                     )
 
             is_correct = False
@@ -321,11 +331,19 @@ class ExperimentAnalyzer:
             all_metrics["models"][model_name] = {"experiments": {}}
             for experiment_name in experiments:
                 try:
-                    metrics = self.analyze_experiment(dataset, model_name, experiment_name, task_type)
-                    all_metrics["models"][model_name]["experiments"][experiment_name] = metrics
+                    metrics = self.analyze_experiment(
+                        dataset, model_name, experiment_name, task_type
+                    )
+                    all_metrics["models"][model_name]["experiments"][
+                        experiment_name
+                    ] = metrics
                 except Exception as e:
-                    print(f"Error analyzing experiment {model_name}/{experiment_name}: {e}")
-                    all_metrics["models"][model_name]["experiments"][experiment_name] = {"error": str(e)}
+                    print(
+                        f"Error analyzing experiment {model_name}/{experiment_name}: {e}"
+                    )
+                    all_metrics["models"][model_name]["experiments"][
+                        experiment_name
+                    ] = {"error": str(e)}
 
         return all_metrics
 
@@ -337,22 +355,44 @@ class ExperimentAnalyzer:
             output_path: Path to save the results.
         """
         metrics_copy = metrics.copy()
-        
+
         if "models" in metrics_copy:
             for model_name, model_data in metrics_copy["models"].items():
                 if "experiments" in model_data:
                     for exp_name, exp_metrics in model_data["experiments"].items():
                         if "samples" in exp_metrics:
-                            for sample_id, sample_data in exp_metrics["samples"].items():
+                            for sample_id, sample_data in exp_metrics[
+                                "samples"
+                            ].items():
                                 if "agents" in sample_data:
                                     for agent_key in sample_data["agents"]:
-                                        if "predicted_answer" in sample_data["agents"][agent_key]:
-                                            del sample_data["agents"][agent_key]["predicted_answer"]
-                                        if "is_correct" in sample_data["agents"][agent_key]:
-                                            del sample_data["agents"][agent_key]["is_correct"]
-                                        if "response" in sample_data["agents"][agent_key]:
-                                            del sample_data["agents"][agent_key]["response"]
-                                        if "format_compliance" in sample_data["agents"][agent_key]:
-                                            del sample_data["agents"][agent_key]["format_compliance"]
-        
+                                        if (
+                                            "predicted_answer"
+                                            in sample_data["agents"][agent_key]
+                                        ):
+                                            del sample_data["agents"][agent_key][
+                                                "predicted_answer"
+                                            ]
+                                        if (
+                                            "is_correct"
+                                            in sample_data["agents"][agent_key]
+                                        ):
+                                            del sample_data["agents"][agent_key][
+                                                "is_correct"
+                                            ]
+                                        if (
+                                            "response"
+                                            in sample_data["agents"][agent_key]
+                                        ):
+                                            del sample_data["agents"][agent_key][
+                                                "response"
+                                            ]
+                                        if (
+                                            "format_compliance"
+                                            in sample_data["agents"][agent_key]
+                                        ):
+                                            del sample_data["agents"][agent_key][
+                                                "format_compliance"
+                                            ]
+
         save_json(metrics_copy, output_path)
