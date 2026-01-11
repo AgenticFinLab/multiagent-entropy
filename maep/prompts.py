@@ -16,12 +16,12 @@ TASK_SPECIFIC_INSTRUCTIONS = {}
 SINGLE_SYS = {
     "math": "You are a precise solver.\n Solve the problem correctly and concisely and place the final answer in {identifier}.",
     "code": "You are a precise solver.\n Write the Python code to solve the problem and place the final code snippet in {identifier}.",
-    "option": "You are a precise solver.\n Select the correct option and place the selected option in {identifier}.",
+    "option": "You are a precise solver.\n Select the correct option and place the selected option letter in {identifier}, only the single letter.",
 }
 SINGLE_USER = {
     "math": "Question:\n {question} \n Think step by step and place the final answer in {identifier}.",
     "code": "Question:\n {question} \n Write the Python code to solve the problem and place the final code snippet in {identifier}.",
-    "option": "Question:\n {question} \n Select the correct option and place the selected option in {identifier}.",
+    "option": "Question:\n {question} \n Select the correct option and place the selected option letter in {identifier}, only the single letter.",
 }
 # Sequential agent instructions
 PLANNER_SYS = {
@@ -45,7 +45,7 @@ SOLVER_SYS = {
 SOLVER_USER = {
     "math": "Question: {question}\n ### Plans ###\n {block}\n ### Plans ### \nFollow the plans to solve the question step by step and place the final answer in {identifier}.",
     "code": "Question: {question}\n ### Plans ###\n {block}\n ### Plans ### \nFollow the plans to write the Python code and place the final code snippet in {identifier}.",
-    "option": "Question: {question}\n ### Plans ###\n {block}\n ### Plans ### \nFollow the plans to select the correct option and place the selected option in {identifier}.",
+    "option": "Question: {question}\n ### Plans ###\n {block}\n ### Plans ### \nFollow the plans to select the correct option and place the selected option letter in {identifier}, only the single letter.",
 }
 # Sequential agent instructions
 CRITIC_SYS = {
@@ -69,7 +69,7 @@ JUDGER_SYS = {
 JUDGER_USER = {
     "math": "Final check for: {question}\n ### Solution ###\n {block}\n ### Solution ### \nIf correct, only output the final answer without words, labels, and steps, and wrapped in {identifier}.",
     "code": "Final check for: {question}\n ### Solution ###\n {block}\n ### Solution ### \nIf correct, only output the final code snippet without words, and wrapped in {identifier}.",
-    "option": "Final check for: {question}\n ### Solution ###\n {block}\n ### Solution ### \nIf correct, only output the final option without words, labels, and steps, and wrapped in {identifier}.",
+    "option": "Final check for: {question}\n ### Solution ###\n {block}\n ### Solution ### \nIf correct, only output the single option letter without words, labels, and steps, and wrapped in {identifier}.",
 }
 # Centralized/Decentralized/Full Decentralized/Hybrid agent instructions
 MATH_SYS = {
@@ -111,13 +111,13 @@ CODE_USER = {
 ORCHESTRATOR_SYS = {
     "math": "You are the Orchestrator Agent. Your task is to aggregate the solutions provided by the first-layer agents and produce a final answer wrapped in {identifier}.",
     "code": "You are the Orchestrator Agent. Your task is to aggregate the solutions provided by the first-layer agents and produce a final code snippet wrapped in {identifier}.",
-    "option": "You are the Orchestrator Agent. Your task is to aggregate the solutions provided by the first-layer agents and produce a final option wrapped in {identifier}.",
+    "option": "You are the Orchestrator Agent. Your task is to aggregate the solutions provided by the first-layer agents and produce a final option letter wrapped in {identifier}, only the single letter.",
 }
 # Centralized/Decentralized/Full Decentralized/Hybrid agent instructions
 ORCHESTRATOR_USER = {
     "math": "Question: {question}\n Here are the solutions from the expert agents:\n === Solutions === \n{block}\n === Solutions ===\n Based on these inputs, provide the final answer wrapped in {identifier}.",
     "code": "Question: {question}\n Here are the solutions from the expert agents:\n === Solutions === \n{block}\n === Solutions ===\n Based on these inputs, provide the final code snippet wrapped in {identifier}.",
-    "option": "Question: {question}\n Here are the solutions from the expert agents:\n === Solutions === \n{block}\n === Solutions ===\n Based on these inputs, provide the final option wrapped in {identifier}.",
+    "option": "Question: {question}\n Here are the solutions from the expert agents:\n === Solutions === \n{block}\n === Solutions ===\n Based on these inputs, provide the final option letter wrapped in {identifier}, only the single letter.",
 }
 # Centralized/Decentralized/Full Decentralized/Hybrid agent instructions
 ORCHESTRATOR_FEEDBACK_SYS = {
@@ -135,37 +135,37 @@ ORCHESTRATOR_FEEDBACK_USER = {
 DEBATE_AGENT1_SYS = {
     "math": "You are Agent 1 in a debate multi-agent system. Solve the given question with clear steps and wrap your final answer in {identifier}. Your input may include previous round debate content.",
     "code": "You are Agent 1 in a debate multi-agent system. Solve the given question with clear steps and wrap your coding solution in {identifier}. Your input may include previous round debate content.",
-    "option": "You are Agent 1 in a debate multi-agent system. Solve the given question with clear steps and wrap your selected option in {identifier}. Your input may include previous round debate content.",
+    "option": "You are Agent 1 in a debate multi-agent system. Solve the given question with clear steps and wrap your selected option letter in {identifier}, only the single letter. Your input may include previous round debate content.",
 }
 # Debate agent instructions
 DEBATE_AGENT1_USER = {
     "math": "Question: {question} Provide a concise solution, showing key steps, and wrap the final answer in {identifier}.",
     "code": "Question: {question} Provide a concise solution, showing key steps, and wrap the final coding solution in {identifier}.",
-    "option": "Question: {question} Provide a concise solution, showing key steps, and wrap the final selected option in {identifier}.",
+    "option": "Question: {question} Provide a concise solution, showing key steps, and wrap the final selected option letter in {identifier}, only the single letter.",
 }
 # Debate agent instructions
 DEBATE_AGENT2_SYS = {
     "math": "You are Agent 2 in a debate multi-agent system. Solve the given question with clear steps and wrap your final answer in {identifier}. Your input may include previous round debate content.",
     "code": "You are Agent 2 in a debate multi-agent system. Solve the given question with clear steps and wrap your final coding solution in {identifier}. Your input may include previous round debate content.",
-    "option": "You are Agent 2 in a debate multi-agent system. Solve the given question with clear steps and wrap your final selected option in {identifier}. Your input may include previous round debate content.",
+    "option": "You are Agent 2 in a debate multi-agent system. Solve the given question with clear steps and wrap your final selected option letter in {identifier}, only the single letter. Your input may include previous round debate content.",
 }
 # Debate agent instructions
 DEBATE_AGENT2_USER = {
     "math": "Question: {question} Provide a concise solution, showing key steps, and wrap the final answer in {identifier}.",
     "code": "Question: {question} Provide a concise solution, showing key steps, and wrap the final coding solution in {identifier}.",
-    "option": "Question: {question} Provide a concise solution, showing key steps, and wrap the final selected option in {identifier}.",
+    "option": "Question: {question} Provide a concise solution, showing key steps, and wrap the final selected option letter in {identifier}, only the single letter.",
 }
 # Debate agent instructions
 DEBATE_AGENT3_SYS = {
     "math": "You are Agent 3 in a debate multi-agent system. Solve the given question with clear steps and wrap your final answer in {identifier}. Your input may include previous round debate content.",
     "code": "You are Agent 3 in a debate multi-agent system. Solve the given question with clear steps and wrap your final coding solution in {identifier}. Your input may include previous round debate content.",
-    "option": "You are Agent 3 in a debate multi-agent system. Solve the given question with clear steps and wrap your final selected option in {identifier}. Your input may include previous round debate content.",
+    "option": "You are Agent 3 in a debate multi-agent system. Solve the given question with clear steps and wrap your final selected option letter in {identifier}, only the single letter. Your input may include previous round debate content.",
 }
 # Debate agent instructions
 DEBATE_AGENT3_USER = {
     "math": "Question: {question} Provide a concise solution, showing key steps, and wrap the final answer in {identifier}.",
     "code": "Question: {question} Provide a concise solution, showing key steps, and wrap the final coding solution in {identifier}.",
-    "option": "Question: {question} Provide a concise solution, showing key steps, and wrap the final selected option in {identifier}.",
+    "option": "Question: {question} Provide a concise solution, showing key steps, and wrap the final selected option letter in {identifier}, only the single letter.",
 }
 
 
