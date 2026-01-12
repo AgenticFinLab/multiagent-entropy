@@ -203,13 +203,16 @@ class Aggregator:
                             agent_key, {}
                         )
 
+                        if not agent_entropy_data:
+                            continue
+
                         agent_type = agent_entropy_data.get(
                             "agent_type", agent_key.split("_")[0]
                         )
 
-                        execution_order = agent_entropy_data.get("execution_order", 0)
-                        agent_time_cost = agent_metrics.get("agent_time_cost", 0)
-                        avg_entropy = agent_metrics.get("average_entropy", 0)
+                        execution_order = agent_entropy_data["execution_order"]
+                        agent_time_cost = agent_metrics["agent_time_cost"]
+                        avg_entropy = agent_metrics["average_entropy"]
 
                         if architecture == "debate" and agent_type == "orchestrator":
                             continue
@@ -370,20 +373,19 @@ class Aggregator:
 
                         round_stats[key].setdefault("round_total_time", 0)
                         round_stats[key].setdefault("round_total_token", 0)
-                        
-                        agent_time_cost = agent_metrics.get("agent_time_cost", 0)
-                        
+
+                        agent_time_cost = agent_metrics["agent_time_cost"]
+
                         if architecture == "centralized":
                             round_stats[key]["round_total_time"] = max(
-                                round_stats[key]["round_total_time"],
-                                agent_time_cost
+                                round_stats[key]["round_total_time"], agent_time_cost
                             )
                         else:
                             round_stats[key]["round_total_time"] += agent_time_cost
-                        
-                        round_stats[key]["round_total_token"] += agent_entropy_data.get(
-                            "token_count", 0
-                        )
+
+                        round_stats[key]["round_total_token"] += agent_entropy_data[
+                            "token_count"
+                        ]
 
         return round_stats
 
@@ -490,7 +492,7 @@ class Aggregator:
                         )
                         if architecture == "debate" and agent_type == "orchestrator":
                             continue
-                        total_time += agent_data.get("agent_time_cost", 0)
+                        total_time += agent_data["agent_time_cost"]
                     if sample_data.get("final_predicted_answer") is not None:
                         total_predictions += 1
                         if sample_data.get("is_finally_correct", False):
