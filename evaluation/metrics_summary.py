@@ -35,6 +35,16 @@ def extract_summary_fields(
     summary_records = []
     seen_keys = set()
 
+    numeric_fields = [
+        "exp_total_entropy",
+        "exp_infer_average_entropy",
+        "exp_accuracy",
+        "exp_format_compliance_rate",
+        "exp_total_time",
+        "base_model_accuracy",
+        "base_model_format_compliance_rate",
+    ]
+
     with open(input_csv_path, "r", encoding="utf-8") as csvfile:
         reader = csv.DictReader(csvfile)
 
@@ -46,7 +56,16 @@ def extract_summary_fields(
 
             seen_keys.add(key)
 
-            summary_record = {field: row.get(field, "") for field in summary_fields}
+            summary_record = {}
+            for field in summary_fields:
+                value = row.get(field, "")
+                if field in numeric_fields and value:
+                    try:
+                        summary_record[field] = round(float(value), 3)
+                    except (ValueError, TypeError):
+                        summary_record[field] = value
+                else:
+                    summary_record[field] = value
             summary_records.append(summary_record)
 
     if not summary_records:
