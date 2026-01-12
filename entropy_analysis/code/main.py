@@ -132,7 +132,7 @@ def main() -> None:
     parser.add_argument(
         "--dataset",
         type=str,
-        default="aime2025",
+        default="aime2024",
         help="Name of the dataset to analyze, options: gsm8k, aime2024, aime2025, math500, mmlu, humaneval.",
     )
     parser.add_argument(

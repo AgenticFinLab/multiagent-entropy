@@ -41,7 +41,9 @@ class Aggregator:
 
         return entropy_data, metrics_data
 
-    def _extract_base_model_data(self, metrics_data: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    def _extract_base_model_data(
+        self, metrics_data: Dict[str, Any]
+    ) -> Dict[str, Dict[str, Any]]:
         """Extract base model data from metrics for each model.
 
         Base model is defined as the first round agent in single agent architecture.
@@ -62,19 +64,25 @@ class Aggregator:
                 if architecture == "single":
                     samples = exp_metrics.get("samples", {})
                     for sample_id, sample_data in samples.items():
-                        for agent_key, agent_data in sample_data.get("agents", {}).items():
+                        for agent_key, agent_data in sample_data.get(
+                            "agents", {}
+                        ).items():
                             if agent_key.endswith("_round_1"):
                                 model_base_data[sample_id] = {
                                     "predicted_answer": agent_data["predicted_answer"],
                                     "is_correct": agent_data["is_correct"],
-                                    "format_compliance": agent_data["format_compliance"],
+                                    "format_compliance": agent_data[
+                                        "format_compliance"
+                                    ],
                                 }
                                 break
             base_model_data[model_name] = model_base_data
 
         return base_model_data
 
-    def _calculate_base_model_stats(self, metrics_data: Dict[str, Any]) -> Dict[str, Dict[str, float]]:
+    def _calculate_base_model_stats(
+        self, metrics_data: Dict[str, Any]
+    ) -> Dict[str, Dict[str, float]]:
         """Calculate base model statistics across all samples for each model.
 
         Base model is defined as the first round agent in single agent architecture.
@@ -98,7 +106,9 @@ class Aggregator:
                 if architecture == "single":
                     samples = exp_metrics.get("samples", {})
                     for sample_id, sample_data in samples.items():
-                        for agent_key, agent_data in sample_data.get("agents", {}).items():
+                        for agent_key, agent_data in sample_data.get(
+                            "agents", {}
+                        ).items():
                             if agent_key.endswith("_round_1"):
                                 base_model_predictions += 1
                                 if agent_data["is_correct"]:
@@ -173,7 +183,9 @@ class Aggregator:
                         "final_format_compliance", False
                     )
 
-                    base_model_sample_data = base_model_data.get(model_name, {}).get(sample_id, {})
+                    base_model_sample_data = base_model_data.get(model_name, {}).get(
+                        sample_id, {}
+                    )
                     base_model_predicted_answer = base_model_sample_data.get(
                         "predicted_answer", ""
                     )
@@ -196,7 +208,7 @@ class Aggregator:
                         )
 
                         execution_order = agent_entropy_data.get("execution_order", 0)
-                        time_cost = agent_metrics.get("time_cost", 0)
+                        agent_time_cost = agent_metrics.get("agent_time_cost", 0)
                         avg_entropy = agent_metrics.get("average_entropy", 0)
 
                         if architecture == "debate" and agent_type == "orchestrator":
@@ -212,7 +224,7 @@ class Aggregator:
                             "agent_name": agent_type,
                             "agent_key": agent_key,
                             "execution_order": execution_order,
-                            "time_cost": time_cost,
+                            "agent_time_cost": agent_time_cost,
                             "final_predicted_answer": final_predicted_answer,
                             "is_finally_correct": is_finally_correct,
                             "final_format_compliance": final_format_compliance,
@@ -312,6 +324,59 @@ class Aggregator:
                         "round_avg_entropy": round_data.get("infer_average_entropy", 0),
                     }
 
+                model_metrics = metrics_data.get("models", {}).get(model_name, {})
+                exp_metrics = model_metrics.get("experiments", {}).get(exp_name, {})
+                if not exp_metrics:
+                    continue
+
+                architecture = exp_entropy.get("agent_architecture", "unknown")
+                micro_stats = exp_entropy.get("micro_statistics", {})
+                samples_entropy = micro_stats.get("samples", {})
+                samples_metrics = exp_metrics.get("samples", {})
+
+                for sample_id, sample_metrics in samples_metrics.items():
+                    if sample_id not in samples_entropy:
+                        continue
+
+                    sample_entropy = samples_entropy[sample_id]
+
+                    for agent_key, agent_metrics in sample_metrics.get(
+                        "agents", {}
+                    ).items():
+                        agent_entropy_data = sample_entropy.get("agents", {}).get(
+                            agent_key, {}
+                        )
+
+                        agent_type = agent_entropy_data.get(
+                            "agent_type", agent_key.split("_")[0]
+                        )
+
+                        if architecture == "debate" and agent_type == "orchestrator":
+                            continue
+
+                        round_number = agent_entropy_data.get("round_number", 0)
+                        if round_number == 0:
+                            continue
+
+                        key = (exp_name, round_number)
+                        if key not in round_stats:
+                            round_stats[key] = {
+                                "round_total_entropy": 0,
+                                "round_num_inferences": 0,
+                                "round_avg_entropy": 0,
+                                "round_total_time": 0,
+                                "round_total_token": 0,
+                            }
+
+                        round_stats[key].setdefault("round_total_time", 0)
+                        round_stats[key].setdefault("round_total_token", 0)
+                        round_stats[key]["round_total_time"] += agent_metrics.get(
+                            "agent_time_cost", 0
+                        )
+                        round_stats[key]["round_total_token"] += agent_entropy_data.get(
+                            "token_count", 0
+                        )
+
         return round_stats
 
     def extract_agent_level_data(
@@ -390,15 +455,34 @@ class Aggregator:
                 total_format_compliance = 0
                 total_predictions = 0
                 total_time = 0
+                total_token = 0
+
+                micro_stats = exp_entropy.get("micro_statistics", {})
+                samples_entropy = micro_stats.get("samples", {})
 
                 for sample_id, sample_data in samples.items():
+                    if sample_id in samples_entropy:
+                        sample_entropy = samples_entropy[sample_id]
+                        for agent_key, agent_entropy_data in sample_entropy.get(
+                            "agents", {}
+                        ).items():
+                            agent_type = agent_entropy_data.get(
+                                "agent_type", agent_key.split("_")[0]
+                            )
+                            if (
+                                architecture == "debate"
+                                and agent_type == "orchestrator"
+                            ):
+                                continue
+                            total_token += agent_entropy_data.get("token_count", 0)
+
                     for agent_key, agent_data in sample_data.get("agents", {}).items():
                         agent_type = agent_data.get(
                             "agent_type", agent_key.split("_")[0]
                         )
                         if architecture == "debate" and agent_type == "orchestrator":
                             continue
-                        total_time += agent_data.get("time_cost", 0)
+                        total_time += agent_data.get("agent_time_cost", 0)
                     if sample_data.get("final_predicted_answer") is not None:
                         total_predictions += 1
                         if sample_data.get("is_finally_correct", False):
@@ -425,6 +509,7 @@ class Aggregator:
                     "exp_accuracy": accuracy,
                     "exp_format_compliance_rate": format_compliance_rate,
                     "exp_total_time": total_time,
+                    "exp_total_token": total_token,
                     "base_model_accuracy": model_base_stats.get("accuracy", 0),
                     "base_model_format_compliance_rate": model_base_stats.get(
                         "format_compliance_rate", 0
