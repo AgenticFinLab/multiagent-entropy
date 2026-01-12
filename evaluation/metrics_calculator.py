@@ -201,7 +201,7 @@ class MetricsCalculator:
             return MetricsCalculator.is_answer_correct(predicted, ground_truth)
 
     @staticmethod
-    def calculate_time_cost(result: Dict[str, Any]) -> float:
+    def calculate_agent_time_cost(result: Dict[str, Any]) -> float:
         """Extract time cost from result dictionary.
 
         Args:

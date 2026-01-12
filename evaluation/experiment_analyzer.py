@@ -170,7 +170,7 @@ class ExperimentAnalyzer:
             execution_order = result_info["execution_order"]
             result_data = result_info["data"]
 
-            time_cost = self.metrics_calculator.calculate_time_cost(result_data)
+            agent_time_cost = self.metrics_calculator.calculate_agent_time_cost(result_data)
 
             entropy_tensor = self.data_loader.load_entropy_tensor(
                 dataset, model_name, experiment_name, result_id
@@ -228,7 +228,7 @@ class ExperimentAnalyzer:
             sample_metrics["agents"][agent_key] = {
                 "agent_type": agent_type,
                 "execution_order": execution_order,
-                "agent_time_cost": time_cost,
+                "agent_agent_time_cost": agent_time_cost,
                 "average_entropy": avg_entropy,
                 "predicted_answer": predicted_answer,
                 "is_correct": is_correct,
