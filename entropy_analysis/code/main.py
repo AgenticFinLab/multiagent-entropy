@@ -32,8 +32,12 @@ The script will:
 import sys
 import warnings
 import argparse
+import os
 from pathlib import Path
 from typing import Dict, Optional
+
+# Set OpenBLAS thread limit to prevent memory allocation errors
+os.environ["OPENBLAS_NUM_THREADS"] = "4"
 
 # Add parent directory to path for module imports
 sys.path.append(str(Path(__file__).parent))
