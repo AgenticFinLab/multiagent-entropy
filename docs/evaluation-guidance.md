@@ -488,12 +488,12 @@ evaluation/results/
 All CSV files (dataset-level, model-level, and experiment-level) share the same column structure:
 
 ```csv
-model_name,sample_id,experiment_name,architecture,num_rounds,ground_truth,agent_name,agent_key,execution_order,time_cost,final_predicted_answer,is_finally_correct,sample_total_entropy,sample_max_entropy,sample_min_entropy,sample_mean_entropy,sample_median_entropy,sample_std_entropy,sample_variance_entropy,sample_q1_entropy,sample_q3_entropy,sample_num_agents,sample_all_agents_token_count,sample_avg_entropy_per_token,agent_total_entropy,agent_max_entropy,agent_min_entropy,agent_mean_entropy,agent_median_entropy,agent_std_entropy,agent_variance_entropy,agent_q1_entropy,agent_q3_entropy,agent_token_count,agent_avg_entropy_per_token,agent_round_number,agent_avg_entropy,round_total_entropy,round_num_inferences,round_avg_entropy,exp_total_entropy,exp_infer_average_entropy,exp_num_inferences,exp_accuracy,exp_total_time,base_model_predicted_answer,base_model_is_finally_correct,base_model_format_compliance,base_model_accuracy,base_model_format_compliance_rate
+model_name,sample_id,experiment_name,architecture,num_rounds,ground_truth,agent_name,agent_key,execution_order,agent_time_cost,final_predicted_answer,is_finally_correct,sample_total_entropy,sample_max_entropy,sample_min_entropy,sample_mean_entropy,sample_median_entropy,sample_std_entropy,sample_variance_entropy,sample_q1_entropy,sample_q3_entropy,sample_num_agents,sample_all_agents_token_count,sample_avg_entropy_per_token,agent_total_entropy,agent_max_entropy,agent_min_entropy,agent_mean_entropy,agent_median_entropy,agent_std_entropy,agent_variance_entropy,agent_q1_entropy,agent_q3_entropy,agent_token_count,agent_avg_entropy_per_token,agent_round_number,agent_avg_entropy,round_total_entropy,round_num_inferences,round_avg_entropy,exp_total_entropy,exp_infer_average_entropy,exp_num_inferences,exp_accuracy,exp_total_time,base_model_predicted_answer,base_model_is_finally_correct,base_model_format_compliance,base_model_accuracy,base_model_format_compliance_rate
 ```
 
 **Column Groups:**
 - **Metadata**: `model_name`, `sample_id`, `experiment_name`, `architecture`, `num_rounds`, `ground_truth`
-- **Agent Information**: `agent_name`, `agent_key`, `execution_order`, `time_cost`
+- **Agent Information**: `agent_name`, `agent_key`, `execution_order`, `agent_time_cost`
 - **Performance**: `final_predicted_answer`, `is_finally_correct`
 - **Sample-level Entropy**: `sample_total_entropy`, `sample_max_entropy`, `sample_min_entropy`, `sample_mean_entropy`, `sample_median_entropy`, `sample_std_entropy`, `sample_variance_entropy`, `sample_q1_entropy`, `sample_q3_entropy`, `sample_num_agents`, `sample_all_agents_token_count`, `sample_avg_entropy_per_token`
 - **Agent-level Entropy**: `agent_total_entropy`, `agent_max_entropy`, `agent_min_entropy`, `agent_mean_entropy`, `agent_median_entropy`, `agent_std_entropy`, `agent_variance_entropy`, `agent_q1_entropy`, `agent_q3_entropy`, `agent_token_count`, `agent_avg_entropy_per_token`, `agent_round_number`, `agent_avg_entropy`
@@ -522,7 +522,7 @@ The structure supports:
 - experiment_name, dataset, task_type, agent_architecture, num_rounds, num_samples
 - samples: Detailed metrics for each sample including agent-level performance
   - main_id, ground_truth, final_predicted_answer, is_finally_correct, agents
-  - agents: Per-agent metrics including agent_type, execution_order, time_cost, average_entropy, predicted_answer, is_correct
+  - agents: Per-agent metrics including agent_type, execution_order, agent_time_cost, average_entropy, predicted_answer, is_correct
 - summary: Aggregated statistics across all samples
 
 **all_entropy_results.json**: Contains entropy analysis for all experiments
@@ -534,7 +534,7 @@ The structure supports:
 
 **aggregated_data.csv**: Unified CSV file combining metrics and entropy data for data mining
 - sample_id, experiment_name, architecture, ground_truth
-- agent_name, agent_key, execution_order, time_cost
+- agent_name, agent_key, execution_order, agent_time_cost
 - predicted_answer, is_correct, final_predicted_answer, is_finally_correct
 - sample-level entropy statistics (total, max, min, mean, median, std, variance, q1, q3)
 - sample token count and average entropy per token
@@ -820,7 +820,7 @@ The aggregator generates a single CSV file in `evaluation/results/{dataset}/aggr
 
 **Columns:**
 - sample_id, experiment_name, architecture, ground_truth
-- agent_name, agent_key, execution_order, time_cost
+- agent_name, agent_key, execution_order, agent_time_cost
 - predicted_answer, is_correct
 - sample-level entropy statistics (total, max, min, mean, median, std, variance, q1, q3)
 - sample token count and average entropy per token
@@ -833,7 +833,7 @@ The aggregator generates a single CSV file in `evaluation/results/{dataset}/aggr
 Each row represents a unique combination of sample and agent sequence, with the following structure:
 
 ```csv
-sample_id,experiment_name,architecture,ground_truth,agent_name,agent_key,execution_order,time_cost,predicted_answer,is_correct,sample_entropy_total,sample_entropy_max,sample_entropy_min,sample_entropy_mean,sample_entropy_median,sample_entropy_std,sample_entropy_variance,sample_entropy_q1,sample_entropy_q3,sample_token_count,sample_avg_entropy_per_token,agent_entropy_total,agent_sample_count,agent_total_tokens,agent_entropy_avg,agent_entropy_mean,agent_entropy_max,agent_entropy_min,agent_entropy_median,agent_entropy_std,agent_entropy_variance,agent_entropy_q1,agent_entropy_q3,experiment_total_entropy,experiment_avg_entropy,experiment_total_samples,experiment_accuracy,experiment_total_time,experiment_avg_time,base_model_predicted_answer,base_model_is_finally_correct,base_model_format_compliance,base_model_accuracy,base_model_format_compliance_rate
+sample_id,experiment_name,architecture,ground_truth,agent_name,agent_key,execution_order,agent_time_cost,predicted_answer,is_correct,sample_entropy_total,sample_entropy_max,sample_entropy_min,sample_entropy_mean,sample_entropy_median,sample_entropy_std,sample_entropy_variance,sample_entropy_q1,sample_entropy_q3,sample_token_count,sample_avg_entropy_per_token,agent_entropy_total,agent_sample_count,agent_total_tokens,agent_entropy_avg,agent_entropy_mean,agent_entropy_max,agent_entropy_min,agent_entropy_median,agent_entropy_std,agent_entropy_variance,agent_entropy_q1,agent_entropy_q3,experiment_total_entropy,experiment_avg_entropy,experiment_total_samples,experiment_accuracy,experiment_total_time,experiment_avg_time,base_model_predicted_answer,base_model_is_finally_correct,base_model_format_compliance,base_model_accuracy,base_model_format_compliance_rate
 ID1,single_agent,single,42,SingleSolver,ID1-SingleSolver-1,1,2.5,42,True,123.45,1.123,0.0,0.062,0.0,0.176,0.031,0.0,0.012,2000,0.062,12345.67,100,69094,0.051,0.051,1.123,0.0,0.0,0.195,0.028,0.0,0.005,37961.39,47.45,100,0.75,250.0,2.5,42,True,True,0.75,0.95
 ```
 
