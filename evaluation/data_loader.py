@@ -62,7 +62,15 @@ class DataLoader:
         with open(data_file, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        return {str(item["main_id"]): item for item in data}
+        if isinstance(data, dict):
+            num_samples = len(data.get("main_id", []))
+            ground_truth_dict = {}
+            for i in range(num_samples):
+                item = {key: data[key][i] for key in data if isinstance(data[key], list) and i < len(data[key])}
+                ground_truth_dict[str(item["main_id"])] = item
+            return ground_truth_dict
+        else:
+            return {str(item["main_id"]): item for item in data}
 
     def load_experiment_config(
         self, dataset: str, experiment_name: str, model_name: Optional[str] = None

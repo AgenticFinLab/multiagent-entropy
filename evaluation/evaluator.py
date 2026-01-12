@@ -26,13 +26,13 @@ def main():
         "--dataset",
         type=str,
         choices=["gsm8k", "humaneval", "mmlu", "aime2024", "aime2025", "math500"],
-        default="aime2024",
+        default="aime2025",
         help="Dataset to analyze",
     )
     parser.add_argument(
         "--model",
         type=str,
-        default="",
+        default=None,
         help="Model name. If not provided, analyze all models",
     )
     parser.add_argument(

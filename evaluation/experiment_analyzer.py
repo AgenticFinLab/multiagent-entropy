@@ -69,11 +69,21 @@ class ExperimentAnalyzer:
         if task_type == "auto" or task_type == "math":
             task_type = self._get_task_type_from_dataset(dataset)
 
-        config = self.data_loader.load_experiment_config(
-            dataset, experiment_name, model_name
-        )
-        agent_architecture = config["agent_type"]
-        num_rounds = config["round"]
+        try:
+            config = self.data_loader.load_experiment_config(
+                dataset, experiment_name, model_name
+            )
+        except Exception as e:
+            raise Exception(f"Failed to load config for {dataset}/{model_name}/{experiment_name}: {e}")
+
+        if not isinstance(config, dict):
+            raise Exception(f"Config is not a dictionary, got {type(config)}: {config}")
+
+        agent_architecture = config.get("agent_type")
+        if agent_architecture is None:
+            raise Exception(f"Config missing 'agent_type' key. Available keys: {list(config.keys())}")
+
+        num_rounds = config.get("round", 1)
 
         ground_truths = self.data_loader.load_ground_truth(dataset)
         all_results = self.data_loader.load_all_results(
@@ -339,9 +349,11 @@ class ExperimentAnalyzer:
                         experiment_name
                     ] = metrics
                 except Exception as e:
+                    import traceback
                     print(
                         f"Error analyzing experiment {model_name}/{experiment_name}: {e}"
                     )
+                    traceback.print_exc()
                     all_metrics["models"][model_name]["experiments"][
                         experiment_name
                     ] = {"error": str(e)}
