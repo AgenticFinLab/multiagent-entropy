@@ -4,7 +4,7 @@ data:
   data_name: Math500
   data_path: experiments/data/Math500
   split: test
-  # The number of samples to be tested, -1 for all
+  # The number of samples to be tested, -1 for all (500 test samples)
   data_num: -1
   # The number of samples for one inference
   batch_size: 1

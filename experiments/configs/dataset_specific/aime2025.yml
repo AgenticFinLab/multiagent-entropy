@@ -7,7 +7,7 @@ data:
   # 'i' for AIME2025-I subset, 'ii' for AIME2025-II subset
   subset: all
   split: test
-  # The number of samples to be tested, -1 for all
+  # The number of samples to be tested, -1 for all (30 test samples)
   data_num: -1
   # The number of samples for one inference
   batch_size: 1
