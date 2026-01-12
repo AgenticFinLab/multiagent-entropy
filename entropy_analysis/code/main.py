@@ -30,6 +30,10 @@ The script will:
 """
 
 import os
+
+# Set OpenBLAS thread limit to prevent memory allocation errors
+os.environ["OPENBLAS_NUM_THREADS"] = "4"
+
 import sys
 import warnings
 import argparse
@@ -41,8 +45,6 @@ from error_handling import ErrorHandler
 from visualizer import EntropyVisualizer
 from entropy_analyzer import EntropyAnalyzer
 
-# Set OpenBLAS thread limit to prevent memory allocation errors
-os.environ["OPENBLAS_NUM_THREADS"] = "4"
 
 # Add parent directory to path for module imports
 sys.path.append(str(Path(__file__).parent))
