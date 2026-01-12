@@ -134,7 +134,7 @@ def main() -> None:
     parser.add_argument(
         "--model",
         type=str,
-        default="qwen3_4b",
+        default=None,
         help="Name of the model to analyze. If not provided, performs dataset-level analysis",
     )
     parser.add_argument(
