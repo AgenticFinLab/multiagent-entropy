@@ -992,7 +992,8 @@ class EntropyVisualizer:
                 model_data = self.data[self.data["model_name"] == model]
                 correlation_matrix = model_data[features_to_correlate].corr()
 
-                # Create heatmap for this model
+                mask = np.triu(np.ones_like(correlation_matrix, dtype=bool))
+
                 sns.heatmap(
                     correlation_matrix,
                     annot=True,
@@ -1003,9 +1004,10 @@ class EntropyVisualizer:
                     linewidths=0.5,
                     cbar_kws={"shrink": 0.8},
                     ax=axes[idx],
-                    vmin=vmin,  # Use global min for consistent color scale
-                    vmax=vmax,  # Use global max for consistent color scale
-                    annot_kws={"fontsize": 6},  # Smaller font size for annotations
+                    vmin=vmin,
+                    vmax=vmax,
+                    annot_kws={"fontsize": 6},
+                    mask=mask,
                 )
 
                 axes[idx].set_title(
@@ -1042,6 +1044,8 @@ class EntropyVisualizer:
                 pad=20,
             )
 
+            mask = np.triu(np.ones_like(correlation_matrix, dtype=bool))
+
             sns.heatmap(
                 correlation_matrix,
                 annot=True,
@@ -1052,7 +1056,8 @@ class EntropyVisualizer:
                 linewidths=0.5,
                 cbar_kws={"shrink": 0.8},
                 ax=ax,
-                annot_kws={"fontsize": 8},  # Font size for annotations
+                annot_kws={"fontsize": 8},
+                mask=mask,
             )
 
             ax.set_xticklabels(
