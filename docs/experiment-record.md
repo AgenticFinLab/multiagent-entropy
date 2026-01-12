@@ -2,6 +2,19 @@
 
 > This document records the experimental results and analysis performed in the multi-agent entropy project.
 
+```yml
+# base config
+
+round:2
+
+generation_config:
+  max_new_tokens: 8192
+  do_sample: true
+  temperature: 0.6
+  top_p: 0.95
+```
+
+
 ### Qwen Series
 
 #### GSM8K
