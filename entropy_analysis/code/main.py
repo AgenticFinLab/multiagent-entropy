@@ -29,23 +29,23 @@ The script will:
 3. Store visualizations in entropy_analysis/visualizations/<dataset_name>/<model_name>/
 """
 
+import os
 import sys
 import warnings
 import argparse
-import os
 from pathlib import Path
 from typing import Dict, Optional
+
+from data_loader import DataLoader
+from error_handling import ErrorHandler
+from visualizer import EntropyVisualizer
+from entropy_analyzer import EntropyAnalyzer
 
 # Set OpenBLAS thread limit to prevent memory allocation errors
 os.environ["OPENBLAS_NUM_THREADS"] = "4"
 
 # Add parent directory to path for module imports
 sys.path.append(str(Path(__file__).parent))
-
-from data_loader import DataLoader
-from error_handling import ErrorHandler
-from visualizer import EntropyVisualizer
-from entropy_analyzer import EntropyAnalyzer
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings("ignore")
