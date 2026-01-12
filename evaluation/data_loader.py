@@ -47,6 +47,7 @@ class DataLoader:
             "humaneval": "HumanEval",
             "mmlu": "MMLU",
             "aime2024": "AIME2024",
+            "aime2025": "AIME2025",
             "math500": "Math500",
         }
         dataset_folder = dataset_map.get(dataset.lower(), dataset)

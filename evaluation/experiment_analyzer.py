@@ -42,6 +42,7 @@ class ExperimentAnalyzer:
             "mmlu": "option",
             "gsm8k": "math",
             "aime2024": "math",
+            "aime2025": "math",
             "math500": "math",
         }
         return dataset_task_map.get(dataset.lower(), "math")

@@ -25,8 +25,8 @@ def main():
     parser.add_argument(
         "--dataset",
         type=str,
-        choices=["gsm8k", "humaneval", "mmlu", "aime2024", "math500"],
-        default="gsm8k",
+        choices=["gsm8k", "humaneval", "mmlu", "aime2024", "aime2025", "math500"],
+        default="aime2024",
         help="Dataset to analyze",
     )
     parser.add_argument(
@@ -222,7 +222,7 @@ def main():
         base_results_path = Path(base_path) / "evaluation" / "results"
 
         if args.aggregate_all:
-            datasets = ["gsm8k", "humaneval", "mmlu", "aime2024", "math500"]
+            datasets = ["gsm8k", "humaneval", "mmlu", "aime2024", "aime2025", "math500"]
             for dataset in datasets:
                 dataset_path = base_results_path / dataset
                 entropy_file = dataset_path / "all_entropy_results.json"
