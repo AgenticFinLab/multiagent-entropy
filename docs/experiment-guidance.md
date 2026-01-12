@@ -13,6 +13,7 @@ experiments/
 │   ├── dataset_specific/                   # Dataset-specific configuration files
 │   │   ├── gsm8k.yml                       # GSM8K dataset configuration
 │   │   ├── aime2024.yml                    # AIME2024 dataset configuration
+│   │   ├── aime2025.yml                    # AIME2025 dataset configuration
 │   │   ├── math500.yml                     # Math500 dataset configuration
 │   │   ├── mmlu.yml                        # MMLU dataset configuration
 │   │   └── humaneval.yml                   # HumanEval dataset configuration
@@ -101,6 +102,22 @@ generation_config:
   max_new_tokens: 8192
 ```
 
+**Dataset-Specific Configuration** (`dataset_specific/aime2025.yml`):
+```yaml
+data:
+  data_name: AIME2025
+  data_path: experiments/data/AIME2025
+  subset: all  # 'all' for both AIME2025-I and AIME2025-II, 'i' for AIME2025-I, 'ii' for AIME2025-II
+  split: test
+  data_num: -1  # -1 for all (30 test samples)
+  batch_size: 1
+
+task_type: "math"
+
+generation_config:
+  max_new_tokens: 8192  # AIME2025 problems require longer reasoning chains
+```
+
 **Result**: When running experiments with AIME2024 dataset:
 - `max_new_tokens`: 8192 (overridden from dataset config)
 - `do_sample`: true (inherited from base config)
@@ -172,10 +189,10 @@ To run a single experiment, use the `run_experiment.py` script with the followin
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --experiment-name qwen3-4b_aime2024_single_agent \
+  --experiment-name qwen3-4b_aime2025_single_agent \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
-  --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
+  --dataset-config "experiments/configs/dataset_specific/aime2025.yml" \
   --agent-type "single"
 ```
 
@@ -183,10 +200,10 @@ python experiments/scripts/run_experiment.py \
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --experiment-name "qwen3-4b_aime2024_sequential_agent" \
+  --experiment-name "qwen3-4b_aime2025_sequential_agent" \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
-  --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
+  --dataset-config "experiments/configs/dataset_specific/aime2025.yml" \
   --agent-type "sequential"
 ```
 
@@ -194,10 +211,10 @@ python experiments/scripts/run_experiment.py \
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --experiment-name "qwen3-4b_aime2024_centralized_agent" \
+  --experiment-name "qwen3-4b_aime2025_centralized_agent" \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
-  --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
+  --dataset-config "experiments/configs/dataset_specific/aime2025.yml" \
   --agent-type "centralized"
 ```
 
@@ -205,10 +222,10 @@ python experiments/scripts/run_experiment.py \
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --experiment-name "qwen3-4b_aime2024_decentralized_agent" \
+  --experiment-name "qwen3-4b_aime2025_decentralized_agent" \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
-  --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
+  --dataset-config "experiments/configs/dataset_specific/aime2025.yml" \
   --agent-type "decentralized"
 ```
 
@@ -216,10 +233,10 @@ python experiments/scripts/run_experiment.py \
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --experiment-name "qwen3-4b_aime2024_full_decentralized_agent" \
+  --experiment-name "qwen3-4b_aime2025_full_decentralized_agent" \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
-  --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
+  --dataset-config "experiments/configs/dataset_specific/aime2025.yml" \
   --agent-type "full_decentralized"
 ```
 
@@ -227,10 +244,10 @@ python experiments/scripts/run_experiment.py \
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --experiment-name "qwen3-4b_aime2024_debate_agent" \
+  --experiment-name "qwen3-4b_aime2025_debate_agent" \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
-  --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
+  --dataset-config "experiments/configs/dataset_specific/aime2025.yml" \
   --agent-type "debate"
 ```
 
@@ -239,10 +256,10 @@ python experiments/scripts/run_experiment.py \
 conda activate maep
 cd /home/yuxuanzhao/multiagent-entropy
 python experiments/scripts/run_experiment.py \
-  --experiment-name "qwen3-4b_aime2024_hybrid_agent" \
+  --experiment-name "qwen3-4b_aime2025_hybrid_agent" \
   --base-config "experiments/configs/base_config.yml" \
   --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
-  --dataset-config "experiments/configs/dataset_specific/aime2024.yml" \
+  --dataset-config "experiments/configs/dataset_specific/aime2025.yml" \
   --agent-type "hybrid"
 ```
 

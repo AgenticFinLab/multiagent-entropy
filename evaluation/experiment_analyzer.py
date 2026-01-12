@@ -7,8 +7,8 @@ calculate metrics, and compare different agent architectures.
 from collections import defaultdict
 from typing import Dict, List, Any, Optional
 
-from data_loader import DataLoader
 from utils import save_json
+from data_loader import DataLoader
 from metrics_calculator import MetricsCalculator
 
 
@@ -74,14 +74,18 @@ class ExperimentAnalyzer:
                 dataset, experiment_name, model_name
             )
         except Exception as e:
-            raise Exception(f"Failed to load config for {dataset}/{model_name}/{experiment_name}: {e}")
+            raise Exception(
+                f"Failed to load config for {dataset}/{model_name}/{experiment_name}: {e}"
+            )
 
         if not isinstance(config, dict):
             raise Exception(f"Config is not a dictionary, got {type(config)}: {config}")
 
         agent_architecture = config.get("agent_type")
         if agent_architecture is None:
-            raise Exception(f"Config missing 'agent_type' key. Available keys: {list(config.keys())}")
+            raise Exception(
+                f"Config missing 'agent_type' key. Available keys: {list(config.keys())}"
+            )
 
         num_rounds = config.get("round", 1)
 
@@ -350,6 +354,7 @@ class ExperimentAnalyzer:
                     ] = metrics
                 except Exception as e:
                     import traceback
+
                     print(
                         f"Error analyzing experiment {model_name}/{experiment_name}: {e}"
                     )
@@ -379,7 +384,12 @@ class ExperimentAnalyzer:
                             ].items():
                                 if "agents" in sample_data:
                                     for agent_key in sample_data["agents"]:
-                                        if "response" in sample_data["agents"][agent_key]:
-                                            del sample_data["agents"][agent_key]["response"]
+                                        if (
+                                            "response"
+                                            in sample_data["agents"][agent_key]
+                                        ):
+                                            del sample_data["agents"][agent_key][
+                                                "response"
+                                            ]
 
         save_json(metrics_copy, output_path)
