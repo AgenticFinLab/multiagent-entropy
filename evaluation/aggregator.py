@@ -22,9 +22,11 @@ class Aggregator:
             metrics_file: Path to all_metrics.json
             output_dir: Path to output directory for CSV files
         """
+        # Convert file paths to Path objects for consistent path handling
         self.entropy_file = Path(entropy_file)
         self.metrics_file = Path(metrics_file)
         self.output_dir = Path(output_dir)
+        # Create output directory if it doesn't exist
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def load_json_files(self) -> tuple:
@@ -33,9 +35,11 @@ class Aggregator:
         Returns:
             Tuple of (entropy_data, metrics_data)
         """
+        # Load entropy analysis results from JSON file
         with open(self.entropy_file, "r", encoding="utf-8") as f:
             entropy_data = json.load(f)
 
+        # Load performance metrics from JSON file
         with open(self.metrics_file, "r", encoding="utf-8") as f:
             metrics_data = json.load(f)
 
@@ -57,12 +61,16 @@ class Aggregator:
         """
         base_model_data = {}
 
+        # Iterate through each model's metrics
         for model_name, model_metrics in metrics_data.get("models", {}).items():
             model_base_data = {}
+            # Iterate through each experiment within the model
             for exp_name, exp_metrics in model_metrics.get("experiments", {}).items():
+                # Only extract from single agent architecture experiments
                 architecture = exp_metrics.get("agent_architecture", "unknown")
                 if architecture == "single":
                     samples = exp_metrics.get("samples", {})
+                    # Extract first round agent data as base model
                     for sample_id, sample_data in samples.items():
                         for agent_key, agent_data in sample_data.get(
                             "agents", {}
@@ -96,11 +104,13 @@ class Aggregator:
         """
         base_model_stats = {}
 
+        # Iterate through each model to calculate statistics
         for model_name, model_metrics in metrics_data.get("models", {}).items():
             base_model_correct = 0
             base_model_format_compliant = 0
             base_model_predictions = 0
 
+            # Count correct predictions and format compliance
             for exp_name, exp_metrics in model_metrics.get("experiments", {}).items():
                 architecture = exp_metrics.get("agent_architecture", "unknown")
                 if architecture == "single":
@@ -117,6 +127,7 @@ class Aggregator:
                                     base_model_format_compliant += 1
                                 break
 
+            # Calculate accuracy and format compliance rate
             accuracy = (
                 base_model_correct / base_model_predictions
                 if base_model_predictions > 0
@@ -149,31 +160,39 @@ class Aggregator:
         """
         records = []
 
+        # Extract base model data for comparison
         base_model_data = self._extract_base_model_data(metrics_data)
 
+        # Iterate through models and experiments to extract sample-level data
         for model_name, model_entropy in entropy_data.get("models", {}).items():
             for exp_name, exp_entropy in model_entropy.get("experiments", {}).items():
+                # Skip experiments with errors
                 if "error" in exp_entropy:
                     continue
 
+                # Get corresponding metrics data
                 model_metrics = metrics_data.get("models", {}).get(model_name, {})
                 exp_metrics = model_metrics.get("experiments", {}).get(exp_name, {})
                 if not exp_metrics:
                     continue
 
+                # Extract experiment metadata
                 architecture = exp_entropy.get("agent_architecture", "unknown")
                 num_rounds = exp_entropy.get("num_rounds", 0)
 
+                # Get sample-level entropy and metrics
                 micro_stats = exp_entropy.get("micro_statistics", {})
                 samples_entropy = micro_stats.get("samples", {})
                 samples_metrics = exp_metrics.get("samples", {})
 
+                # Process each sample
                 for sample_id, sample_metrics in samples_metrics.items():
                     if sample_id not in samples_entropy:
                         continue
 
                     sample_entropy = samples_entropy[sample_id]
 
+                    # Extract sample-level performance metrics
                     ground_truth = sample_metrics.get("ground_truth", "")
                     final_predicted_answer = sample_metrics.get(
                         "final_predicted_answer", ""
@@ -183,6 +202,7 @@ class Aggregator:
                         "final_format_compliance", False
                     )
 
+                    # Extract base model data for this sample
                     base_model_sample_data = base_model_data.get(model_name, {}).get(
                         sample_id, {}
                     )
@@ -196,6 +216,7 @@ class Aggregator:
                         "format_compliance", False
                     )
 
+                    # Process each agent within the sample
                     for agent_key, agent_metrics in sample_metrics.get(
                         "agents", {}
                     ).items():
@@ -206,6 +227,7 @@ class Aggregator:
                         if not agent_entropy_data:
                             continue
 
+                        # Extract agent type and execution details
                         agent_type = agent_entropy_data.get(
                             "agent_type", agent_key.split("_")[0]
                         )
@@ -214,9 +236,11 @@ class Aggregator:
                         agent_time_cost = agent_metrics["agent_time_cost"]
                         avg_entropy = agent_metrics["average_entropy"]
 
+                        # Skip orchestrator agents in debate architecture
                         if architecture == "debate" and agent_type == "orchestrator":
                             continue
 
+                        # Build comprehensive record with all metrics
                         record = {
                             "model_name": model_name,
                             "sample_id": sample_id,
@@ -311,14 +335,18 @@ class Aggregator:
         """
         round_stats = {}
 
+        # Iterate through models and experiments to extract round-level data
         for model_name, model_entropy in entropy_data.get("models", {}).items():
             for exp_name, exp_entropy in model_entropy.get("experiments", {}).items():
+                # Skip experiments with errors
                 if "error" in exp_entropy:
                     continue
 
+                # Extract round-level entropy statistics
                 macro_stats = exp_entropy.get("macro_statistics", {})
                 round_level = macro_stats.get("round_level", {})
 
+                # Initialize round statistics from entropy data
                 for round_num, round_data in round_level.items():
                     key = (exp_name, int(round_num))
                     round_stats[key] = {
@@ -327,25 +355,30 @@ class Aggregator:
                         "round_avg_entropy": round_data.get("infer_average_entropy", 0),
                     }
 
+                # Get corresponding metrics data
                 model_metrics = metrics_data.get("models", {}).get(model_name, {})
                 exp_metrics = model_metrics.get("experiments", {}).get(exp_name, {})
                 if not exp_metrics:
                     continue
 
+                # Get architecture type for time calculation
                 architecture = exp_entropy.get("agent_architecture", "unknown")
                 micro_stats = exp_entropy.get("micro_statistics", {})
                 samples_entropy = micro_stats.get("samples", {})
                 samples_metrics = exp_metrics.get("samples", {})
 
+                # Initialize time tracking for centralized architecture
                 if architecture == "centralized":
                     sample_round_times = defaultdict(lambda: defaultdict(list))
 
+                # Process each sample to calculate round-level metrics
                 for sample_id, sample_metrics in samples_metrics.items():
                     if sample_id not in samples_entropy:
                         continue
 
                     sample_entropy = samples_entropy[sample_id]
 
+                    # Process each agent within the sample
                     for agent_key, agent_metrics in sample_metrics.get(
                         "agents", {}
                     ).items():
@@ -357,6 +390,7 @@ class Aggregator:
                             "agent_type", agent_key.split("_")[0]
                         )
 
+                        # Skip orchestrator agents in debate architecture
                         if architecture == "debate" and agent_type == "orchestrator":
                             continue
 
@@ -364,6 +398,7 @@ class Aggregator:
                         if round_number == 0:
                             continue
 
+                        # Initialize round statistics if not exists
                         key = (exp_name, round_number)
                         if key not in round_stats:
                             round_stats[key] = {
@@ -379,6 +414,7 @@ class Aggregator:
 
                         agent_time_cost = agent_metrics["agent_time_cost"]
 
+                        # Handle time calculation differently for centralized architecture
                         if architecture == "centralized":
                             if agent_type == "OrchestratorAgent":
                                 sample_round_times[sample_id][round_number].append(
@@ -391,10 +427,12 @@ class Aggregator:
                         else:
                             round_stats[key]["round_total_time"] += agent_time_cost
 
+                        # Accumulate token count
                         round_stats[key]["round_total_token"] += agent_entropy_data[
                             "token_count"
                         ]
 
+                # Calculate total time for centralized architecture (parallel execution)
                 if architecture == "centralized":
                     for sample_id, rounds in sample_round_times.items():
                         for round_number, agents in rounds.items():
@@ -406,6 +444,7 @@ class Aggregator:
                                 else:
                                     parallel_times.append(time_cost)
 
+                            # Total time = max parallel time + orchestrator time
                             round_time = max(parallel_times) + orchestrator_time if parallel_times else orchestrator_time
                             key = (exp_name, round_number)
                             round_stats[key]["round_total_time"] += round_time
@@ -426,16 +465,21 @@ class Aggregator:
         """
         agent_stats = {}
 
+        # Iterate through models and experiments to extract agent-level data
         for model_name, model_entropy in entropy_data.get("models", {}).items():
             for exp_name, exp_entropy in model_entropy.get("experiments", {}).items():
+                # Skip experiments with errors
                 if "error" in exp_entropy:
                     continue
 
+                # Extract agent-level entropy statistics
                 macro_stats = exp_entropy.get("macro_statistics", {})
                 agent_level = macro_stats.get("agent_level", {})
 
+                # Process each agent's statistics
                 for agent_name, agent_data in agent_level.items():
                     key = (exp_name, agent_name)
+                    # Build comprehensive agent statistics record
                     agent_stats[key] = {
                         "agent_total_entropy": agent_data.get("total_entropy", 0),
                         "agent_num_inferences": agent_data.get("num_inferences", 0),
@@ -467,22 +511,28 @@ class Aggregator:
         """
         exp_stats = {}
 
+        # Calculate base model statistics for comparison
         base_model_stats = self._calculate_base_model_stats(metrics_data)
 
+        # Iterate through models and experiments to extract experiment-level data
         for model_name, model_entropy in entropy_data.get("models", {}).items():
             for exp_name, exp_entropy in model_entropy.get("experiments", {}).items():
+                # Skip experiments with errors
                 if "error" in exp_entropy:
                     continue
 
+                # Get corresponding metrics data
                 model_metrics = metrics_data.get("models", {}).get(model_name, {})
                 exp_metrics = model_metrics.get("experiments", {}).get(exp_name, {})
                 if not exp_metrics:
                     continue
 
+                # Extract experiment metadata
                 architecture = exp_entropy.get("agent_architecture", "unknown")
                 macro_stats = exp_entropy.get("macro_statistics", {})
                 exp_level = macro_stats.get("experiment_level", {})
 
+                # Initialize counters for experiment-level metrics
                 samples = exp_metrics.get("samples", {})
                 total_correct = 0
                 total_format_compliance = 0
@@ -490,21 +540,26 @@ class Aggregator:
                 total_time = 0
                 total_token = 0
 
+                # Get sample-level entropy data
                 micro_stats = exp_entropy.get("micro_statistics", {})
                 samples_entropy = micro_stats.get("samples", {})
 
+                # Initialize time tracking for centralized architecture
                 if architecture == "centralized":
                     sample_round_times = defaultdict(lambda: defaultdict(list))
 
+                # Process each sample to calculate experiment-level metrics
                 for sample_id, sample_data in samples.items():
                     if sample_id in samples_entropy:
                         sample_entropy = samples_entropy[sample_id]
+                        # Accumulate token count from all agents
                         for agent_key, agent_entropy_data in sample_entropy.get(
                             "agents", {}
                         ).items():
                             agent_type = agent_entropy_data.get(
                                 "agent_type", agent_key.split("_")[0]
                             )
+                            # Skip orchestrator in debate architecture
                             if (
                                 architecture == "debate"
                                 and agent_type == "orchestrator"
@@ -512,13 +567,16 @@ class Aggregator:
                                 continue
                             total_token += agent_entropy_data.get("token_count", 0)
 
+                    # Process each agent within the sample
                     for agent_key, agent_data in sample_data.get("agents", {}).items():
                         agent_type = agent_data.get(
                             "agent_type", agent_key.split("_")[0]
                         )
+                        # Skip orchestrator in debate architecture
                         if architecture == "debate" and agent_type == "orchestrator":
                             continue
 
+                        # Handle time calculation for centralized architecture
                         if architecture == "centralized":
                             round_number = int(agent_key.split("_round_")[-1]) if "_round_" in agent_key else 0
                             if agent_type == "OrchestratorAgent":
@@ -530,7 +588,10 @@ class Aggregator:
                                     ("parallel", agent_data["agent_time_cost"])
                                 )
                         else:
+                            # Accumulate time for non-centralized architectures
                             total_time += agent_data["agent_time_cost"]
+
+                    # Count predictions and correctness
                     if sample_data.get("final_predicted_answer") is not None:
                         total_predictions += 1
                         if sample_data.get("is_finally_correct", False):
@@ -538,6 +599,7 @@ class Aggregator:
                         if sample_data.get("final_format_compliance", False):
                             total_format_compliance += 1
 
+                # Calculate total time for centralized architecture (parallel execution)
                 if architecture == "centralized":
                     for sample_id, rounds in sample_round_times.items():
                         for round_number, agents in rounds.items():
@@ -549,9 +611,11 @@ class Aggregator:
                                 else:
                                     parallel_times.append(time_cost)
 
+                            # Total time = max parallel time + orchestrator time
                             round_time = max(parallel_times) + orchestrator_time if parallel_times else orchestrator_time
                             total_time += round_time
 
+                # Calculate accuracy and format compliance rate
                 accuracy = (
                     total_correct / total_predictions if total_predictions > 0 else 0
                 )
@@ -561,7 +625,9 @@ class Aggregator:
                     else 0
                 )
 
+                # Get base model statistics for comparison
                 model_base_stats = base_model_stats.get(model_name, {})
+                # Build comprehensive experiment statistics record
                 exp_stats[exp_name] = {
                     "exp_total_entropy": exp_level.get("total_entropy", 0),
                     "exp_infer_average_entropy": exp_level.get(
@@ -600,19 +666,23 @@ class Aggregator:
         """
         merged_records = []
 
+        # Merge each sample record with corresponding round, agent, and experiment stats
         for record in sample_records:
             exp_name = record["experiment_name"]
             agent_name = record["agent_name"]
             agent_round_number = record.get("agent_round_number", 0)
 
+            # Merge agent-level statistics
             key = (exp_name, agent_name)
             if key in agent_stats:
                 record.update(agent_stats[key])
 
+            # Merge round-level statistics
             round_key = (exp_name, agent_round_number)
             if round_key in round_stats:
                 record.update(round_stats[round_key])
 
+            # Merge experiment-level statistics
             if exp_name in exp_stats:
                 record.update(exp_stats[exp_name])
 
@@ -627,13 +697,17 @@ class Aggregator:
             records: List of dictionaries to write
             filename: Output filename
         """
+        # Check if there are records to write
         if not records:
             print(f"No records to write for {filename}")
             return
 
+        # Construct full output path
         output_path = self.output_dir / filename
+        # Extract field names from first record
         fieldnames = list(records[0].keys())
 
+        # Write records to CSV file
         with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
@@ -643,43 +717,56 @@ class Aggregator:
 
     def generate_aggregated_csvs(self):
         """Generate multiple CSV files based on different experimental conditions."""
+        # Load JSON data files
         entropy_data, metrics_data = self.load_json_files()
 
+        # Extract data at different levels of granularity
         sample_records = self.extract_sample_level_data(entropy_data, metrics_data)
         round_stats = self.extract_round_level_data(entropy_data, metrics_data)
         agent_stats = self.extract_agent_level_data(entropy_data, metrics_data)
         exp_stats = self.extract_experiment_level_data(entropy_data, metrics_data)
 
+        # Merge all levels of data into comprehensive records
         merged_records = self.merge_all_data(
             sample_records, round_stats, agent_stats, exp_stats
         )
 
+        # Exit early if no records were found
         if not merged_records:
             print("No records found to aggregate")
             return
 
+        # Write all aggregated data to a single CSV file
         self.write_csv(merged_records, "all_aggregated_data.csv")
 
+        # Group records by model name for model-specific CSV files
         records_by_model = defaultdict(list)
         for record in merged_records:
             model_name = record["model_name"]
             records_by_model[model_name].append(record)
 
+        # Generate CSV files for each model
         for model_name, model_records in records_by_model.items():
+            # Save original output directory
             original_output_dir = self.output_dir
+            # Create model-specific subdirectory
             self.output_dir = self.output_dir / model_name
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
+            # Group records by experiment name for experiment-specific CSV files
             records_by_experiment = defaultdict(list)
             for record in model_records:
                 exp = record["experiment_name"]
                 records_by_experiment[exp].append(record)
 
+            # Write CSV file for each experiment
             for exp, records in records_by_experiment.items():
                 filename = f"aggregated_data_{exp}.csv"
                 self.write_csv(records, filename)
 
+            # Write CSV file containing all data for this model
             self.write_csv(model_records, "aggregated_data.csv")
+            # Restore original output directory
             self.output_dir = original_output_dir
 
         return merged_records

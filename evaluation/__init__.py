@@ -5,15 +5,23 @@ performance, including metrics calculation, experiment analysis, and entropy
 statistics.
 """
 
+# Import data loading functionality for accessing experiment results
 from .data_loader import DataLoader
-from .entropy_analyzer import EntropyAnalyzer
+
+# Import entropy analysis functionality for analyzing entropy statistics
+from .entropy_statistic import EntropyStatistic
+
+# Import metrics calculation functionality for evaluating system performance
 from .metrics_calculator import MetricsCalculator
+
+# Import experiment analysis functionality for analyzing experiment results
 from .experiment_analyzer import ExperimentAnalyzer
 
 
+# Define public API for the evaluation package
 __all__ = [
     "DataLoader",
     "MetricsCalculator",
     "ExperimentAnalyzer",
-    "EntropyAnalyzer",
+    "EntropyStatistic",
 ]
