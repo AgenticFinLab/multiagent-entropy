@@ -19,6 +19,7 @@ def ensure_directory_exists(file_path: Path) -> None:
     Returns:
         None
     """
+    # Create parent directory and all necessary parent directories if they don't exist
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -32,9 +33,12 @@ def save_json(data: Dict[str, Any], output_path: str) -> None:
     Returns:
         None
     """
+    # Convert output path to Path object
     output_file = Path(output_path)
+    # Ensure parent directory exists before writing
     ensure_directory_exists(output_file)
 
+    # Write data to JSON file with proper formatting
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
@@ -52,12 +56,18 @@ def save_csv(
     Returns:
         None
     """
+    # Convert output path to Path object
     output_file = Path(output_path)
+    # Ensure parent directory exists before writing
     ensure_directory_exists(output_file)
 
+    # Write data to CSV file with proper formatting
     with open(output_file, "w", newline="", encoding="utf-8") as f:
+        # Create CSV writer with specified field names
         writer = csv.DictWriter(f, fieldnames=fieldnames)
+        # Write header row
         writer.writeheader()
+        # Write all data rows
         writer.writerows(rows)
 
 
@@ -72,7 +82,9 @@ def get_output_directory(base_path: Path, dataset: str, subdirectory: str = "") 
     Returns:
         Path object pointing to the output directory.
     """
+    # Construct base output directory path
     output_dir = base_path / "evaluation" / "results" / dataset
+    # Append subdirectory if provided
     if subdirectory:
         output_dir = output_dir / subdirectory
     return output_dir
@@ -88,6 +100,7 @@ def format_float(value: float, precision: int = 4) -> float:
     Returns:
         Rounded float value.
     """
+    # Round the float value to the specified precision
     return round(value, precision)
 
 
@@ -102,4 +115,5 @@ def safe_divide(numerator: float, denominator: float, default: float = 0.0) -> f
     Returns:
         Result of division or default value if denominator is zero.
     """
+    # Return division result if denominator is non-zero, otherwise return default
     return numerator / denominator if denominator != 0 else default
