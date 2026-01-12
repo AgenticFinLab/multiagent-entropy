@@ -370,9 +370,17 @@ class Aggregator:
 
                         round_stats[key].setdefault("round_total_time", 0)
                         round_stats[key].setdefault("round_total_token", 0)
-                        round_stats[key]["round_total_time"] += agent_metrics.get(
-                            "agent_time_cost", 0
-                        )
+                        
+                        agent_time_cost = agent_metrics.get("agent_time_cost", 0)
+                        
+                        if architecture == "centralized":
+                            round_stats[key]["round_total_time"] = max(
+                                round_stats[key]["round_total_time"],
+                                agent_time_cost
+                            )
+                        else:
+                            round_stats[key]["round_total_time"] += agent_time_cost
+                        
                         round_stats[key]["round_total_token"] += agent_entropy_data.get(
                             "token_count", 0
                         )
