@@ -126,25 +126,6 @@ def main():
     print(f"Output will be saved to: {output_path}")
 
     summary_records = extract_summary_fields(input_path, output_path)
-
-    if summary_records:
-        print(f"\nSummary statistics:")
-        print(f"Total experiments: {len(summary_records)}")
-
-        models = set(record["model_name"] for record in summary_records)
-        architectures = set(record["architecture"] for record in summary_records)
-
-        print(f"Models: {', '.join(sorted(models))}")
-        print(f"Architectures: {', '.join(sorted(architectures))}")
-
-        for record in summary_records:
-            print(
-                f"\n{record['model_name']} - {record['architecture']}: "
-                f"Accuracy={record['exp_accuracy']}, "
-                f"Base Model Accuracy={record['base_model_accuracy']}, "
-                f"Total Time={record['exp_total_time']}"
-            )
-
-
+    
 if __name__ == "__main__":
     main()
