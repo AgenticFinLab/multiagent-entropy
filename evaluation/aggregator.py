@@ -337,6 +337,9 @@ class Aggregator:
                 samples_entropy = micro_stats.get("samples", {})
                 samples_metrics = exp_metrics.get("samples", {})
 
+                if architecture == "centralized":
+                    sample_round_times = defaultdict(lambda: defaultdict(list))
+
                 for sample_id, sample_metrics in samples_metrics.items():
                     if sample_id not in samples_entropy:
                         continue
@@ -377,15 +380,35 @@ class Aggregator:
                         agent_time_cost = agent_metrics["agent_time_cost"]
 
                         if architecture == "centralized":
-                            round_stats[key]["round_total_time"] = max(
-                                round_stats[key]["round_total_time"], agent_time_cost
-                            )
+                            if agent_type == "OrchestratorAgent":
+                                sample_round_times[sample_id][round_number].append(
+                                    ("orchestrator", agent_time_cost)
+                                )
+                            else:
+                                sample_round_times[sample_id][round_number].append(
+                                    ("parallel", agent_time_cost)
+                                )
                         else:
                             round_stats[key]["round_total_time"] += agent_time_cost
 
                         round_stats[key]["round_total_token"] += agent_entropy_data[
                             "token_count"
                         ]
+
+                if architecture == "centralized":
+                    for sample_id, rounds in sample_round_times.items():
+                        for round_number, agents in rounds.items():
+                            parallel_times = []
+                            orchestrator_time = 0
+                            for agent_type, time_cost in agents:
+                                if agent_type == "orchestrator":
+                                    orchestrator_time = time_cost
+                                else:
+                                    parallel_times.append(time_cost)
+
+                            round_time = max(parallel_times) + orchestrator_time if parallel_times else orchestrator_time
+                            key = (exp_name, round_number)
+                            round_stats[key]["round_total_time"] += round_time
 
         return round_stats
 
@@ -470,6 +493,9 @@ class Aggregator:
                 micro_stats = exp_entropy.get("micro_statistics", {})
                 samples_entropy = micro_stats.get("samples", {})
 
+                if architecture == "centralized":
+                    sample_round_times = defaultdict(lambda: defaultdict(list))
+
                 for sample_id, sample_data in samples.items():
                     if sample_id in samples_entropy:
                         sample_entropy = samples_entropy[sample_id]
@@ -492,13 +518,39 @@ class Aggregator:
                         )
                         if architecture == "debate" and agent_type == "orchestrator":
                             continue
-                        total_time += agent_data["agent_time_cost"]
+
+                        if architecture == "centralized":
+                            round_number = int(agent_key.split("_round_")[-1]) if "_round_" in agent_key else 0
+                            if agent_type == "OrchestratorAgent":
+                                sample_round_times[sample_id][round_number].append(
+                                    ("orchestrator", agent_data["agent_time_cost"])
+                                )
+                            else:
+                                sample_round_times[sample_id][round_number].append(
+                                    ("parallel", agent_data["agent_time_cost"])
+                                )
+                        else:
+                            total_time += agent_data["agent_time_cost"]
                     if sample_data.get("final_predicted_answer") is not None:
                         total_predictions += 1
                         if sample_data.get("is_finally_correct", False):
                             total_correct += 1
                         if sample_data.get("final_format_compliance", False):
                             total_format_compliance += 1
+
+                if architecture == "centralized":
+                    for sample_id, rounds in sample_round_times.items():
+                        for round_number, agents in rounds.items():
+                            parallel_times = []
+                            orchestrator_time = 0
+                            for agent_type, time_cost in agents:
+                                if agent_type == "orchestrator":
+                                    orchestrator_time = time_cost
+                                else:
+                                    parallel_times.append(time_cost)
+
+                            round_time = max(parallel_times) + orchestrator_time if parallel_times else orchestrator_time
+                            total_time += round_time
 
                 accuracy = (
                     total_correct / total_predictions if total_predictions > 0 else 0
