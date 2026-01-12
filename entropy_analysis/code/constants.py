@@ -81,4 +81,18 @@ METADATA_COLUMNS = [
     "time_cost",
     "final_predicted_answer",
     "is_finally_correct",
+    "model_name",
+    "base_model_predicted_answer",
+    "base_model_is_finally_correct",
+    "base_model_format_compliance",
+    "base_model_accuracy",
+    "base_model_format_compliance_rate",
+]
+
+BASE_MODEL_COLUMNS = [
+    "base_model_predicted_answer",
+    "base_model_is_finally_correct",
+    "base_model_format_compliance",
+    "base_model_accuracy",
+    "base_model_format_compliance_rate",
 ]

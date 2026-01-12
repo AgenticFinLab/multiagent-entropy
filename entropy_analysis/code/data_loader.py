@@ -840,16 +840,22 @@ class DataLoader:
             model_data = data[data["model_name"] == model]
             for arch in model_data["architecture"].unique():
                 arch_data = model_data[model_data["architecture"] == arch]
-                comparison.append(
-                    {
-                        "model": model,
-                        "architecture": arch,
-                        "accuracy": arch_data["exp_accuracy"].mean(),
-                        "mean_entropy": arch_data["sample_mean_entropy"].mean(),
-                        "std_entropy": arch_data["sample_std_entropy"].mean(),
-                        "num_samples": arch_data["sample_id"].nunique(),
-                    }
-                )
+                arch_stats = {
+                    "model": model,
+                    "architecture": arch,
+                    "accuracy": arch_data["exp_accuracy"].mean(),
+                    "mean_entropy": arch_data["sample_mean_entropy"].mean(),
+                    "std_entropy": arch_data["sample_std_entropy"].mean(),
+                    "num_samples": arch_data["sample_id"].nunique(),
+                }
+
+                if "base_model_accuracy" in arch_data.columns:
+                    arch_stats["base_model_accuracy"] = arch_data["base_model_accuracy"].mean()
+
+                if "base_model_format_compliance_rate" in arch_data.columns:
+                    arch_stats["base_model_format_compliance_rate"] = arch_data["base_model_format_compliance_rate"].mean()
+
+                comparison.append(arch_stats)
 
         comparison_df = pd.DataFrame(comparison)
 
@@ -869,18 +875,25 @@ class DataLoader:
         comparison = []
         for model in data["model_name"].unique():
             model_data = data[data["model_name"] == model]
-            comparison.append(
-                {
-                    "model": model,
-                    "mean_accuracy": model_data["exp_accuracy"].mean(),
-                    "std_accuracy": model_data["exp_accuracy"].std(),
-                    "median_accuracy": model_data["exp_accuracy"].median(),
-                    "mean_entropy": model_data["sample_mean_entropy"].mean(),
-                    "std_entropy": model_data["sample_std_entropy"].mean(),
-                    "num_samples": model_data["sample_id"].nunique(),
-                    "num_experiments": model_data["experiment_name"].nunique(),
-                }
-            )
+            model_stats = {
+                "model": model,
+                "mean_accuracy": model_data["exp_accuracy"].mean(),
+                "std_accuracy": model_data["exp_accuracy"].std(),
+                "median_accuracy": model_data["exp_accuracy"].median(),
+                "mean_entropy": model_data["sample_mean_entropy"].mean(),
+                "std_entropy": model_data["sample_std_entropy"].mean(),
+                "num_samples": model_data["sample_id"].nunique(),
+                "num_experiments": model_data["experiment_name"].nunique(),
+            }
+
+            if "base_model_accuracy" in model_data.columns:
+                model_stats["base_model_accuracy"] = model_data["base_model_accuracy"].mean()
+                model_stats["base_model_std_accuracy"] = model_data["base_model_accuracy"].std()
+
+            if "base_model_format_compliance_rate" in model_data.columns:
+                model_stats["base_model_format_compliance_rate"] = model_data["base_model_format_compliance_rate"].mean()
+
+            comparison.append(model_stats)
 
         return pd.DataFrame(comparison)
 

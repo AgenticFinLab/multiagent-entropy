@@ -8,7 +8,7 @@ from typing import Dict, List
 
 import pandas as pd
 
-from constants import ARCHITECTURES, METADATA_COLUMNS
+from constants import ARCHITECTURES, METADATA_COLUMNS, BASE_MODEL_COLUMNS
 
 
 def get_feature_groups(data_columns: List[str]) -> Dict[str, List[str]]:
@@ -76,6 +76,9 @@ def get_summary_statistics(data: pd.DataFrame) -> Dict[str, object]:
     if "architecture" in data.columns:
         summary["architectures"] = data["architecture"].unique().tolist()
 
+    if "model_name" in data.columns:
+        summary["models"] = data["model_name"].unique().tolist()
+
     if "num_rounds" in data.columns:
         summary["rounds"] = data["num_rounds"].unique().tolist()
 
@@ -85,8 +88,18 @@ def get_summary_statistics(data: pd.DataFrame) -> Dict[str, object]:
             data["exp_accuracy"].max(),
         )
 
+    if "base_model_accuracy" in data.columns:
+        summary["base_model_accuracy_range"] = (
+            data["base_model_accuracy"].min(),
+            data["base_model_accuracy"].max(),
+        )
+
     summary["entropy_features"] = [
         col for col in data.columns if "entropy" in col.lower()
+    ]
+
+    summary["base_model_features"] = [
+        col for col in data.columns if col in BASE_MODEL_COLUMNS
     ]
 
     return summary
@@ -152,5 +165,14 @@ def calculate_metrics_from_data(data: pd.DataFrame) -> Dict:
 
     if "architecture" in data.columns:
         metrics["architectures"] = data["architecture"].unique().tolist()
+
+    if "base_model_accuracy" in data.columns:
+        metrics["base_model_accuracy"] = data["base_model_accuracy"].mean()
+        metrics["base_model_std_accuracy"] = data["base_model_accuracy"].std()
+
+    if "base_model_format_compliance_rate" in data.columns:
+        metrics["base_model_format_compliance_rate"] = data[
+            "base_model_format_compliance_rate"
+        ].mean()
 
     return metrics
