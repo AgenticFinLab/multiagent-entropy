@@ -11,6 +11,7 @@ from pathlib import Path
 from aggregator import Aggregator
 from experiment_analyzer import ExperimentAnalyzer
 from entropy_statistic import EntropyStatistic
+from metrics_summary import extract_summary_fields
 
 
 def main():
@@ -88,6 +89,11 @@ def main():
         "--aggregate-all",
         default=False,
         help="Aggregate results from all datasets",
+    )
+    parser.add_argument(
+        "--generate-summary",
+        default=True,
+        help="Generate summary CSV from aggregated data",
     )
 
     args = parser.parse_args()
@@ -247,6 +253,28 @@ def main():
                 )
                 aggregator.generate_aggregated_csvs()
                 print(f"CSV generated for {args.dataset}: {output_csv}")
+
+    if args.generate_summary:
+        base_results_path = Path(base_path) / "evaluation" / "results"
+
+        if args.aggregate_all:
+            datasets = ["gsm8k", "humaneval", "mmlu", "aime2024", "aime2025", "math500"]
+            for dataset in datasets:
+                dataset_path = base_results_path / dataset
+                input_csv = dataset_path / "all_aggregated_data.csv"
+                output_csv = dataset_path / "all_summary_data.csv"
+
+                if input_csv.exists():
+                    print(f"\nGenerating summary for {dataset}...")
+                    extract_summary_fields(input_csv, output_csv)
+        else:
+            dataset_path = base_results_path / args.dataset
+            input_csv = dataset_path / "all_aggregated_data.csv"
+            output_csv = dataset_path / "all_summary_data.csv"
+
+            if input_csv.exists():
+                print(f"\nGenerating summary for {args.dataset}...")
+                extract_summary_fields(input_csv, output_csv)
 
 
 if __name__ == "__main__":
