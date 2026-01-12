@@ -137,6 +137,7 @@ class DataLoader:
             "exp_infer_average_entropy",
             "exp_num_inferences",
             "exp_total_time",
+            "exp_total_token",
         ]
 
         exp_data = self.processed_data[exp_cols].drop_duplicates(

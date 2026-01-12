@@ -441,6 +441,8 @@ class EntropyVisualizer:
                     {
                         "round_total_entropy": "first",
                         "round_avg_entropy": "first",
+                        "round_total_time": "first",
+                        "round_total_token": "first",
                         "is_finally_correct": "first",
                     }
                 )
@@ -453,6 +455,8 @@ class EntropyVisualizer:
                     {
                         "round_total_entropy": "first",
                         "round_avg_entropy": "first",
+                        "round_total_time": "first",
+                        "round_total_token": "first",
                         "is_finally_correct": "first",
                     }
                 )

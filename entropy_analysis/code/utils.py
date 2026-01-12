@@ -137,6 +137,26 @@ def get_architecture_comparison(data: pd.DataFrame) -> pd.DataFrame:
                     "sample_all_agents_token_count"
                 ].mean()
 
+            if "round_total_time" in arch_data.columns:
+                comparison[arch]["avg_round_time"] = arch_data[
+                    "round_total_time"
+                ].mean()
+
+            if "round_total_token" in arch_data.columns:
+                comparison[arch]["avg_round_token"] = arch_data[
+                    "round_total_token"
+                ].mean()
+
+            if "exp_total_token" in arch_data.columns:
+                comparison[arch]["avg_exp_token"] = arch_data[
+                    "exp_total_token"
+                ].mean()
+
+            if "exp_total_time" in arch_data.columns:
+                comparison[arch]["avg_exp_time"] = arch_data[
+                    "exp_total_time"
+                ].mean()
+
     return pd.DataFrame(comparison).T
 
 
