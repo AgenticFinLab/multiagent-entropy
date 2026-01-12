@@ -25,7 +25,9 @@ class ExperimentAnalyzer:
         Args:
             base_path: Base path to the project directory.
         """
+        # Initialize data loader for reading experiment data
         self.data_loader = DataLoader(base_path)
+        # Initialize metrics calculator for computing performance metrics
         self.metrics_calculator = MetricsCalculator()
 
     def _get_task_type_from_dataset(self, dataset: str) -> str:
@@ -37,6 +39,7 @@ class ExperimentAnalyzer:
         Returns:
             Task type ("math", "code", or "option").
         """
+        # Map dataset names to their corresponding task types
         dataset_task_map = {
             "humaneval": "code",
             "mmlu": "option",
@@ -45,6 +48,7 @@ class ExperimentAnalyzer:
             "aime2025": "math",
             "math500": "math",
         }
+        # Return task type or default to "math" if dataset not found
         return dataset_task_map.get(dataset.lower(), "math")
 
     def analyze_experiment(
@@ -66,9 +70,11 @@ class ExperimentAnalyzer:
         Returns:
             Dictionary containing experiment metrics and analysis results.
         """
+        # Infer task type from dataset if not provided or set to auto/math
         if task_type == "auto" or task_type == "math":
             task_type = self._get_task_type_from_dataset(dataset)
 
+        # Load experiment configuration
         try:
             config = self.data_loader.load_experiment_config(
                 dataset, experiment_name, model_name
@@ -78,22 +84,28 @@ class ExperimentAnalyzer:
                 f"Failed to load config for {dataset}/{model_name}/{experiment_name}: {e}"
             )
 
+        # Validate configuration format
         if not isinstance(config, dict):
             raise Exception(f"Config is not a dictionary, got {type(config)}: {config}")
 
+        # Extract agent architecture from configuration
         agent_architecture = config.get("agent_type")
         if agent_architecture is None:
             raise Exception(
                 f"Config missing 'agent_type' key. Available keys: {list(config.keys())}"
             )
 
+        # Extract number of rounds from configuration
         num_rounds = config.get("round", 1)
 
+        # Load ground truth data for the dataset
         ground_truths = self.data_loader.load_ground_truth(dataset)
+        # Load all results for the experiment
         all_results = self.data_loader.load_all_results(
             dataset, model_name, experiment_name
         )
 
+        # Group results by sample ID for analysis
         results_by_sample = defaultdict(list)
         for result_id, result_data in all_results.items():
             parsed = self.data_loader.parse_result_id(result_id)
@@ -107,6 +119,7 @@ class ExperimentAnalyzer:
                 }
             )
 
+        # Initialize metrics dictionary with experiment metadata
         metrics = {
             "experiment_name": experiment_name,
             "dataset": dataset,
@@ -118,6 +131,7 @@ class ExperimentAnalyzer:
             "samples": {},
         }
 
+        # Analyze each sample individually
         for main_id, sample_results in results_by_sample.items():
             sample_metrics = self._analyze_sample(
                 main_id,
@@ -159,21 +173,25 @@ class ExperimentAnalyzer:
         Returns:
             Dictionary containing sample-level metrics.
         """
+        # Initialize sample metrics with ground truth
         sample_metrics = {
             "main_id": main_id,
             "ground_truth": ground_truth["groundtruth"] if ground_truth else None,
         }
 
+        # Process each agent result for this sample
         for result_info in sample_results:
             result_id = result_info["result_id"]
             agent_type = result_info["agent_type"]
             execution_order = result_info["execution_order"]
             result_data = result_info["data"]
 
+            # Calculate agent time cost
             agent_time_cost = self.metrics_calculator.calculate_agent_time_cost(
                 result_data
             )
 
+            # Load entropy tensor and calculate average entropy
             entropy_tensor = self.data_loader.load_entropy_tensor(
                 dataset, model_name, experiment_name, result_id
             )
@@ -181,6 +199,7 @@ class ExperimentAnalyzer:
                 entropy_tensor
             )
 
+            # Extract predicted answer based on task type
             if task_type == "code":
                 if "final_answer" in result_data:
                     response = result_data["final_answer"]
@@ -207,6 +226,7 @@ class ExperimentAnalyzer:
                         self.metrics_calculator.extract_boxed_answer(response)
                     )
 
+            # Determine if answer is correct
             is_correct = False
             if ground_truth and predicted_answer and format_compliance:
                 test_cases = ground_truth.get("test_cases") if ground_truth else None
@@ -214,6 +234,7 @@ class ExperimentAnalyzer:
                     predicted_answer, ground_truth["groundtruth"], task_type, test_cases
                 )
 
+            # Generate agent key based on architecture and execution order
             if agent_architecture == "single":
                 round_num = execution_order
                 agent_key = f"{agent_type}_round_{round_num}"
@@ -226,6 +247,8 @@ class ExperimentAnalyzer:
             else:
                 round_num = (execution_order - 1) // 4 + 1
                 agent_key = f"{agent_type}_round_{round_num}"
+
+            # Store agent metrics
             sample_metrics["agents"] = sample_metrics.get("agents", {})
             sample_metrics["agents"][agent_key] = {
                 "agent_type": agent_type,
@@ -238,9 +261,12 @@ class ExperimentAnalyzer:
                 "format_compliance": format_compliance,
             }
 
+        # Determine final agent key based on architecture
         final_agent_key = self._get_final_agent_key(
             sample_metrics["agents"], agent_architecture
         )
+
+        # Extract final answer from the last agent
         if final_agent_key and final_agent_key in sample_metrics["agents"]:
             final_agent_data = sample_metrics["agents"][final_agent_key]
             sample_metrics["final_predicted_answer"] = final_agent_data[
@@ -255,6 +281,7 @@ class ExperimentAnalyzer:
             sample_metrics["is_finally_correct"] = False
             sample_metrics["final_format_compliance"] = False
 
+        # Move agents dict to top level
         sample_metrics["agents"] = sample_metrics.pop("agents")
 
         return sample_metrics
@@ -268,6 +295,7 @@ class ExperimentAnalyzer:
         Returns:
             List of agent keys for the final agent.
         """
+        # Return final agent keys based on architecture type
         if agent_architecture == "single":
             return ["SingleSolver_round_1", "SingleSolver_round_2"]
         elif agent_architecture == "sequential":
@@ -293,9 +321,11 @@ class ExperimentAnalyzer:
         Returns:
             The key of the final agent, or None if not found.
         """
+        # Return None if no agents are present
         if not agents:
             return None
 
+        # Determine final agent type based on architecture
         if agent_architecture == "single":
             final_agent_type = "SingleSolver"
         elif agent_architecture == "sequential":
@@ -309,9 +339,11 @@ class ExperimentAnalyzer:
         else:
             return None
 
+        # For debate architecture, return orchestrator directly
         if agent_architecture == "debate":
             return "orchestrator"
 
+        # Find the agent with the highest execution order
         max_execution_order = -1
         final_agent_key = None
 
@@ -337,13 +369,17 @@ class ExperimentAnalyzer:
         Returns:
             Dictionary containing metrics for all experiments, grouped by model.
         """
+        # Infer task type from dataset if not provided or set to auto/math
         if task_type == "auto" or task_type == "math":
             task_type = self._get_task_type_from_dataset(dataset)
 
+        # Get all experiments grouped by model
         experiments_by_model = self.data_loader.get_experiments_by_dataset(dataset)
 
+        # Initialize all metrics dictionary
         all_metrics = {"dataset": dataset, "task_type": task_type, "models": {}}
 
+        # Analyze each experiment for each model
         for model_name, experiments in experiments_by_model.items():
             all_metrics["models"][model_name] = {"experiments": {}}
             for experiment_name in experiments:
@@ -374,8 +410,10 @@ class ExperimentAnalyzer:
             metrics: Dictionary containing analysis metrics.
             output_path: Path to save the results.
         """
+        # Create a copy of metrics to avoid modifying the original
         metrics_copy = metrics.copy()
 
+        # Remove response fields to reduce file size
         if "models" in metrics_copy:
             for model_name, model_data in metrics_copy["models"].items():
                 if "experiments" in model_data:
@@ -394,4 +432,5 @@ class ExperimentAnalyzer:
                                                 "response"
                                             ]
 
+        # Save metrics to JSON file
         save_json(metrics_copy, output_path)

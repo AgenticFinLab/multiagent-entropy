@@ -29,18 +29,26 @@ class MetricsCalculator:
             Tuple of (extracted_answer_string, format_compliance_bool).
             Returns (None, False) if no valid format found.
         """
+        # Define regex pattern to match LaTeX boxed format \boxed{...}
         pattern = r"\\boxed\{([^}]*)\}"
+        # Find all matches of the pattern in the text
         matches = re.findall(pattern, text)
+        # Check if any matches were found
         if matches:
+            # Handle case where answer starts with { (nested braces)
             if matches[-1].startswith("{"):
                 return matches[-1][1:], True
+            # Handle case where answer ends with } (nested braces)
             elif matches[-1].endswith("}"):
                 return matches[-1][:-1], True
+            # Handle case where answer is wrapped in parentheses
             elif matches[-1].startswith("(") and matches[-1].endswith(")"):
                 return matches[-1][1:-1], True
+            # Default case: return the matched answer as-is
             else:
                 return matches[-1], True
 
+        # No valid boxed format found
         return None, False
 
     @staticmethod
@@ -53,6 +61,7 @@ class MetricsCalculator:
         Returns:
             True if valid format found, False otherwise.
         """
+        # Extract boxed answer and return format compliance status
         _, format_compliance = MetricsCalculator.extract_boxed_answer(text)
         return format_compliance
 
@@ -67,10 +76,14 @@ class MetricsCalculator:
             Tuple of (extracted_code_string, format_compliance_bool).
             Returns (None, False) if no valid format found.
         """
+        # Define regex pattern to match Python code blocks
         pattern = r"```python\s*(.*?)\s*```"
+        # Find all matches with DOTALL flag to match across newlines
         matches = re.findall(pattern, text, re.DOTALL)
+        # Return the last match if any code blocks were found
         if matches:
             return matches[-1], True
+        # No valid code block found
         return None, False
 
     @staticmethod
@@ -83,7 +96,9 @@ class MetricsCalculator:
         Returns:
             Normalized answer string.
         """
+        # Remove leading and trailing whitespace
         answer = answer.strip()
+        # Collapse multiple whitespace characters into single space
         answer = re.sub(r"\s+", " ", answer)
         return answer
 
@@ -97,7 +112,9 @@ class MetricsCalculator:
         Returns:
             True if single uppercase letter, False otherwise.
         """
+        # Remove any surrounding whitespace
         text = text.strip()
+        # Check if text is exactly one character and is uppercase
         return len(text) == 1 and text.isupper()
 
     @staticmethod
@@ -111,24 +128,32 @@ class MetricsCalculator:
         Returns:
             True if answers match, False otherwise.
         """
+        # Return False if no predicted answer was provided
         if predicted is None:
             return False
 
+        # Normalize both predicted and ground truth answers
         predicted_norm = MetricsCalculator.normalize_answer(predicted)
         ground_truth_norm = MetricsCalculator.normalize_answer(ground_truth)
 
+        # For single letter options, do direct string comparison
         if MetricsCalculator.is_single_uppercase_letter(ground_truth_norm):
             return predicted_norm == ground_truth_norm
 
+        # For mathematical expressions, use parsing and verification
         try:
+            # Parse both answers into mathematical expressions
             gold_parsed = parse(ground_truth_norm)
             answer_parsed = parse(predicted_norm)
 
+            # Return False if parsing failed for either answer
             if gold_parsed is None or answer_parsed is None:
                 return False
 
+            # Verify if parsed answers are mathematically equivalent
             is_correct = verify(gold_parsed, answer_parsed)
             return is_correct
+        # Return False if any error occurs during verification
         except Exception as e:
             return False
 
@@ -148,30 +173,42 @@ class MetricsCalculator:
         Returns:
             True if code passes all tests, False otherwise.
         """
+        # Return False if no predicted code was provided
         if not predicted_code:
             return False
 
+        # Return False if no test cases were provided
         if not test_cases:
             return False
 
         try:
+            # Execute predicted code in isolated namespace
             local_namespace = {}
             exec(predicted_code, {}, local_namespace)
 
+            # Execute test cases in copy of local namespace
             test_namespace = local_namespace.copy()
             exec(test_cases, {}, test_namespace)
 
+            # Check if test cases define a check function
             if "check" in test_namespace:
+                # Run check function for each callable in predicted code
                 for func_name, func in local_namespace.items():
+                    # Skip private functions and non-callables
                     if callable(func) and not func_name.startswith("_"):
                         try:
+                            # Run check function with the predicted function
                             test_namespace["check"](func)
+                        # Return False if assertion fails
                         except AssertionError:
                             return False
+                        # Continue if other exceptions occur
                         except Exception:
                             continue
 
+            # All tests passed
             return True
+        # Return False if any error occurs during execution
         except Exception as e:
             return False
 
@@ -193,10 +230,12 @@ class MetricsCalculator:
         Returns:
             True if answers match, False otherwise.
         """
+        # For code tasks, use code verification with test cases
         if task_type == "code":
             return MetricsCalculator.is_code_correct(
                 predicted, ground_truth, test_cases
             )
+        # For math and option tasks, use mathematical verification
         else:
             return MetricsCalculator.is_answer_correct(predicted, ground_truth)
 
@@ -210,8 +249,11 @@ class MetricsCalculator:
         Returns:
             Time cost value or 0.0 if not found.
         """
+        # Check if cost dictionary exists and contains time information
         if "cost" in result and "time" in result["cost"]:
+            # Return the time cost value
             return result["cost"]["time"]
+        # Return 0.0 if no time cost information is available
         return 0.0
 
     @staticmethod
@@ -224,12 +266,16 @@ class MetricsCalculator:
         Returns:
             Average entropy value or 0.0 if tensor is None.
         """
+        # Return 0.0 if tensor is None
         if entropy_tensor is None:
             return 0.0
 
+        # Check if input is a PyTorch tensor
         if isinstance(entropy_tensor, torch.Tensor):
+            # Calculate mean and convert to Python float
             return float(entropy_tensor.mean().item())
 
+        # Return 0.0 for non-tensor inputs
         return 0.0
 
     @staticmethod
@@ -254,38 +300,54 @@ class MetricsCalculator:
         Returns:
             Dictionary mapping agent keys to accuracy values.
         """
+        # Initialize dictionary to store accuracy results
         accuracies = {}
 
+        # Iterate through each sample ID
         for sample_id in sample_ids:
+            # Get result data for this sample
             result = results.get(sample_id)
+            # Skip if no result data exists
             if not result:
                 continue
 
+            # Parse the sample ID to extract components
             parsed_id = sample_id.replace("Result_", "").split("-")
             main_id = parsed_id[0]
             agent_type = parsed_id[1]
 
+            # Get ground truth for this sample
             ground_truth = ground_truths.get(main_id)
+            # Skip if no ground truth exists
             if not ground_truth:
                 continue
 
+            # Extract predicted answer based on configuration
             if use_final_answer and "final_answer" in result:
+                # Use final answer field if available and requested
                 predicted = result["final_answer"]
             else:
+                # Extract answer from response text using boxed format
                 predicted, _ = MetricsCalculator.extract_boxed_answer(
                     result.get("response", "")
                 )
 
+            # Check if predicted answer is correct
             is_correct = MetricsCalculator.is_answer_correct(
                 predicted, ground_truth["groundtruth"]
             )
 
+            # Only process if agent type matches filter or no filter is set
             if agent_filter is None or agent_type in agent_filter:
+                # Create key for this agent result
                 key = f"{main_id}_{key_suffix if key_suffix else agent_type}"
+                # Initialize list for this key if not exists
                 if key not in accuracies:
                     accuracies[key] = []
+                # Append correctness result to list
                 accuracies[key].append(is_correct)
 
+        # Calculate accuracy for each agent by averaging correctness values
         return {k: sum(v) / len(v) if v else 0.0 for k, v in accuracies.items()}
 
     @staticmethod
@@ -302,6 +364,7 @@ class MetricsCalculator:
         Returns:
             Dictionary mapping agent keys to accuracy values.
         """
+        # Calculate accuracy using base implementation without filtering
         return MetricsCalculator._calculate_agent_accuracy_base(
             results, ground_truths, sample_ids
         )
@@ -320,6 +383,7 @@ class MetricsCalculator:
         Returns:
             Dictionary mapping agent keys to accuracy values.
         """
+        # Calculate accuracy using base implementation with judger filter
         return MetricsCalculator._calculate_agent_accuracy_base(
             results, ground_truths, sample_ids, agent_filter=["judger"]
         )
@@ -338,6 +402,7 @@ class MetricsCalculator:
         Returns:
             Dictionary mapping agent keys to accuracy values.
         """
+        # Calculate accuracy using base implementation with OrchestratorAgent filter
         return MetricsCalculator._calculate_agent_accuracy_base(
             results, ground_truths, sample_ids, agent_filter=["OrchestratorAgent"]
         )
@@ -356,6 +421,7 @@ class MetricsCalculator:
         Returns:
             Dictionary mapping agent keys to accuracy values.
         """
+        # Calculate accuracy using base implementation with OrchestratorAgent filter and final answer
         return MetricsCalculator._calculate_agent_accuracy_base(
             results,
             ground_truths,
@@ -379,6 +445,7 @@ class MetricsCalculator:
         Returns:
             Dictionary mapping agent keys to accuracy values.
         """
+        # Calculate accuracy using base implementation with OrchestratorAgent filter
         return MetricsCalculator._calculate_agent_accuracy_base(
             results, ground_truths, sample_ids, agent_filter=["OrchestratorAgent"]
         )
@@ -401,6 +468,7 @@ class MetricsCalculator:
         Returns:
             Dictionary mapping agent keys to accuracy values.
         """
+        # Map architecture names to their corresponding calculator functions
         architecture_map = {
             "single": MetricsCalculator.get_agent_accuracy_for_single,
             "sequential": MetricsCalculator.get_agent_accuracy_for_sequential,
@@ -409,8 +477,11 @@ class MetricsCalculator:
             "hybrid": MetricsCalculator.get_agent_accuracy_for_hybrid,
         }
 
+        # Get the appropriate calculator function for the architecture
         calculator = architecture_map.get(agent_architecture.lower())
+        # Call the calculator function if it exists
         if calculator:
             return calculator(results, ground_truths, sample_ids)
 
+        # Return empty dictionary if architecture is not recognized
         return {}
