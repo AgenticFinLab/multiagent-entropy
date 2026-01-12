@@ -228,7 +228,7 @@ class ExperimentAnalyzer:
             sample_metrics["agents"][agent_key] = {
                 "agent_type": agent_type,
                 "execution_order": execution_order,
-                "time_cost": time_cost,
+                "agent_time_cost": time_cost,
                 "average_entropy": avg_entropy,
                 "predicted_answer": predicted_answer,
                 "is_correct": is_correct,
