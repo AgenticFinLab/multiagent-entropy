@@ -46,37 +46,49 @@ class EntropyStatistic:
             Dictionary containing entropy analysis results for all experiments,
             organized by model and architecture.
         """
+        # Get all experiments grouped by model for the specified dataset
         experiments_by_model = self.data_loader.get_experiments_by_dataset(dataset)
 
+        # Initialize results dictionary with dataset and model/architecture structures
         all_results = {
             "dataset": dataset,
             "models": {},
             "architectures": defaultdict(list),
         }
 
+        # Iterate through each model and its experiments
         for model_name, experiments in experiments_by_model.items():
+            # Initialize model-specific results structure
             all_results["models"][model_name] = {"experiments": {}}
+            # Process each experiment for the current model
             for experiment_name in experiments:
                 try:
+                    # Analyze entropy for the current experiment
                     experiment_results = self.analyze_experiment_entropy(
                         dataset, model_name, experiment_name
                     )
+                    # Store experiment results in the results dictionary
                     all_results["models"][model_name]["experiments"][
                         experiment_name
                     ] = experiment_results
 
+                    # Extract architecture type from experiment results
                     arch = experiment_results["agent_architecture"]
+                    # Add experiment to architecture grouping
                     all_results["architectures"][arch].append(
                         f"{model_name}/{experiment_name}"
                     )
                 except Exception as e:
+                    # Handle errors during experiment analysis
                     print(
                         f"Error analyzing experiment {model_name}/{experiment_name}: {e}"
                     )
+                    # Store error information in results
                     all_results["models"][model_name]["experiments"][
                         experiment_name
                     ] = {"error": str(e)}
 
+        # Convert defaultdict to regular dict for JSON serialization
         all_results["architectures"] = dict(all_results["architectures"])
 
         return all_results
@@ -94,25 +106,33 @@ class EntropyStatistic:
         Returns:
             Dictionary containing macro and micro level entropy statistics.
         """
+        # Load experiment configuration to get architecture and round settings
         config = self.data_loader.load_experiment_config(dataset, experiment_name, model_name)
+        # Extract agent architecture type from configuration
         agent_architecture = config.get("agent_type", "unknown")
+        # Extract number of rounds from configuration
         num_rounds = config.get("round", 1)
 
+        # Load result store information to get block structure
         info = self.data_loader.load_result_store_info(
             dataset, model_name, experiment_name
         )
 
+        # Collect entropy tensors from all results in the experiment
         entropy_data = self._collect_entropy_data(
             dataset, model_name, experiment_name, info
         )
 
+        # Calculate macro-level statistics (experiment, round, agent level)
         macro_stats = self._calculate_macro_statistics(
             entropy_data, agent_architecture, num_rounds
         )
+        # Calculate micro-level statistics (sample, sequence, token position level)
         micro_stats = self._calculate_micro_statistics(
             entropy_data, agent_architecture, num_rounds
         )
 
+        # Compile results with metadata and statistics
         results = {
             "experiment_name": experiment_name,
             "dataset": dataset,
@@ -142,22 +162,29 @@ class EntropyStatistic:
         Returns:
             Dictionary mapping sequence IDs to entropy data.
         """
+        # Initialize dictionary to store entropy data by sequence ID
         entropy_data = defaultdict(list)
 
+        # Iterate through all result blocks
         for block_name, block_info in info.items():
+            # Process each result ID in the block
             for result_id in block_info["ids"]:
+                # Parse result ID to extract components
                 parsed = self.data_loader.parse_result_id(result_id)
                 main_id = parsed["main_id"]
                 agent_type = parsed["agent_type"]
                 execution_order = parsed["execution_order"]
                 sample_number = parsed["sample_number"]
 
+                # Create unique sequence ID for grouping
                 sequence_id = f"{main_id}-{agent_type}-{execution_order}"
 
+                # Load entropy tensor for the current result
                 entropy_tensor = self.data_loader.load_entropy_tensor(
                     dataset, model_name, experiment_name, result_id
                 )
 
+                # Store entropy data if tensor exists
                 if entropy_tensor is not None:
                     entropy_data[sequence_id].append(
                         {
@@ -169,6 +196,7 @@ class EntropyStatistic:
                         }
                     )
 
+        # Convert defaultdict to regular dict for JSON serialization
         return dict(entropy_data)
 
     def _calculate_macro_statistics(
@@ -187,6 +215,7 @@ class EntropyStatistic:
         Returns:
             Dictionary containing experiment, round, and agent level statistics.
         """
+        # Initialize macro statistics structure
         macro_stats = {
             "experiment_level": {},
             "round_level": defaultdict(
@@ -194,41 +223,53 @@ class EntropyStatistic:
             ),
         }
 
+        # Initialize accumulators for experiment-level statistics
         total_experiment_entropy = 0.0
         total_count = 0
 
+        # Iterate through all sequences and their entropy data
         for main_id, sample_entropies in entropy_data.items():
             for entropy_info in sample_entropies:
+                # Get entropy tensor for current inference
                 entropy_tensor = entropy_info["entropy_tensor"]
+                # Calculate total entropy sum for this inference
                 entropy_sum = float(entropy_tensor.sum().item())
 
+                # Accumulate experiment-level entropy
                 total_experiment_entropy += entropy_sum
                 total_count += 1
 
+                # Determine round number for this inference
                 round_num = self._get_round_number(
                     entropy_info, agent_architecture, num_rounds
                 )
+                # Accumulate round-level entropy statistics
                 macro_stats["round_level"][round_num]["total_entropy"] += entropy_sum
                 macro_stats["round_level"][round_num]["num_inferences"] += 1
 
+                # Extract agent type for potential agent-level analysis
                 agent_type = entropy_info["agent_type"]
 
+                # Convert tensor to numpy array for processing
                 if isinstance(entropy_tensor, torch.Tensor):
                     entropy_array = entropy_tensor.cpu().numpy()
                 else:
                     entropy_array = np.array(entropy_tensor)
 
+        # Calculate experiment-level average entropy
         macro_stats["experiment_level"]["total_entropy"] = total_experiment_entropy
         macro_stats["experiment_level"]["infer_average_entropy"] = (
             total_experiment_entropy / total_count if total_count > 0 else 0.0
         )
 
+        # Calculate round-level average entropy
         for round_num, round_data in macro_stats["round_level"].items():
             if round_data["num_inferences"] > 0:
                 round_data["infer_average_entropy"] = (
                     round_data["total_entropy"] / round_data["num_inferences"]
                 )
 
+        # Convert defaultdict to regular dict for JSON serialization
         macro_stats["round_level"] = dict(macro_stats["round_level"])
 
         return macro_stats
@@ -249,6 +290,7 @@ class EntropyStatistic:
         Returns:
             Dictionary containing sample, sequence, and token position level statistics.
         """
+        # Initialize micro statistics structure for samples and token positions
         micro_stats = {
             "samples": defaultdict(
                 lambda: {
@@ -269,7 +311,9 @@ class EntropyStatistic:
             "token_position_level": defaultdict(list),
         }
 
+        # Iterate through all sequences and their entropy data
         for sequence_id, sample_entropies in entropy_data.items():
+            # Initialize sequence-level accumulators
             sequence_total_entropy = 0.0
             sequence_max_entropy = 0.0
             sequence_mean_entropy = 0.0
@@ -282,21 +326,27 @@ class EntropyStatistic:
             sequence_token_count = 0
             sequence_sample_count = len(sample_entropies)
 
+            # Initialize sequence metadata
             sequence_agent_type = None
             sequence_execution_order = None
 
+            # Process each entropy sample in the sequence
             for entropy_info in sample_entropies:
+                # Capture agent type and execution order from first sample
                 if sequence_agent_type is None:
                     sequence_agent_type = entropy_info["agent_type"]
                     sequence_execution_order = entropy_info["execution_order"]
 
+                # Get entropy tensor for current sample
                 entropy_tensor = entropy_info["entropy_tensor"]
 
+                # Convert tensor to numpy array for statistical calculations
                 if isinstance(entropy_tensor, torch.Tensor):
                     entropy_array = entropy_tensor.cpu().numpy()
                 else:
                     entropy_array = np.array(entropy_tensor)
 
+                # Calculate statistical measures for the entropy array
                 max_entropy = float(np.max(entropy_array))
                 mean_entropy = float(np.mean(entropy_array))
                 variance_entropy = float(np.var(entropy_array))
@@ -308,6 +358,7 @@ class EntropyStatistic:
                 entropy_sum = float(np.sum(entropy_array))
                 token_count = len(entropy_array)
 
+                # Accumulate sequence-level statistics
                 sequence_total_entropy += entropy_sum
                 sequence_max_entropy += max_entropy
                 sequence_mean_entropy += mean_entropy
@@ -319,10 +370,13 @@ class EntropyStatistic:
                 sequence_min_entropy += min_entropy
                 sequence_token_count += token_count
 
+                # Collect entropy values by token position for position-level analysis
                 for pos, entropy_val in enumerate(entropy_array):
                     micro_stats["token_position_level"][pos].append(float(entropy_val))
 
+            # Extract main_id from sequence_id
             main_id = sequence_id.split("-")[0]
+            # Initialize sample statistics if not already present
             if main_id not in micro_stats["samples"]:
                 micro_stats["samples"][main_id] = {
                     "total_entropy": 0.0,
@@ -339,7 +393,9 @@ class EntropyStatistic:
                     "agents": {},
                 }
 
+            # Get reference to sample statistics
             stats = micro_stats["samples"][main_id]
+            # Accumulate sequence statistics into sample statistics
             stats["total_entropy"] += sequence_total_entropy
             stats["max_entropy"] += (
                 sequence_max_entropy / sequence_sample_count
@@ -384,7 +440,9 @@ class EntropyStatistic:
             stats["all_agents_token_count"] += sequence_token_count
             stats["num_agents"] += 1
 
+            # Create agent-specific statistics if samples exist
             if sequence_sample_count > 0:
+                # Determine round number for this sequence
                 round_number = self._get_round_number(
                     {
                         "agent_type": sequence_agent_type,
@@ -393,7 +451,9 @@ class EntropyStatistic:
                     agent_architecture,
                     num_rounds,
                 )
+                # Create agent key for this round
                 agent_key = f"{sequence_agent_type}_round_{round_number}"
+                # Store agent-specific statistics
                 stats["agents"][agent_key] = {
                     "agent_type": sequence_agent_type,
                     "execution_order": sequence_execution_order,
@@ -416,8 +476,10 @@ class EntropyStatistic:
                     ),
                 }
 
+        # Convert defaultdict to regular dict for JSON serialization
         micro_stats["samples"] = dict(micro_stats["samples"])
 
+        # Normalize sample statistics by number of agents
         for main_id, stats in micro_stats["samples"].items():
             if stats["num_agents"] > 0:
                 stats["max_entropy"] = stats["max_entropy"] / stats["num_agents"]
@@ -436,6 +498,7 @@ class EntropyStatistic:
                     else 0.0
                 )
 
+        # Calculate statistics for each token position
         for pos, entropies in micro_stats["token_position_level"].items():
             entropies_array = np.array(entropies)
             micro_stats["token_position_level"][pos] = {
@@ -449,6 +512,7 @@ class EntropyStatistic:
                 "q3": float(np.percentile(entropies_array, 75)),
             }
 
+        # Convert defaultdict to regular dict for JSON serialization
         micro_stats["token_position_level"] = dict(micro_stats["token_position_level"])
 
         return micro_stats
@@ -469,16 +533,22 @@ class EntropyStatistic:
         Returns:
             Round number for the entropy result.
         """
+        # Extract execution order from entropy info
         execution_order = entropy_info["execution_order"]
+        # Extract agent type from entropy info
         agent_type = entropy_info["agent_type"]
 
+        # For single agent architecture, round number equals execution order
         if agent_architecture == "single":
             return execution_order
+        # For debate architecture, orchestrator is in final round
         elif agent_architecture == "debate":
             if agent_type == "orchestrator":
                 return num_rounds
+            # Other agents: calculate round from execution order (3 agents per round)
             else:
                 return (execution_order - 1) // 3 + 1
+        # For other architectures: calculate round from execution order (4 agents per round)
         else:
             return (execution_order - 1) // 4 + 1
 
@@ -493,23 +563,31 @@ class EntropyStatistic:
         Returns:
             Dictionary containing distribution analysis results.
         """
+        # Initialize distribution analysis structure
         distribution = {"architecture_comparison": {}}
 
+        # Iterate through all experiments
         for exp_name, results in all_results["experiments"].items():
+            # Skip experiments with errors
             if "error" in results:
                 continue
 
+            # Extract architecture type from experiment results
             arch = results["agent_architecture"]
+            # Initialize architecture comparison structure if not exists
             if arch not in distribution["architecture_comparison"]:
                 distribution["architecture_comparison"][arch] = {
                     "all_entropies": [],
                     "agent_entropies": defaultdict(list),
                 }
 
+            # Get macro statistics for the experiment
             macro_stats = results["macro_statistics"]
 
+        # Calculate statistical measures for each architecture
         for arch, data in distribution["architecture_comparison"].items():
             arch_comparison = {}
+            # Calculate statistics for each agent type within the architecture
             for agent_type, entropies in data["agent_entropies"].items():
                 entropies_array = np.array(entropies)
                 arch_comparison[agent_type] = {
@@ -519,6 +597,7 @@ class EntropyStatistic:
                     "max": float(np.max(entropies_array)),
                 }
 
+            # Store architecture comparison results
             distribution["architecture_comparison"][arch] = arch_comparison
 
         return distribution
@@ -530,6 +609,7 @@ class EntropyStatistic:
             results: Dictionary containing entropy analysis results.
             output_path: Path to output JSON file.
         """
+        # Use utility function to save results as JSON
         save_json(results, output_path)
 
     def analyze_entropy_change_trends(
@@ -545,17 +625,23 @@ class EntropyStatistic:
         Returns:
             Dictionary containing entropy change trend analysis results.
         """
+        # Load experiment configuration to get architecture and round settings
         config = self.data_loader.load_experiment_config(dataset, experiment_name, model_name)
+        # Extract agent architecture type from configuration
         agent_architecture = config.get("agent_type", "unknown")
+        # Extract number of rounds from configuration
         num_rounds = config.get("round", 1)
 
+        # Load result store information to get block structure
         info = self.data_loader.load_result_store_info(
             dataset, model_name, experiment_name
         )
+        # Collect entropy tensors from all results in the experiment
         entropy_data = self._collect_entropy_data(
             dataset, model_name, experiment_name, info
         )
 
+        # Initialize trend results structure
         trend_results = {
             "experiment_name": experiment_name,
             "dataset": dataset,
@@ -568,18 +654,22 @@ class EntropyStatistic:
             "trend_statistics": {},
         }
 
+        # Extract entropy values organized by round and agent
         trend_results["entropy_by_round_agent"] = self._extract_entropy_by_round_agent(
             entropy_data, agent_architecture, num_rounds
         )
 
+        # Calculate entropy trends within each round
         trend_results["intra_round_trends"] = self._calculate_intra_round_trends(
             trend_results["entropy_by_round_agent"]
         )
 
+        # Calculate entropy trends between rounds
         trend_results["inter_round_trends"] = self._calculate_inter_round_trends(
             trend_results["entropy_by_round_agent"]
         )
 
+        # Calculate statistical measures for trends
         trend_results["trend_statistics"] = self._calculate_trend_statistics(
             trend_results["intra_round_trends"],
             trend_results["inter_round_trends"],
@@ -603,35 +693,47 @@ class EntropyStatistic:
         Returns:
             Dictionary mapping round numbers to agent types to entropy values.
         """
+        # Initialize nested defaultdict for round-agent entropy organization
         round_agent_entropy = defaultdict(
             lambda: defaultdict(lambda: {"entropies": [], "sums": []})
         )
 
+        # Iterate through all sequences and their entropy data
         for sequence_id, sample_entropies in entropy_data.items():
+            # Process each entropy sample in the sequence
             for entropy_info in sample_entropies:
+                # Get entropy tensor for current sample
                 entropy_tensor = entropy_info["entropy_tensor"]
+                # Extract agent type
                 agent_type = entropy_info["agent_type"]
 
+                # Convert tensor to numpy array for processing
                 if isinstance(entropy_tensor, torch.Tensor):
                     entropy_array = entropy_tensor.cpu().numpy()
                 else:
                     entropy_array = np.array(entropy_tensor)
 
+                # Determine round number for this entropy result
                 round_num = self._get_round_number(
                     entropy_info, agent_architecture, num_rounds
                 )
 
+                # Calculate entropy statistics
                 entropy_sum = float(np.sum(entropy_array))
                 entropy_mean = float(np.mean(entropy_array))
 
+                # Store entropy values by round and agent
                 round_agent_entropy[round_num][agent_type]["entropies"].append(
                     entropy_mean
                 )
                 round_agent_entropy[round_num][agent_type]["sums"].append(entropy_sum)
 
+        # Compile results with statistical measures
         result = {}
+        # Sort rounds for consistent ordering
         for round_num in sorted(round_agent_entropy.keys()):
             result[round_num] = {}
+            # Sort agent types for consistent ordering
             for agent_type in sorted(round_agent_entropy[round_num].keys()):
                 result[round_num][agent_type] = {
                     "mean_entropy": float(
@@ -654,9 +756,6 @@ class EntropyStatistic:
                     "total_entropy": float(
                         np.sum(round_agent_entropy[round_num][agent_type]["sums"])
                     ),
-                    "num_inferences": len(
-                        round_agent_entropy[round_num][agent_type]["entropies"]
-                    ),
                 }
 
         return result
@@ -672,11 +771,15 @@ class EntropyStatistic:
         Returns:
             Dictionary containing intra-round trend analysis.
         """
+        # Initialize intra-round trends dictionary
         intra_round_trends = {}
 
+        # Iterate through each round and its agent data
         for round_num, agents_data in entropy_by_round_agent.items():
+            # Get list of agent types for this round
             agent_types = list(agents_data.keys())
 
+            # Handle case with only one agent
             if len(agent_types) < 2:
                 intra_round_trends[round_num] = {
                     "trends": {},
@@ -685,30 +788,36 @@ class EntropyStatistic:
                 }
                 continue
 
+            # Initialize structure for multi-agent round
             intra_round_trends[round_num] = {
                 "trends": {},
                 "differences": {},
                 "summary": "",
             }
 
+            # Initialize dictionaries for trends and differences
             trends = {}
             differences = {}
 
+            # Calculate differences between all pairs of agents
             for i in range(len(agent_types)):
                 for j in range(i + 1, len(agent_types)):
                     agent1 = agent_types[i]
                     agent2 = agent_types[j]
 
+                    # Calculate absolute difference in mean entropy
                     diff = (
                         agents_data[agent1]["mean_entropy"]
                         - agents_data[agent2]["mean_entropy"]
                     )
+                    # Calculate percentage change relative to agent2
                     pct_change = (
                         (diff / agents_data[agent2]["mean_entropy"]) * 100
                         if agents_data[agent2]["mean_entropy"] != 0
                         else 0.0
                     )
 
+                    # Create pair key for identification
                     pair_key = f"{agent1}_vs_{agent2}"
                     differences[pair_key] = {
                         "absolute_difference": diff,
@@ -719,12 +828,16 @@ class EntropyStatistic:
                         "agent2_std": agents_data[agent2]["std_entropy"],
                     }
 
+            # Store differences in results
             intra_round_trends[round_num]["differences"] = differences
 
+            # Calculate ranking for rounds with 4 agents
             if len(agent_types) == 4:
+                # Sort agents by mean entropy
                 sorted_agents = sorted(
                     agent_types, key=lambda x: agents_data[x]["mean_entropy"]
                 )
+                # Create trend description with ranking
                 trend_desc = " -> ".join(
                     [
                         f"{a}({agents_data[a]['mean_entropy']:.4f})"
@@ -732,13 +845,16 @@ class EntropyStatistic:
                     ]
                 )
                 trends["ranking"] = trend_desc
+                # Identify highest and lowest entropy agents
                 trends["highest_entropy_agent"] = sorted_agents[-1]
                 trends["lowest_entropy_agent"] = sorted_agents[0]
+                # Calculate entropy range
                 trends["entropy_range"] = (
                     agents_data[sorted_agents[-1]]["mean_entropy"]
                     - agents_data[sorted_agents[0]]["mean_entropy"]
                 )
 
+            # Store trends in results
             intra_round_trends[round_num]["trends"] = trends
 
         return intra_round_trends
@@ -754,16 +870,20 @@ class EntropyStatistic:
         Returns:
             Dictionary containing inter-round trend analysis.
         """
+        # Initialize inter-round trends structure
         inter_round_trends = {
             "agent_trends": {},
             "round_to_round_changes": {},
             "summary": {},
         }
 
+        # Get sorted list of round numbers
         round_numbers = sorted(entropy_by_round_agent.keys())
 
+        # Collect entropy data for each agent across rounds
         for round_num, agents_data in entropy_by_round_agent.items():
             for agent_type, stats in agents_data.items():
+                # Initialize agent trend structure if not exists
                 if agent_type not in inter_round_trends["agent_trends"]:
                     inter_round_trends["agent_trends"][agent_type] = {
                         "mean_entropies": [],
@@ -772,6 +892,7 @@ class EntropyStatistic:
                         "percentage_changes": [],
                     }
 
+                # Append mean entropy and round number for this agent
                 inter_round_trends["agent_trends"][agent_type]["mean_entropies"].append(
                     stats["mean_entropy"]
                 )
@@ -779,25 +900,33 @@ class EntropyStatistic:
                     round_num
                 )
 
+        # Calculate changes between consecutive rounds for each agent
         for agent_type, agent_data in inter_round_trends["agent_trends"].items():
             mean_entropies = agent_data["mean_entropies"]
             rounds = agent_data["rounds"]
 
+            # Iterate through consecutive pairs of rounds
             for i in range(1, len(mean_entropies)):
+                # Calculate absolute change
                 change = mean_entropies[i] - mean_entropies[i - 1]
+                # Calculate percentage change
                 pct_change = (
                     (change / mean_entropies[i - 1]) * 100
                     if mean_entropies[i - 1] != 0
                     else 0.0
                 )
 
+                # Store changes in agent data
                 agent_data["changes"].append(change)
                 agent_data["percentage_changes"].append(pct_change)
 
+                # Create round pair key
                 round_pair = f"{rounds[i - 1]}_to_{rounds[i]}"
+                # Initialize round pair structure if not exists
                 if round_pair not in inter_round_trends["round_to_round_changes"]:
                     inter_round_trends["round_to_round_changes"][round_pair] = {}
 
+                # Store round-to-round change data
                 inter_round_trends["round_to_round_changes"][round_pair][agent_type] = {
                     "change": change,
                     "percentage_change": pct_change,
@@ -805,6 +934,7 @@ class EntropyStatistic:
                     "to_entropy": mean_entropies[i],
                 }
 
+        # Calculate summary statistics for each agent
         for agent_type, agent_data in inter_round_trends["agent_trends"].items():
             if len(agent_data["changes"]) > 0:
                 inter_round_trends["summary"][agent_type] = {
@@ -822,11 +952,13 @@ class EntropyStatistic:
                     "average_percentage_change": float(
                         np.mean(agent_data["percentage_changes"])
                     ),
+                    # Determine trend direction based on average change
                     "trend_direction": (
                         "increasing"
                         if np.mean(agent_data["changes"]) > 0
                         else "decreasing"
                     ),
+                    # Calculate volatility as standard deviation of changes
                     "volatility": float(np.std(agent_data["changes"])),
                 }
 
@@ -846,18 +978,21 @@ class EntropyStatistic:
         Returns:
             Dictionary containing overall trend statistics.
         """
+        # Initialize statistics structure
         statistics = {
             "intra_round_stats": {},
             "inter_round_stats": {},
             "overall_summary": {},
         }
 
+        # Collect all absolute differences from intra-round trends
         all_differences = []
         for round_num, round_data in intra_round_trends.items():
             if "differences" in round_data:
                 for diff_key, diff_data in round_data["differences"].items():
                     all_differences.append(abs(diff_data["absolute_difference"]))
 
+        # Calculate intra-round statistics if differences exist
         if all_differences:
             statistics["intra_round_stats"] = {
                 "mean_agent_difference": float(np.mean(all_differences)),
@@ -866,10 +1001,12 @@ class EntropyStatistic:
                 "std_agent_difference": float(np.std(all_differences)),
             }
 
+        # Collect all agent changes from inter-round trends
         all_agent_changes = []
         for agent_type, agent_data in inter_round_trends["agent_trends"].items():
             all_agent_changes.extend(agent_data["changes"])
 
+        # Calculate inter-round statistics if changes exist
         if all_agent_changes:
             statistics["inter_round_stats"] = {
                 "mean_round_to_round_change": float(np.mean(all_agent_changes)),
@@ -878,18 +1015,23 @@ class EntropyStatistic:
                 "std_round_to_round_change": float(np.std(all_agent_changes)),
             }
 
+        # Calculate overall summary if summary data exists
         if "summary" in inter_round_trends:
+            # Count agents with increasing trends
             num_increasing = sum(
                 1
                 for summary in inter_round_trends["summary"].values()
                 if summary["trend_direction"] == "increasing"
             )
+            # Count agents with decreasing trends
             num_decreasing = len(inter_round_trends["summary"]) - num_increasing
 
+            # Compile overall summary statistics
             statistics["overall_summary"] = {
                 "total_agents_analyzed": len(inter_round_trends["summary"]),
                 "agents_with_increasing_trend": num_increasing,
                 "agents_with_decreasing_trend": num_decreasing,
+                # Determine dominant trend direction
                 "dominant_trend": (
                     "increasing" if num_increasing > num_decreasing else "decreasing"
                 ),
