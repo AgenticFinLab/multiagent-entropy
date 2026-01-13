@@ -827,7 +827,7 @@ class Aggregator:
         This method processes an existing CSV file to:
         1. Remove agent-specific columns (agent_name, agent_key, execution_order,
            agent_time_cost, final_predicted_answer, base_model_predicted_answer,
-           and all columns starting with "agent_")
+           and all columns starting with "agent_" except agent_round_number which is used for round detection)
         2. Merge multiple records per sample into a single record
         3. Rename round-related columns to include round number (e.g., round_1_total_entropy)
         4. Save to a new CSV file
@@ -859,18 +859,32 @@ class Aggregator:
             reader = csv.DictReader(csvfile)
             fieldnames = reader.fieldnames
 
-            # Determine which columns to keep (excluding agent-specific columns)
-            columns_to_keep = []
-            for field in fieldnames:
-                if field in columns_to_remove:
-                    continue
-                if field.startswith("agent_"):
-                    continue
-                columns_to_keep.append(field)
-
-            # Process each row
+            # Process each row and extract round number before removing agent columns
             for row in reader:
+                # Extract round number from agent_round_number before removing agent columns
+                round_num = None
+                if "agent_round_number" in row:
+                    try:
+                        round_num = int(row["agent_round_number"])
+                    except (ValueError, TypeError):
+                        pass
+                
+                # Determine which columns to keep (excluding agent-specific columns)
+                columns_to_keep = []
+                for field in fieldnames:
+                    if field in columns_to_remove:
+                        continue
+                    if field.startswith("agent_") and field != "agent_round_number":
+                        continue
+                    columns_to_keep.append(field)
+
+                # Create new row with only the columns we want to keep
                 new_row = {col: row[col] for col in columns_to_keep}
+                
+                # Store round number for later processing
+                if round_num is not None:
+                    new_row["_round_number"] = round_num
+                
                 records.append(new_row)
 
         # Group records by sample (using model_name, sample_id, architecture, num_rounds)
@@ -892,61 +906,58 @@ class Aggregator:
 
             # Use the first record as base
             base_record = sample_records[0].copy()
+            
+            # Get num_rounds from the base record
+            num_rounds = None
+            if "num_rounds" in base_record and base_record["num_rounds"]:
+                try:
+                    num_rounds = int(base_record["num_rounds"])
+                except (ValueError, TypeError):
+                    pass
 
             # Collect round data from all records
             round_data = {}
             for record in sample_records:
-                # Extract round number from agent_round_number if available
-                # Or determine from the round_total_entropy field
+                # Get round number from the stored _round_number field
                 round_num = None
+                if "_round_number" in record:
+                    round_num = record["_round_number"]
+                
+                # Validate round number against num_rounds if available
+                if round_num is not None and num_rounds is not None:
+                    if round_num < 1 or round_num > num_rounds:
+                        print(f"Warning: Round number {round_num} exceeds num_rounds {num_rounds}, skipping")
+                        continue
 
-                # Try to get round number from various sources
-                if "agent_round_number" in record:
-                    try:
-                        round_num = int(record["agent_round_number"])
-                    except (ValueError, TypeError):
-                        pass
-
-                # If no round number found, try to infer from the data
-                if round_num is None:
-                    # Check if we can determine round from the round fields
-                    # For centralized architecture, round 1 and 2 have different values
-                    # We'll use the first record as round 1, second as round 2, etc.
-                    pass
-
-                # If we have a round number, collect round-specific fields
+                # If we have a valid round number, collect round-specific fields
                 if round_num is not None:
-                    round_data[round_num] = {
-                        "round_total_entropy": record.get("round_total_entropy", ""),
-                        "round_num_inferences": record.get("round_num_inferences", ""),
-                        "round_infer_avg_entropy": record.get(
-                            "round_infer_avg_entropy", ""
-                        ),
-                        "round_total_time": record.get("round_total_time", ""),
-                        "round_total_token": record.get("round_total_token", ""),
-                    }
-
-            # If we couldn't determine round numbers from agent_round_number,
-            # try to infer from unique round_total_entropy values
-            if not round_data and len(sample_records) > 1:
-                unique_round_entropies = {}
-                for idx, record in enumerate(sample_records):
-                    round_entropy = record.get("round_total_entropy", "")
-                    if round_entropy not in unique_round_entropies:
-                        unique_round_entropies[round_entropy] = idx + 1
-
-                for idx, record in enumerate(sample_records):
-                    round_entropy = record.get("round_total_entropy", "")
-                    round_num = unique_round_entropies.get(round_entropy, idx + 1)
-                    round_data[round_num] = {
-                        "round_total_entropy": record.get("round_total_entropy", ""),
-                        "round_num_inferences": record.get("round_num_inferences", ""),
-                        "round_infer_avg_entropy": record.get(
-                            "round_infer_avg_entropy", ""
-                        ),
-                        "round_total_time": record.get("round_total_time", ""),
-                        "round_total_token": record.get("round_total_token", ""),
-                    }
+                    # If we already have data for this round, verify it's consistent
+                    if round_num in round_data:
+                        existing_data = round_data[round_num]
+                        new_data = {
+                            "round_total_entropy": record.get("round_total_entropy", ""),
+                            "round_num_inferences": record.get("round_num_inferences", ""),
+                            "round_infer_avg_entropy": record.get(
+                                "round_infer_avg_entropy", ""
+                            ),
+                            "round_total_time": record.get("round_total_time", ""),
+                            "round_total_token": record.get("round_total_token", ""),
+                        }
+                        # Check if the new data is consistent with existing data
+                        # (they should be the same for all agents in the same round)
+                        for key, value in new_data.items():
+                            if value and existing_data[key] and existing_data[key] != value:
+                                print(f"Warning: Inconsistent {key} for round {round_num}: {existing_data[key]} vs {value}")
+                    else:
+                        round_data[round_num] = {
+                            "round_total_entropy": record.get("round_total_entropy", ""),
+                            "round_num_inferences": record.get("round_num_inferences", ""),
+                            "round_infer_avg_entropy": record.get(
+                                "round_infer_avg_entropy", ""
+                            ),
+                            "round_total_time": record.get("round_total_time", ""),
+                            "round_total_token": record.get("round_total_token", ""),
+                        }
 
             # Remove original round fields from base record
             for field in [
@@ -955,6 +966,7 @@ class Aggregator:
                 "round_infer_avg_entropy",
                 "round_total_time",
                 "round_total_token",
+                "_round_number",
             ]:
                 if field in base_record:
                     del base_record[field]
