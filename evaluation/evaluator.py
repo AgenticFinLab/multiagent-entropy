@@ -24,6 +24,7 @@ DATASETS = [
     "aime2025_8192",
 ]
 
+
 def main():
     """Main entry point for the evaluation script.
 
@@ -39,7 +40,7 @@ def main():
         "--dataset",
         type=str,
         choices=DATASETS,
-        default="math500",
+        default="aime2025",
         help="Dataset to analyze",
     )
     # Add model argument for specifying which model to analyze

@@ -868,7 +868,7 @@ class Aggregator:
                         round_num = int(row["agent_round_number"])
                     except (ValueError, TypeError):
                         pass
-                
+
                 # Determine which columns to keep (excluding agent-specific columns)
                 columns_to_keep = []
                 for field in fieldnames:
@@ -880,11 +880,11 @@ class Aggregator:
 
                 # Create new row with only the columns we want to keep
                 new_row = {col: row[col] for col in columns_to_keep}
-                
+
                 # Store round number for later processing
                 if round_num is not None:
                     new_row["_round_number"] = round_num
-                
+
                 records.append(new_row)
 
         # Group records by sample (using model_name, sample_id, architecture, num_rounds)
@@ -906,7 +906,7 @@ class Aggregator:
 
             # Use the first record as base
             base_record = sample_records[0].copy()
-            
+
             # Get num_rounds from the base record
             num_rounds = None
             if "num_rounds" in base_record and base_record["num_rounds"]:
@@ -922,11 +922,13 @@ class Aggregator:
                 round_num = None
                 if "_round_number" in record:
                     round_num = record["_round_number"]
-                
+
                 # Validate round number against num_rounds if available
                 if round_num is not None and num_rounds is not None:
                     if round_num < 1 or round_num > num_rounds:
-                        print(f"Warning: Round number {round_num} exceeds num_rounds {num_rounds}, skipping")
+                        print(
+                            f"Warning: Round number {round_num} exceeds num_rounds {num_rounds}, skipping"
+                        )
                         continue
 
                 # If we have a valid round number, collect round-specific fields
@@ -935,8 +937,12 @@ class Aggregator:
                     if round_num in round_data:
                         existing_data = round_data[round_num]
                         new_data = {
-                            "round_total_entropy": record.get("round_total_entropy", ""),
-                            "round_num_inferences": record.get("round_num_inferences", ""),
+                            "round_total_entropy": record.get(
+                                "round_total_entropy", ""
+                            ),
+                            "round_num_inferences": record.get(
+                                "round_num_inferences", ""
+                            ),
                             "round_infer_avg_entropy": record.get(
                                 "round_infer_avg_entropy", ""
                             ),
@@ -946,12 +952,22 @@ class Aggregator:
                         # Check if the new data is consistent with existing data
                         # (they should be the same for all agents in the same round)
                         for key, value in new_data.items():
-                            if value and existing_data[key] and existing_data[key] != value:
-                                print(f"Warning: Inconsistent {key} for round {round_num}: {existing_data[key]} vs {value}")
+                            if (
+                                value
+                                and existing_data[key]
+                                and existing_data[key] != value
+                            ):
+                                print(
+                                    f"Warning: Inconsistent {key} for round {round_num}: {existing_data[key]} vs {value}"
+                                )
                     else:
                         round_data[round_num] = {
-                            "round_total_entropy": record.get("round_total_entropy", ""),
-                            "round_num_inferences": record.get("round_num_inferences", ""),
+                            "round_total_entropy": record.get(
+                                "round_total_entropy", ""
+                            ),
+                            "round_num_inferences": record.get(
+                                "round_num_inferences", ""
+                            ),
                             "round_infer_avg_entropy": record.get(
                                 "round_infer_avg_entropy", ""
                             ),
@@ -1052,6 +1068,15 @@ class Aggregator:
             print(f"No records to write to {output_path}")
             return
 
+        # Remove 'agent_round_number' field from each record
+        for record in merged_records:
+            record.pop("agent_round_number", None)
+
+        if "agent_round_number" in final_fieldnames:
+            final_fieldnames = [
+                field for field in final_fieldnames if field != "agent_round_number"
+            ]
+
         with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
             writer = csv.DictWriter(
                 csvfile, fieldnames=final_fieldnames, extrasaction="ignore"
@@ -1061,12 +1086,6 @@ class Aggregator:
 
         print(
             f"Successfully wrote {len(merged_records)} merged records to {output_path}"
-        )
-        print(
-            f"Merged {len(records)} original records into {len(merged_records)} sample records"
-        )
-        print(
-            f"Removed {len(fieldnames) - len(columns_to_keep)} agent-specific columns"
         )
 
     def generate_aggregated_csvs(self):
