@@ -158,6 +158,8 @@ class Aggregator:
         Returns:
             List of dictionaries containing sample-level data
         """
+        import numpy as np
+        
         records = []
 
         # Extract base model data for comparison
@@ -215,6 +217,69 @@ class Aggregator:
                     base_model_format_compliance = base_model_sample_data.get(
                         "format_compliance", False
                     )
+
+                    # Collect round-based agent entropy statistics
+                    # Group agents by round number and collect their entropy metrics
+                    round_agent_entropy_data = defaultdict(lambda: defaultdict(list))
+                    
+                    for agent_key, agent_entropy_data in sample_entropy.get("agents", {}).items():
+                        agent_type = agent_entropy_data.get(
+                            "agent_type", agent_key.split("_")[0]
+                        )
+                        
+                        # Skip orchestrator agents in debate architecture
+                        if architecture == "debate" and agent_type == "orchestrator":
+                            continue
+                        
+                        round_number = agent_entropy_data.get("round_number", 0)
+                        if round_number > 0:
+                            # Collect all entropy types for this agent
+                            entropy_types = [
+                                "max_entropy", "min_entropy", "mean_entropy", 
+                                "median_entropy", "std_entropy", "variance_entropy",
+                                "q1_entropy", "q3_entropy", "total_entropy"
+                            ]
+                            for entropy_type in entropy_types:
+                                value = agent_entropy_data.get(entropy_type, 0)
+                                round_agent_entropy_data[round_number][entropy_type].append(value)
+                    
+                    # Calculate round-based statistics
+                    round_statistics = {}
+                    for round_num, entropy_dict in round_agent_entropy_data.items():
+                        for entropy_type, values in entropy_dict.items():
+                            if len(values) > 1:
+                                # Multiple agents in this round, calculate statistics
+                                values_array = np.array(values)
+                                stats = {
+                                    "max": float(np.max(values_array)),
+                                    "min": float(np.min(values_array)),
+                                    "mean": float(np.mean(values_array)),
+                                    "median": float(np.median(values_array)),
+                                    "std": float(np.std(values_array)),
+                                    "variance": float(np.var(values_array)),
+                                    "q1": float(np.percentile(values_array, 25)),
+                                    "q3": float(np.percentile(values_array, 75)),
+                                }
+                            elif len(values) == 1:
+                                # Single agent in this round, all statistics are the same value
+                                single_value = float(values[0])
+                                stats = {
+                                    "max": single_value,
+                                    "min": single_value,
+                                    "mean": single_value,
+                                    "median": single_value,
+                                    "std": 0.0,  # Standard deviation is 0 for single value
+                                    "variance": 0.0,  # Variance is 0 for single value
+                                    "q1": single_value,
+                                    "q3": single_value,
+                                }
+                            else:
+                                continue
+                            
+                            # Store statistics with proper naming convention
+                            for stat_name, stat_value in stats.items():
+                                key = f"sample_round_{round_num}_{stat_name}_agent_{entropy_type}"
+                                round_statistics[key] = stat_value
 
                     # Process each agent within the sample
                     for agent_key, agent_metrics in sample_metrics.get(
@@ -316,6 +381,9 @@ class Aggregator:
                             ),
                             "agent_avg_entropy": avg_entropy,
                         }
+                        
+                        # Add round-based statistics to the record
+                        record.update(round_statistics)
 
                         # Calculate derived features with numerical stability
                         sample_mean_entropy = sample_entropy.get("mean_entropy", 0)
