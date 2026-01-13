@@ -13,6 +13,16 @@ from experiment_analyzer import ExperimentAnalyzer
 from entropy_statistic import EntropyStatistic
 from metrics_summary import extract_summary_fields
 
+DATASETS = [
+    "gsm8k",
+    "humaneval",
+    "mmlu",
+    "aime2024",
+    "aime2025",
+    "math500",
+    "aime2024_8192",
+    "aime2025_8192",
+]
 
 def main():
     """Main entry point for the evaluation script.
@@ -28,8 +38,8 @@ def main():
     parser.add_argument(
         "--dataset",
         type=str,
-        choices=["gsm8k", "humaneval", "mmlu", "aime2024", "aime2025", "math500"],
-        default="gsm8k",
+        choices=DATASETS,
+        default="math500",
         help="Dataset to analyze",
     )
     # Add model argument for specifying which model to analyze
@@ -268,7 +278,7 @@ def main():
 
         # Aggregate all datasets if aggregate_all flag is set
         if args.aggregate_all:
-            datasets = ["gsm8k", "humaneval", "mmlu", "aime2024", "aime2025", "math500"]
+            datasets = DATASETS
             for dataset in datasets:
                 dataset_path = base_results_path / dataset
                 entropy_file = dataset_path / "all_entropy_results.json"
@@ -303,7 +313,7 @@ def main():
 
         # Generate summary for all datasets if aggregate_all flag is set
         if args.aggregate_all:
-            datasets = ["gsm8k", "humaneval", "mmlu", "aime2024", "aime2025", "math500"]
+            datasets = DATASETS
             for dataset in datasets:
                 dataset_path = base_results_path / dataset
                 input_csv = dataset_path / "all_aggregated_data.csv"

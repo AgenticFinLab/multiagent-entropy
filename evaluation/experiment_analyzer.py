@@ -47,6 +47,8 @@ class ExperimentAnalyzer:
             "aime2024": "math",
             "aime2025": "math",
             "math500": "math",
+            "aime2024_8192": "math",
+            "aime2025_8192": "math",
         }
         # Return task type or default to "math" if dataset not found
         return dataset_task_map.get(dataset.lower(), "math")

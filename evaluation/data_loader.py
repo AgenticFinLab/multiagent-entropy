@@ -54,6 +54,8 @@ class DataLoader:
             "aime2024": "AIME2024",
             "aime2025": "AIME2025",
             "math500": "Math500",
+            "aime2024_8192": "AIME2024",
+            "aime2025_8192": "AIME2025",
         }
         # Get the folder name for this dataset
         dataset_folder = dataset_map.get(dataset.lower(), dataset)
