@@ -19,12 +19,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+EXCLUDE_COLUMNS = ["dataset", "model_name", "sample_id", "num_rounds", "exp_num_inferences","round_1_num_inferences","round_2_num_inferences", "agent_round_number",]
+
 
 warnings.filterwarnings("ignore")
 
 # Machine Learning libraries
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     mean_squared_error,
     mean_absolute_error,
@@ -33,8 +35,6 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
     f1_score,
-    classification_report,
-    confusion_matrix,
 )
 
 # Try to import XGBoost and LightGBM
@@ -146,8 +146,7 @@ class DataMiningAnalyzer:
     def prepare_features(
         self,
         target_column: str,
-        exclude_columns: List[str] = None,
-        include_target_in_corr: bool = False,
+        exclude_columns: List[str] = EXCLUDE_COLUMNS,
     ) -> Tuple[pd.DataFrame, pd.Series]:
         """
         Prepare features and target for modeling.
@@ -523,7 +522,7 @@ class DataMiningAnalyzer:
         logger.info("Experiment-level analysis completed")
 
         return self.results["experiment_level"]
-
+        
     def run_sample_level_analysis(self):
         """
         Perform sample-level analysis (classification on is_finally_correct).
