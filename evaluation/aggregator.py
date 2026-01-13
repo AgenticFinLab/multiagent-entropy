@@ -967,7 +967,7 @@ class Aggregator:
                 base_record[f"round_{round_num}_num_inferences"] = data[
                     "round_num_inferences"
                 ]
-                base_record[f"round_{round_num}_avg_entropy"] = data[
+                base_record[f"round_{round_num}_infer_avg_entropy"] = data[
                     "round_infer_avg_entropy"
                 ]
                 base_record[f"round_{round_num}_total_time"] = data["round_total_time"]
