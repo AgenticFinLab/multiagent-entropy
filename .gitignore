@@ -222,3 +222,5 @@ evaluation/results
 # Data mining results
 entropy_analysis/visualizations
 entropy_analysis/results
+data_mining/data
+data_mining/results
