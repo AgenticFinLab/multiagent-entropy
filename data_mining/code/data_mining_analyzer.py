@@ -19,7 +19,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-EXCLUDE_COLUMNS = ["dataset", "model_name", "architecture", "sample_id", "num_rounds", "exp_num_inferences","round_1_num_inferences","round_2_num_inferences", "agent_round_number",]
+EXCLUDE_COLUMNS = [
+    "dataset",
+    "model_name",
+    "architecture",
+    "sample_id",
+    "num_rounds",
+    "exp_num_inferences",
+    "round_1_num_inferences",
+    "round_2_num_inferences",
+    "agent_round_number",
+]
 
 
 warnings.filterwarnings("ignore")
@@ -136,11 +146,6 @@ class DataMiningAnalyzer:
             # Apply encoding
             df_encoded[col] = df_encoded[col].map(value_mapping)
 
-            logger.info(
-                f"Encoded '{col}': {len(value_mapping)} unique values mapped to 0-{len(value_mapping)-1}"
-            )
-            logger.info(f"  Mapping: {value_mapping}")
-
         return df_encoded
 
     def prepare_features(
@@ -169,7 +174,7 @@ class DataMiningAnalyzer:
             exclude_columns = []
 
         # Always exclude the target column and dataset identifier from features
-        exclude_columns = exclude_columns + [target_column, "dataset"]
+        exclude_columns = exclude_columns + [target_column]
 
         # Get feature columns (all columns except excluded ones)
         feature_columns = [col for col in self.df.columns if col not in exclude_columns]
@@ -257,6 +262,7 @@ class DataMiningAnalyzer:
                 random_state=42,
                 n_jobs=-1,
                 verbose=-1,
+                importance_type="gain",
             )
             lgb_model.fit(X_train, y_train)
             lgb_pred = lgb_model.predict(X_test)
@@ -355,6 +361,7 @@ class DataMiningAnalyzer:
                 random_state=42,
                 n_jobs=-1,
                 verbose=-1,
+                importance_type="gain",
             )
             lgb_model.fit(X_train, y_train)
             lgb_pred = lgb_model.predict(X_test)
@@ -487,7 +494,7 @@ class DataMiningAnalyzer:
         # Prepare features for regression
         # Exclude is_finally_correct as it's used to calculate exp_accuracy
         X, y = self.prepare_features(
-            target_column="exp_accuracy", exclude_columns=EXCLUDE_COLUMNS + ["is_finally_correct"]
+            target_column="exp_accuracy", exclude_columns=EXCLUDE_COLUMNS
         )
 
         # Train models
@@ -522,7 +529,7 @@ class DataMiningAnalyzer:
         logger.info("Experiment-level analysis completed")
 
         return self.results["experiment_level"]
-        
+
     def run_sample_level_analysis(self):
         """
         Perform sample-level analysis (classification on is_finally_correct).
