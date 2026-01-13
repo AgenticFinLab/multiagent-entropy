@@ -20,22 +20,21 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 EXCLUDE_COLUMNS = [
+    # ignored identifier
     "dataset",
     "model_name",
-    "architecture",
+    # "architecture",
     "sample_id",
-    "num_rounds",
-    "exp_num_inferences",
-    "round_1_num_inferences",
-    "round_2_num_inferences",
-    "agent_round_number",
-]
-
-EXCLUDE_COLUMNS += [
-    "base_model_accuracy",
-    "base_model_is_finally_correct",
-    "base_model_format_compliance",
-    "base_model_format_compliance_rate",
+    # useless data
+    # "num_rounds",
+    # "exp_num_inferences",
+    # "round_1_num_inferences",
+    # "round_2_num_inferences",
+    # base model metrics
+    # "base_model_accuracy",
+    # "base_model_is_finally_correct",
+    # "base_model_format_compliance",
+    # "base_model_format_compliance_rate",
 ]
 
 warnings.filterwarnings("ignore")
@@ -268,7 +267,6 @@ class DataMiningAnalyzer:
                 random_state=42,
                 n_jobs=-1,
                 verbose=-1,
-                importance_type="gain",
             )
             lgb_model.fit(X_train, y_train)
             lgb_pred = lgb_model.predict(X_test)
