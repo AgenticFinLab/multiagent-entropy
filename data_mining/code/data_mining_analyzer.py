@@ -73,9 +73,9 @@ class DataMiningAnalyzer:
             output_dir: Directory to save analysis results
         """
         if data_path is None:
-            data_path = "/home/yuxuanzhao/multiagent-entropy/data_mining/data/merged_datasets.csv"
+            data_path = "data_mining/data/merged_datasets.csv"
         if output_dir is None:
-            output_dir = "/home/yuxuanzhao/multiagent-entropy/data_mining/results"
+            output_dir = "data_mining/results"
 
         self.data_path = Path(data_path)
         self.output_dir = Path(output_dir)

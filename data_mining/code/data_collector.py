@@ -25,7 +25,7 @@ class DataCollector:
     """Collects and merges data from multiple dataset folders."""
 
     def __init__(
-        self, base_dir: str = "/home/yuxuanzhao/multiagent-entropy/evaluation/results"
+        self, base_dir: str = "evaluation/results"
     ):
         """
         Initialize the DataCollector.
@@ -135,7 +135,7 @@ class DataCollector:
             self.merge_datasets()
 
         if output_path is None:
-            output_path = "/home/yuxuanzhao/multiagent-entropy/data_mining/data/merged_datasets.csv"
+            output_path = "data_mining/data/merged_datasets.csv"
 
         # Ensure directory exists
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
