@@ -440,7 +440,7 @@ class EntropyVisualizer:
                 .agg(
                     {
                         "round_total_entropy": "first",
-                        "round_avg_entropy": "first",
+                        "round_infer_avg_entropy": "first",
                         "round_total_time": "first",
                         "round_total_token": "first",
                         "is_finally_correct": "first",
@@ -454,7 +454,7 @@ class EntropyVisualizer:
                 .agg(
                     {
                         "round_total_entropy": "first",
-                        "round_avg_entropy": "first",
+                        "round_infer_avg_entropy": "first",
                         "round_total_time": "first",
                         "round_total_token": "first",
                         "is_finally_correct": "first",
@@ -482,7 +482,7 @@ class EntropyVisualizer:
             round_stats = round_data.groupby("agent_round_number").agg(
                 {
                     "round_total_entropy": ["mean", "std"],
-                    "round_avg_entropy": ["mean", "std"],
+                    "round_infer_avg_entropy": ["mean", "std"],
                 }
             )
 
@@ -504,8 +504,8 @@ class EntropyVisualizer:
             ax = axes[0, 1]
             ax.errorbar(
                 round_stats.index,
-                round_stats[("round_avg_entropy", "mean")],
-                yerr=round_stats[("round_avg_entropy", "std")],
+                round_stats[("round_infer_avg_entropy", "mean")],
+                yerr=round_stats[("round_infer_avg_entropy", "std")],
                 marker="s",
                 linewidth=2,
                 markersize=8,
@@ -521,10 +521,10 @@ class EntropyVisualizer:
             incorrect_data = round_data[round_data["is_finally_correct"] == False]
 
             correct_stats = correct_data.groupby("agent_round_number")[
-                "round_avg_entropy"
+                "round_infer_avg_entropy"
             ].mean()
             incorrect_stats = incorrect_data.groupby("agent_round_number")[
-                "round_avg_entropy"
+                "round_infer_avg_entropy"
             ].mean()
 
             ax = axes[1, 0]
@@ -557,7 +557,7 @@ class EntropyVisualizer:
                 for model in round_data["model_name"].unique():
                     model_round_data = round_data[round_data["model_name"] == model]
                     model_stats = model_round_data.groupby("agent_round_number")[
-                        "round_avg_entropy"
+                        "round_infer_avg_entropy"
                     ].mean()
                     ax.plot(
                         model_stats.index,
@@ -576,7 +576,7 @@ class EntropyVisualizer:
                 for arch in self.architectures:
                     arch_data = round_data[round_data["architecture"] == arch]
                     arch_stats = arch_data.groupby("agent_round_number")[
-                        "round_avg_entropy"
+                        "round_infer_avg_entropy"
                     ].mean()
                     ax.plot(
                         arch_stats.index,
@@ -595,7 +595,7 @@ class EntropyVisualizer:
             round_stats = round_data.groupby("agent_round_number").agg(
                 {
                     "round_total_entropy": ["mean", "std"],
-                    "round_avg_entropy": ["mean", "std"],
+                    "round_infer_avg_entropy": ["mean", "std"],
                 }
             )
 
@@ -617,8 +617,8 @@ class EntropyVisualizer:
             ax = axes[0, 1]
             ax.errorbar(
                 round_stats.index,
-                round_stats[("round_avg_entropy", "mean")],
-                yerr=round_stats[("round_avg_entropy", "std")],
+                round_stats[("round_infer_avg_entropy", "mean")],
+                yerr=round_stats[("round_infer_avg_entropy", "std")],
                 marker="s",
                 linewidth=2,
                 markersize=8,
@@ -634,10 +634,10 @@ class EntropyVisualizer:
             incorrect_data = round_data[round_data["is_finally_correct"] == False]
 
             correct_stats = correct_data.groupby("agent_round_number")[
-                "round_avg_entropy"
+                "round_infer_avg_entropy"
             ].mean()
             incorrect_stats = incorrect_data.groupby("agent_round_number")[
-                "round_avg_entropy"
+                "round_infer_avg_entropy"
             ].mean()
 
             ax = axes[1, 0]
@@ -671,7 +671,7 @@ class EntropyVisualizer:
             for arch in self.architectures:
                 arch_data = round_data[round_data["architecture"] == arch]
                 arch_stats = arch_data.groupby("agent_round_number")[
-                    "round_avg_entropy"
+                    "round_infer_avg_entropy"
                 ].mean()
                 ax.plot(
                     arch_stats.index,

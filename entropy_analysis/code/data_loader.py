@@ -1035,7 +1035,7 @@ class DataLoader:
             .agg(
                 {
                     "round_total_entropy": "first",
-                    "round_avg_entropy": "first",
+                    "round_infer_avg_entropy": "first",
                     "is_finally_correct": "first",
                 }
             )
@@ -1045,7 +1045,7 @@ class DataLoader:
         round_stats = round_data.groupby("agent_round_number").agg(
             {
                 "round_total_entropy": ["mean", "std", "median"],
-                "round_avg_entropy": ["mean", "std", "median"],
+                "round_infer_avg_entropy": ["mean", "std", "median"],
                 "is_finally_correct": "mean",
             }
         )

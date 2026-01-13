@@ -146,7 +146,7 @@ class EntropyAnalyzer:
             .agg(
                 {
                     "round_total_entropy": "first",
-                    "round_avg_entropy": "first",
+                    "round_infer_avg_entropy": "first",
                     "round_total_time": "first",
                     "round_total_token": "first",
                     "is_finally_correct": "first",
@@ -158,7 +158,7 @@ class EntropyAnalyzer:
         round_stats = round_data.groupby("agent_round_number").agg(
             {
                 "round_total_entropy": ["mean", "std", "median"],
-                "round_avg_entropy": ["mean", "std", "median"],
+                "round_infer_avg_entropy": ["mean", "std", "median"],
                 "round_total_time": ["mean", "std", "median"],
                 "round_total_token": ["mean", "std", "median"],
                 "is_finally_correct": "mean",
@@ -171,7 +171,7 @@ class EntropyAnalyzer:
         correct_stats = correct_round_data.groupby("agent_round_number").agg(
             {
                 "round_total_entropy": "mean",
-                "round_avg_entropy": "mean",
+                "round_infer_avg_entropy": "mean",
                 "round_total_time": "mean",
                 "round_total_token": "mean",
             }
@@ -180,7 +180,7 @@ class EntropyAnalyzer:
         incorrect_stats = incorrect_round_data.groupby("agent_round_number").agg(
             {
                 "round_total_entropy": "mean",
-                "round_avg_entropy": "mean",
+                "round_infer_avg_entropy": "mean",
                 "round_total_time": "mean",
                 "round_total_token": "mean",
             }
