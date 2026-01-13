@@ -326,19 +326,25 @@ class Aggregator:
 
                         # sample_entropy_stability_index: 1 - (std / mean)
                         if sample_mean_entropy > 0:
-                            record["sample_entropy_stability_index"] = 1 - (sample_std_entropy / sample_mean_entropy)
+                            record["sample_entropy_stability_index"] = 1 - (
+                                sample_std_entropy / sample_mean_entropy
+                            )
                         else:
                             record["sample_entropy_stability_index"] = 0.0
 
                         # agent_entropy_contribution: agent_total / sample_total
                         if sample_total_entropy > 0:
-                            record["agent_entropy_contribution"] = agent_total_entropy / sample_total_entropy
+                            record["agent_entropy_contribution"] = (
+                                agent_total_entropy / sample_total_entropy
+                            )
                         else:
                             record["agent_entropy_contribution"] = 0.0
 
                         # sample_avg_entropy_per_agent: sample_total / sample_num_agents
                         if sample_num_agents > 0:
-                            record["sample_avg_entropy_per_agent"] = sample_total_entropy / sample_num_agents
+                            record["sample_avg_entropy_per_agent"] = (
+                                sample_total_entropy / sample_num_agents
+                            )
                         else:
                             record["sample_avg_entropy_per_agent"] = 0.0
 
@@ -377,7 +383,9 @@ class Aggregator:
                     round_stats[key] = {
                         "round_total_entropy": round_data.get("total_entropy", 0),
                         "round_num_inferences": round_data.get("num_inferences", 0),
-                        "round_avg_entropy": round_data.get("infer_average_entropy", 0),
+                        "round_infer_avg_entropy": round_data.get(
+                            "infer_average_entropy", 0
+                        ),
                     }
 
                 # Get corresponding metrics data
@@ -429,7 +437,7 @@ class Aggregator:
                             round_stats[key] = {
                                 "round_total_entropy": 0,
                                 "round_num_inferences": 0,
-                                "round_avg_entropy": 0,
+                                "round_infer_avg_entropy": 0,
                                 "round_total_time": 0,
                                 "round_total_token": 0,
                             }
@@ -470,20 +478,13 @@ class Aggregator:
                                     parallel_times.append(time_cost)
 
                             # Total time = max parallel time + orchestrator time
-                            round_time = max(parallel_times) + orchestrator_time if parallel_times else orchestrator_time
+                            round_time = (
+                                max(parallel_times) + orchestrator_time
+                                if parallel_times
+                                else orchestrator_time
+                            )
                             key = (exp_name, round_number)
                             round_stats[key]["round_total_time"] += round_time
-
-        # Calculate round_infer_average_entropy for each round
-        for key in round_stats:
-            round_data = round_stats[key]
-            total_entropy = round_data.get("round_total_entropy", 0)
-            num_inferences = round_data.get("round_num_inferences", 0)
-            # Calculate average entropy with numerical stability and zero-division handling
-            if num_inferences > 0:
-                round_data["round_infer_average_entropy"] = total_entropy / num_inferences
-            else:
-                round_data["round_infer_average_entropy"] = 0.0
 
         return round_stats
 
@@ -614,7 +615,11 @@ class Aggregator:
 
                         # Handle time calculation for centralized architecture
                         if architecture == "centralized":
-                            round_number = int(agent_key.split("_round_")[-1]) if "_round_" in agent_key else 0
+                            round_number = (
+                                int(agent_key.split("_round_")[-1])
+                                if "_round_" in agent_key
+                                else 0
+                            )
                             if agent_type == "OrchestratorAgent":
                                 sample_round_times[sample_id][round_number].append(
                                     ("orchestrator", agent_data["agent_time_cost"])
@@ -648,7 +653,11 @@ class Aggregator:
                                     parallel_times.append(time_cost)
 
                             # Total time = max parallel time + orchestrator time
-                            round_time = max(parallel_times) + orchestrator_time if parallel_times else orchestrator_time
+                            round_time = (
+                                max(parallel_times) + orchestrator_time
+                                if parallel_times
+                                else orchestrator_time
+                            )
                             total_time += round_time
 
                 # Calculate accuracy and format compliance rate
@@ -764,14 +773,20 @@ class Aggregator:
 
             # Calculate comparison features for all valid round pairs
             for i, x in enumerate(round_numbers):
-                for y in round_numbers[i+1:]:
+                for y in round_numbers[i + 1 :]:
                     if x in round_data and y in round_data:
                         # Calculate token change
-                        token_change = round_data[y]["round_total_token"] - round_data[x]["round_total_token"]
+                        token_change = (
+                            round_data[y]["round_total_token"]
+                            - round_data[x]["round_total_token"]
+                        )
                         token_feature_name = f"round_{x}_{y}_change_tokens"
 
                         # Calculate entropy change
-                        entropy_change = round_data[y]["round_total_entropy"] - round_data[x]["round_total_entropy"]
+                        entropy_change = (
+                            round_data[y]["round_total_entropy"]
+                            - round_data[x]["round_total_entropy"]
+                        )
                         entropy_feature_name = f"round_{x}_{y}_change_entropy"
 
                         # Add features to all records in this experiment
@@ -810,7 +825,7 @@ class Aggregator:
         """Generate CSV file excluding agent-specific columns and merging records by sample.
 
         This method processes an existing CSV file to:
-        1. Remove agent-specific columns (agent_name, agent_key, execution_order, 
+        1. Remove agent-specific columns (agent_name, agent_key, execution_order,
            agent_time_cost, final_predicted_answer, base_model_predicted_answer,
            and all columns starting with "agent_")
         2. Merge multiple records per sample into a single record
@@ -884,14 +899,14 @@ class Aggregator:
                 # Extract round number from agent_round_number if available
                 # Or determine from the round_total_entropy field
                 round_num = None
-                
+
                 # Try to get round number from various sources
                 if "agent_round_number" in record:
                     try:
                         round_num = int(record["agent_round_number"])
                     except (ValueError, TypeError):
                         pass
-                
+
                 # If no round number found, try to infer from the data
                 if round_num is None:
                     # Check if we can determine round from the round fields
@@ -904,10 +919,11 @@ class Aggregator:
                     round_data[round_num] = {
                         "round_total_entropy": record.get("round_total_entropy", ""),
                         "round_num_inferences": record.get("round_num_inferences", ""),
-                        "round_avg_entropy": record.get("round_avg_entropy", ""),
+                        "round_infer_avg_entropy": record.get(
+                            "round_infer_avg_entropy", ""
+                        ),
                         "round_total_time": record.get("round_total_time", ""),
                         "round_total_token": record.get("round_total_token", ""),
-                        "round_infer_average_entropy": record.get("round_infer_average_entropy", ""),
                     }
 
             # If we couldn't determine round numbers from agent_round_number,
@@ -918,33 +934,46 @@ class Aggregator:
                     round_entropy = record.get("round_total_entropy", "")
                     if round_entropy not in unique_round_entropies:
                         unique_round_entropies[round_entropy] = idx + 1
-                
+
                 for idx, record in enumerate(sample_records):
                     round_entropy = record.get("round_total_entropy", "")
                     round_num = unique_round_entropies.get(round_entropy, idx + 1)
                     round_data[round_num] = {
                         "round_total_entropy": record.get("round_total_entropy", ""),
                         "round_num_inferences": record.get("round_num_inferences", ""),
-                        "round_avg_entropy": record.get("round_avg_entropy", ""),
+                        "round_infer_avg_entropy": record.get(
+                            "round_infer_avg_entropy", ""
+                        ),
                         "round_total_time": record.get("round_total_time", ""),
                         "round_total_token": record.get("round_total_token", ""),
-                        "round_infer_average_entropy": record.get("round_infer_average_entropy", ""),
                     }
 
             # Remove original round fields from base record
-            for field in ["round_total_entropy", "round_num_inferences", "round_avg_entropy", 
-                          "round_total_time", "round_total_token", "round_infer_average_entropy"]:
+            for field in [
+                "round_total_entropy",
+                "round_num_inferences",
+                "round_infer_avg_entropy",
+                "round_total_time",
+                "round_total_token",
+            ]:
                 if field in base_record:
                     del base_record[field]
 
             # Add round-specific fields with round number in the name
             for round_num, data in sorted(round_data.items()):
-                base_record[f"round_{round_num}_total_entropy"] = data["round_total_entropy"]
-                base_record[f"round_{round_num}_num_inferences"] = data["round_num_inferences"]
-                base_record[f"round_{round_num}_avg_entropy"] = data["round_avg_entropy"]
+                base_record[f"round_{round_num}_total_entropy"] = data[
+                    "round_total_entropy"
+                ]
+                base_record[f"round_{round_num}_num_inferences"] = data[
+                    "round_num_inferences"
+                ]
+                base_record[f"round_{round_num}_avg_entropy"] = data[
+                    "round_infer_avg_entropy"
+                ]
                 base_record[f"round_{round_num}_total_time"] = data["round_total_time"]
-                base_record[f"round_{round_num}_total_token"] = data["round_total_token"]
-                base_record[f"round_{round_num}_infer_average_entropy"] = data["round_infer_average_entropy"]
+                base_record[f"round_{round_num}_total_token"] = data[
+                    "round_total_token"
+                ]
 
             merged_records.append(base_record)
 
@@ -952,29 +981,55 @@ class Aggregator:
         all_fieldnames = set()
         for record in merged_records:
             all_fieldnames.update(record.keys())
-        
+
         # Sort fieldnames for consistent ordering
         # Put common fields first, then round fields
         common_fields = [
-            "model_name", "sample_id", "architecture", "num_rounds",
-            "is_finally_correct", "final_format_compliance",
-            "base_model_is_finally_correct", "base_model_format_compliance",
-            "sample_total_entropy", "sample_max_entropy", "sample_min_entropy",
-            "sample_mean_entropy", "sample_median_entropy", "sample_std_entropy",
-            "sample_variance_entropy", "sample_q1_entropy", "sample_q3_entropy",
-            "sample_num_agents", "sample_all_agents_token_count", "sample_avg_entropy_per_token",
-            "sample_entropy_stability_index", "sample_avg_entropy_per_agent",
-            "exp_total_entropy", "exp_infer_average_entropy", "exp_num_inferences",
-            "exp_accuracy", "exp_format_compliance_rate", "exp_total_time", "exp_total_token",
-            "base_model_accuracy", "base_model_format_compliance_rate"
+            "model_name",
+            "sample_id",
+            "architecture",
+            "num_rounds",
+            "is_finally_correct",
+            "final_format_compliance",
+            "base_model_is_finally_correct",
+            "base_model_format_compliance",
+            "sample_total_entropy",
+            "sample_max_entropy",
+            "sample_min_entropy",
+            "sample_mean_entropy",
+            "sample_median_entropy",
+            "sample_std_entropy",
+            "sample_variance_entropy",
+            "sample_q1_entropy",
+            "sample_q3_entropy",
+            "sample_num_agents",
+            "sample_all_agents_token_count",
+            "sample_avg_entropy_per_token",
+            "sample_entropy_stability_index",
+            "sample_avg_entropy_per_agent",
+            "exp_total_entropy",
+            "exp_infer_average_entropy",
+            "exp_num_inferences",
+            "exp_accuracy",
+            "exp_format_compliance_rate",
+            "exp_total_time",
+            "exp_total_token",
+            "base_model_accuracy",
+            "base_model_format_compliance_rate",
         ]
-        
+
         # Add round fields
         round_fields = sorted([f for f in all_fieldnames if f.startswith("round_")])
-        
+
         # Add any other fields not in common_fields or round_fields
-        other_fields = sorted([f for f in all_fieldnames if f not in common_fields and not f.startswith("round_")])
-        
+        other_fields = sorted(
+            [
+                f
+                for f in all_fieldnames
+                if f not in common_fields and not f.startswith("round_")
+            ]
+        )
+
         final_fieldnames = common_fields + other_fields + round_fields
 
         # Write the output CSV file
@@ -986,13 +1041,21 @@ class Aggregator:
             return
 
         with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=final_fieldnames, extrasaction='ignore')
+            writer = csv.DictWriter(
+                csvfile, fieldnames=final_fieldnames, extrasaction="ignore"
+            )
             writer.writeheader()
             writer.writerows(merged_records)
 
-        print(f"Successfully wrote {len(merged_records)} merged records to {output_path}")
-        print(f"Merged {len(records)} original records into {len(merged_records)} sample records")
-        print(f"Removed {len(fieldnames) - len(columns_to_keep)} agent-specific columns")
+        print(
+            f"Successfully wrote {len(merged_records)} merged records to {output_path}"
+        )
+        print(
+            f"Merged {len(records)} original records into {len(merged_records)} sample records"
+        )
+        print(
+            f"Removed {len(fieldnames) - len(columns_to_keep)} agent-specific columns"
+        )
 
     def generate_aggregated_csvs(self):
         """Generate multiple CSV files based on different experimental conditions."""
