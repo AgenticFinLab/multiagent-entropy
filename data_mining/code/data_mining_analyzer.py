@@ -79,21 +79,28 @@ logger = logging.getLogger(__name__)
 class DataMiningAnalyzer:
     """Performs comprehensive data mining analysis on multi-agent entropy data."""
 
-    def __init__(self, data_path: str = None, output_dir: str = None):
+    def __init__(self, data_path: str = None, output_dir: str = None, target_dataset: str = None):
         """
         Initialize the DataMiningAnalyzer.
 
         Args:
             data_path: Path to the merged dataset CSV file
             output_dir: Directory to save analysis results
+            target_dataset: Target dataset name for determining output directory
         """
         if data_path is None:
             data_path = "data_mining/data/merged_datasets.csv"
+        
+        # Determine output directory based on target_dataset
         if output_dir is None:
-            output_dir = "data_mining/results"
+            if target_dataset:
+                output_dir = f"data_mining/results/{target_dataset}"
+            else:
+                output_dir = "data_mining/results"
 
         self.data_path = Path(data_path)
         self.output_dir = Path(output_dir)
+        self.target_dataset = target_dataset
         self.df = None
         self.results = {}
 

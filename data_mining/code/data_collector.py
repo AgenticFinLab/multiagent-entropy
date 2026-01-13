@@ -25,21 +25,27 @@ class DataCollector:
     """Collects and merges data from multiple dataset folders."""
 
     def __init__(
-        self, base_dir: str = "evaluation/results"
+        self, base_dir: str = "evaluation/results",
+        target_datasets: Optional[List[str]] = None
     ):
         """
         Initialize the DataCollector.
 
         Args:
             base_dir: Base directory containing dataset folders
+            target_datasets: Optional list of specific dataset names to collect.
+                           If None, discovers all available datasets automatically.
         """
         self.base_dir = Path(base_dir)
+        self.target_datasets = target_datasets
         self.datasets = []
         self.merged_data = None
 
     def discover_datasets(self) -> List[str]:
         """
-        Discover all dataset folders in the base directory.
+        Discover dataset folders in the base directory.
+        If target_datasets is specified, only validates and uses those datasets.
+        Otherwise, discovers all available datasets.
 
         Returns:
             List of dataset folder names
@@ -47,16 +53,34 @@ class DataCollector:
         if not self.base_dir.exists():
             raise FileNotFoundError(f"Base directory not found: {self.base_dir}")
 
-        # Find all subdirectories that contain the target CSV file
-        datasets = []
-        for item in self.base_dir.iterdir():
-            if item.is_dir():
-                csv_file = item / "all_aggregated_data_exclude_agent.csv"
-                if csv_file.exists():
-                    datasets.append(item.name)
-                    logger.info(f"Found dataset: {item.name}")
+        # If target_datasets is specified, validate and use them
+        if self.target_datasets:
+            datasets = []
+            for dataset_name in self.target_datasets:
+                dataset_path = self.base_dir / dataset_name
+                csv_file = dataset_path / "all_aggregated_data_exclude_agent.csv"
+                
+                if not dataset_path.exists():
+                    logger.warning(f"Target dataset folder not found: {dataset_name}")
+                elif not csv_file.exists():
+                    logger.warning(f"Target dataset CSV not found: {dataset_name}")
+                else:
+                    datasets.append(dataset_name)
+                    logger.info(f"Found target dataset: {dataset_name}")
+            
+            self.datasets = datasets
+        else:
+            # Find all subdirectories that contain the target CSV file
+            datasets = []
+            for item in self.base_dir.iterdir():
+                if item.is_dir():
+                    csv_file = item / "all_aggregated_data_exclude_agent.csv"
+                    if csv_file.exists():
+                        datasets.append(item.name)
+                        logger.info(f"Found dataset: {item.name}")
 
-        self.datasets = sorted(datasets)
+            self.datasets = sorted(datasets)
+        
         return self.datasets
 
     def load_dataset(self, dataset_name: str) -> Optional[pd.DataFrame]:
@@ -127,6 +151,8 @@ class DataCollector:
 
         Args:
             output_path: Path to save the merged data. If None, uses default path.
+                        If target_datasets contains single dataset, saves to 
+                        data_mining/results/{dataset_name}/merged_datasets.csv
 
         Returns:
             Path where the file was saved
@@ -135,7 +161,11 @@ class DataCollector:
             self.merge_datasets()
 
         if output_path is None:
-            output_path = "data_mining/data/merged_datasets.csv"
+            # If single target dataset specified, save to its results folder
+            if self.target_datasets and len(self.target_datasets) == 1:
+                output_path = f"data_mining/results/{self.target_datasets[0]}/merged_datasets.csv"
+            else:
+                output_path = "data_mining/data/merged_datasets.csv"
 
         # Ensure directory exists
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
