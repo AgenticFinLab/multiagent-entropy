@@ -317,6 +317,31 @@ class Aggregator:
                             "agent_avg_entropy": avg_entropy,
                         }
 
+                        # Calculate derived features with numerical stability
+                        sample_mean_entropy = sample_entropy.get("mean_entropy", 0)
+                        sample_std_entropy = sample_entropy.get("std_entropy", 0)
+                        sample_total_entropy = sample_entropy.get("total_entropy", 0)
+                        sample_num_agents = sample_entropy.get("num_agents", 0)
+                        agent_total_entropy = agent_entropy_data.get("total_entropy", 0)
+
+                        # sample_entropy_stability_index: 1 - (std / mean)
+                        if sample_mean_entropy > 0:
+                            record["sample_entropy_stability_index"] = 1 - (sample_std_entropy / sample_mean_entropy)
+                        else:
+                            record["sample_entropy_stability_index"] = 0.0
+
+                        # agent_entropy_contribution: agent_total / sample_total
+                        if sample_total_entropy > 0:
+                            record["agent_entropy_contribution"] = agent_total_entropy / sample_total_entropy
+                        else:
+                            record["agent_entropy_contribution"] = 0.0
+
+                        # sample_avg_entropy_per_agent: sample_total / sample_num_agents
+                        if sample_num_agents > 0:
+                            record["sample_avg_entropy_per_agent"] = sample_total_entropy / sample_num_agents
+                        else:
+                            record["sample_avg_entropy_per_agent"] = 0.0
+
                         records.append(record)
 
         return records
@@ -448,6 +473,17 @@ class Aggregator:
                             round_time = max(parallel_times) + orchestrator_time if parallel_times else orchestrator_time
                             key = (exp_name, round_number)
                             round_stats[key]["round_total_time"] += round_time
+
+        # Calculate round_infer_average_entropy for each round
+        for key in round_stats:
+            round_data = round_stats[key]
+            total_entropy = round_data.get("round_total_entropy", 0)
+            num_inferences = round_data.get("round_num_inferences", 0)
+            # Calculate average entropy with numerical stability and zero-division handling
+            if num_inferences > 0:
+                round_data["round_infer_average_entropy"] = total_entropy / num_inferences
+            else:
+                round_data["round_infer_average_entropy"] = 0.0
 
         return round_stats
 
@@ -690,6 +726,61 @@ class Aggregator:
 
         return merged_records
 
+    def add_dynamic_round_features(
+        self, records: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Add dynamic round comparison features to records.
+
+        This method adds features that compare different rounds:
+        - round_{x}_{y}_change_tokens: Token change from round x to round y
+        - round_{x}_{y}_change_entropy: Entropy change from round x to round y
+
+        Args:
+            records: List of sample records with round-level data
+
+        Returns:
+            List of records with added dynamic features
+        """
+        # Group records by experiment to enable round comparisons
+        exp_records = defaultdict(list)
+        for record in records:
+            exp_name = record["experiment_name"]
+            exp_records[exp_name].append(record)
+
+        # For each experiment, calculate round comparison features
+        for exp_name, exp_record_list in exp_records.items():
+            # Collect round data for this experiment
+            round_data = {}
+            for record in exp_record_list:
+                round_num = record.get("agent_round_number", 0)
+                if round_num > 0:
+                    round_data[round_num] = {
+                        "round_total_token": record.get("round_total_token", 0),
+                        "round_total_entropy": record.get("round_total_entropy", 0),
+                    }
+
+            # Get all valid round numbers sorted
+            round_numbers = sorted(round_data.keys())
+
+            # Calculate comparison features for all valid round pairs
+            for i, x in enumerate(round_numbers):
+                for y in round_numbers[i+1:]:
+                    if x in round_data and y in round_data:
+                        # Calculate token change
+                        token_change = round_data[y]["round_total_token"] - round_data[x]["round_total_token"]
+                        token_feature_name = f"round_{x}_{y}_change_tokens"
+
+                        # Calculate entropy change
+                        entropy_change = round_data[y]["round_total_entropy"] - round_data[x]["round_total_entropy"]
+                        entropy_feature_name = f"round_{x}_{y}_change_entropy"
+
+                        # Add features to all records in this experiment
+                        for record in exp_record_list:
+                            record[token_feature_name] = token_change
+                            record[entropy_feature_name] = entropy_change
+
+        return records
+
     def write_csv(self, records: List[Dict[str, Any]], filename: str):
         """Write records to CSV file.
 
@@ -735,6 +826,9 @@ class Aggregator:
         if not merged_records:
             print("No records found to aggregate")
             return
+
+        # Add dynamic round comparison features
+        merged_records = self.add_dynamic_round_features(merged_records)
 
         # Write all aggregated data to a single CSV file
         self.write_csv(merged_records, "all_aggregated_data.csv")
