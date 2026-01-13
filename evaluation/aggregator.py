@@ -806,6 +806,194 @@ class Aggregator:
 
         print(f"Successfully wrote {len(records)} records to {output_path}")
 
+    def generate_exclude_agent_csv(self, input_csv_path: str, output_csv_path: str):
+        """Generate CSV file excluding agent-specific columns and merging records by sample.
+
+        This method processes an existing CSV file to:
+        1. Remove agent-specific columns (agent_name, agent_key, execution_order, 
+           agent_time_cost, final_predicted_answer, base_model_predicted_answer,
+           and all columns starting with "agent_")
+        2. Merge multiple records per sample into a single record
+        3. Rename round-related columns to include round number (e.g., round_1_total_entropy)
+        4. Save to a new CSV file
+
+        Args:
+            input_csv_path: Path to the input CSV file
+            output_csv_path: Path to the output CSV file
+        """
+        # Define columns to remove
+        columns_to_remove = {
+            "experiment_name",
+            "ground_truth",
+            "agent_name",
+            "agent_key",
+            "execution_order",
+            "agent_time_cost",
+            "final_predicted_answer",
+            "base_model_predicted_answer",
+        }
+
+        # Read the input CSV file
+        input_path = Path(input_csv_path)
+        if not input_path.exists():
+            print(f"Input CSV file not found: {input_path}")
+            return
+
+        records = []
+        with open(input_path, "r", encoding="utf-8") as csvfile:
+            reader = csv.DictReader(csvfile)
+            fieldnames = reader.fieldnames
+
+            # Determine which columns to keep (excluding agent-specific columns)
+            columns_to_keep = []
+            for field in fieldnames:
+                if field in columns_to_remove:
+                    continue
+                if field.startswith("agent_"):
+                    continue
+                columns_to_keep.append(field)
+
+            # Process each row
+            for row in reader:
+                new_row = {col: row[col] for col in columns_to_keep}
+                records.append(new_row)
+
+        # Group records by sample (using model_name, sample_id, architecture, num_rounds)
+        sample_groups = defaultdict(list)
+        for record in records:
+            sample_key = (
+                record.get("model_name", ""),
+                record.get("sample_id", ""),
+                record.get("architecture", ""),
+                record.get("num_rounds", ""),
+            )
+            sample_groups[sample_key].append(record)
+
+        # Merge records for each sample
+        merged_records = []
+        for sample_key, sample_records in sample_groups.items():
+            if not sample_records:
+                continue
+
+            # Use the first record as base
+            base_record = sample_records[0].copy()
+
+            # Collect round data from all records
+            round_data = {}
+            for record in sample_records:
+                # Extract round number from agent_round_number if available
+                # Or determine from the round_total_entropy field
+                round_num = None
+                
+                # Try to get round number from various sources
+                if "agent_round_number" in record:
+                    try:
+                        round_num = int(record["agent_round_number"])
+                    except (ValueError, TypeError):
+                        pass
+                
+                # If no round number found, try to infer from the data
+                if round_num is None:
+                    # Check if we can determine round from the round fields
+                    # For centralized architecture, round 1 and 2 have different values
+                    # We'll use the first record as round 1, second as round 2, etc.
+                    pass
+
+                # If we have a round number, collect round-specific fields
+                if round_num is not None:
+                    round_data[round_num] = {
+                        "round_total_entropy": record.get("round_total_entropy", ""),
+                        "round_num_inferences": record.get("round_num_inferences", ""),
+                        "round_avg_entropy": record.get("round_avg_entropy", ""),
+                        "round_total_time": record.get("round_total_time", ""),
+                        "round_total_token": record.get("round_total_token", ""),
+                        "round_infer_average_entropy": record.get("round_infer_average_entropy", ""),
+                    }
+
+            # If we couldn't determine round numbers from agent_round_number,
+            # try to infer from unique round_total_entropy values
+            if not round_data and len(sample_records) > 1:
+                unique_round_entropies = {}
+                for idx, record in enumerate(sample_records):
+                    round_entropy = record.get("round_total_entropy", "")
+                    if round_entropy not in unique_round_entropies:
+                        unique_round_entropies[round_entropy] = idx + 1
+                
+                for idx, record in enumerate(sample_records):
+                    round_entropy = record.get("round_total_entropy", "")
+                    round_num = unique_round_entropies.get(round_entropy, idx + 1)
+                    round_data[round_num] = {
+                        "round_total_entropy": record.get("round_total_entropy", ""),
+                        "round_num_inferences": record.get("round_num_inferences", ""),
+                        "round_avg_entropy": record.get("round_avg_entropy", ""),
+                        "round_total_time": record.get("round_total_time", ""),
+                        "round_total_token": record.get("round_total_token", ""),
+                        "round_infer_average_entropy": record.get("round_infer_average_entropy", ""),
+                    }
+
+            # Remove original round fields from base record
+            for field in ["round_total_entropy", "round_num_inferences", "round_avg_entropy", 
+                          "round_total_time", "round_total_token", "round_infer_average_entropy"]:
+                if field in base_record:
+                    del base_record[field]
+
+            # Add round-specific fields with round number in the name
+            for round_num, data in sorted(round_data.items()):
+                base_record[f"round_{round_num}_total_entropy"] = data["round_total_entropy"]
+                base_record[f"round_{round_num}_num_inferences"] = data["round_num_inferences"]
+                base_record[f"round_{round_num}_avg_entropy"] = data["round_avg_entropy"]
+                base_record[f"round_{round_num}_total_time"] = data["round_total_time"]
+                base_record[f"round_{round_num}_total_token"] = data["round_total_token"]
+                base_record[f"round_{round_num}_infer_average_entropy"] = data["round_infer_average_entropy"]
+
+            merged_records.append(base_record)
+
+        # Determine final fieldnames (may include dynamic round fields)
+        all_fieldnames = set()
+        for record in merged_records:
+            all_fieldnames.update(record.keys())
+        
+        # Sort fieldnames for consistent ordering
+        # Put common fields first, then round fields
+        common_fields = [
+            "model_name", "sample_id", "architecture", "num_rounds",
+            "is_finally_correct", "final_format_compliance",
+            "base_model_is_finally_correct", "base_model_format_compliance",
+            "sample_total_entropy", "sample_max_entropy", "sample_min_entropy",
+            "sample_mean_entropy", "sample_median_entropy", "sample_std_entropy",
+            "sample_variance_entropy", "sample_q1_entropy", "sample_q3_entropy",
+            "sample_num_agents", "sample_all_agents_token_count", "sample_avg_entropy_per_token",
+            "sample_entropy_stability_index", "sample_avg_entropy_per_agent",
+            "exp_total_entropy", "exp_infer_average_entropy", "exp_num_inferences",
+            "exp_accuracy", "exp_format_compliance_rate", "exp_total_time", "exp_total_token",
+            "base_model_accuracy", "base_model_format_compliance_rate"
+        ]
+        
+        # Add round fields
+        round_fields = sorted([f for f in all_fieldnames if f.startswith("round_")])
+        
+        # Add any other fields not in common_fields or round_fields
+        other_fields = sorted([f for f in all_fieldnames if f not in common_fields and not f.startswith("round_")])
+        
+        final_fieldnames = common_fields + other_fields + round_fields
+
+        # Write the output CSV file
+        output_path = Path(output_csv_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if not merged_records:
+            print(f"No records to write to {output_path}")
+            return
+
+        with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=final_fieldnames, extrasaction='ignore')
+            writer.writeheader()
+            writer.writerows(merged_records)
+
+        print(f"Successfully wrote {len(merged_records)} merged records to {output_path}")
+        print(f"Merged {len(records)} original records into {len(merged_records)} sample records")
+        print(f"Removed {len(fieldnames) - len(columns_to_keep)} agent-specific columns")
+
     def generate_aggregated_csvs(self):
         """Generate multiple CSV files based on different experimental conditions."""
         # Load JSON data files
@@ -832,6 +1020,11 @@ class Aggregator:
 
         # Write all aggregated data to a single CSV file
         self.write_csv(merged_records, "all_aggregated_data.csv")
+
+        # Generate CSV file excluding agent-specific columns
+        input_csv_path = self.output_dir / "all_aggregated_data.csv"
+        output_csv_path = self.output_dir / "all_aggregated_data_exclude_agent.csv"
+        self.generate_exclude_agent_csv(str(input_csv_path), str(output_csv_path))
 
         # Group records by model name for model-specific CSV files
         records_by_model = defaultdict(list)

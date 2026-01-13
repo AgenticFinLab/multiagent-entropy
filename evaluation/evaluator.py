@@ -28,7 +28,7 @@ def main():
     parser.add_argument(
         "--dataset",
         type=str,
-        choices=["aime2024", "humaneval", "mmlu", "aime2024", "aime2025", "math500"],
+        choices=["gsm8k", "humaneval", "mmlu", "aime2024", "aime2025", "math500"],
         default="gsm8k",
         help="Dataset to analyze",
     )
