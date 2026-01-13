@@ -31,6 +31,12 @@ EXCLUDE_COLUMNS = [
     "agent_round_number",
 ]
 
+EXCLUDE_COLUMNS += [
+    "base_model_accuracy",
+    "base_model_is_finally_correct",
+    "base_model_format_compliance",
+    "base_model_format_compliance_rate",
+]
 
 warnings.filterwarnings("ignore")
 
