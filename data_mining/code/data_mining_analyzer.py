@@ -19,7 +19,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-EXCLUDE_COLUMNS = ["dataset", "model_name", "sample_id", "num_rounds", "exp_num_inferences","round_1_num_inferences","round_2_num_inferences", "agent_round_number",]
+EXCLUDE_COLUMNS = ["dataset", "model_name", "architecture", "sample_id", "num_rounds", "exp_num_inferences","round_1_num_inferences","round_2_num_inferences", "agent_round_number",]
 
 
 warnings.filterwarnings("ignore")
@@ -487,7 +487,7 @@ class DataMiningAnalyzer:
         # Prepare features for regression
         # Exclude is_finally_correct as it's used to calculate exp_accuracy
         X, y = self.prepare_features(
-            target_column="exp_accuracy", exclude_columns=["is_finally_correct"]
+            target_column="exp_accuracy", exclude_columns=EXCLUDE_COLUMNS + ["is_finally_correct"]
         )
 
         # Train models
@@ -533,7 +533,7 @@ class DataMiningAnalyzer:
 
         # Prepare features for classification
         X, y = self.prepare_features(
-            target_column="is_finally_correct", exclude_columns=[]
+            target_column="is_finally_correct", exclude_columns=EXCLUDE_COLUMNS
         )
 
         # Train models
