@@ -26,15 +26,15 @@ EXCLUDE_COLUMNS = [
     # "architecture",
     "sample_id",
     # useless data
-    # "num_rounds",
-    # "exp_num_inferences",
-    # "round_1_num_inferences",
-    # "round_2_num_inferences",
+    "num_rounds",
+    "exp_num_inferences",
+    "round_1_num_inferences",
+    "round_2_num_inferences",
     # base model metrics
-    # "base_model_accuracy",
-    # "base_model_is_finally_correct",
-    # "base_model_format_compliance",
-    # "base_model_format_compliance_rate",
+    "base_model_accuracy",
+    "base_model_is_finally_correct",
+    "base_model_format_compliance",
+    "base_model_format_compliance_rate",
 ]
 
 warnings.filterwarnings("ignore")
@@ -79,7 +79,12 @@ logger = logging.getLogger(__name__)
 class DataMiningAnalyzer:
     """Performs comprehensive data mining analysis on multi-agent entropy data."""
 
-    def __init__(self, data_path: str = None, output_dir: str = None, target_dataset: str = None):
+    def __init__(
+        self,
+        data_path: str = None,
+        output_dir: str = None,
+        target_dataset: str = None,
+    ):
         """
         Initialize the DataMiningAnalyzer.
 
@@ -90,7 +95,7 @@ class DataMiningAnalyzer:
         """
         if data_path is None:
             data_path = "data_mining/data/merged_datasets.csv"
-        
+
         # Determine output directory based on target_dataset
         if output_dir is None:
             if target_dataset:
