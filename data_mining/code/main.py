@@ -88,6 +88,28 @@ def main():
         action="store_false",
         help="Skip SHAP analysis",
     )
+    parser.add_argument(
+        "--exclude-features",
+        type=str,
+        default="default",
+        help="""Feature exclusion configuration. Options:
+            '*' - Use all features (no exclusions)
+            'default' - Use default exclusions (recommended)
+            Feature group name(s) - Specify groups from features.py (comma-separated)
+            Available groups: base_model_metrics, experiment_identifier, sample_identifier,
+                experiment_statistics, unseen_features, round_statistics, sample_statistics,
+                sample_distribution_shape, sample_baseline_entropy, aggregation_over_agents,
+                sample_round_wise_aggregated, cross_round_aggregated,
+                intra_round_agent_distribution, cross_round_agent_spread_change,
+                sample_round1_agent_statistics, sample_round2_agent_statistics
+            Examples:
+                --exclude-features '*' (use all features)
+                --exclude-features 'default' (default exclusions)
+                --exclude-features 'base_model_metrics' (exclude base model metrics only)
+                --exclude-features 'base_model_metrics,experiment_identifier' (exclude multiple groups)
+                --exclude-features 'default+base_model_metrics' (combine default with additional exclusions)
+        """,
+    )
     args = parser.parse_args()
     
     # Handle the case where user specifies '*' to collect all available datasets
@@ -118,6 +140,7 @@ def main():
     logger.info(f"Filter - Model Names: {model_names if model_names else 'All'}")
     logger.info(f"Filter - Architectures: {architectures if architectures else 'All'}")
     logger.info(f"Filter - Datasets: {datasets if datasets else 'All'}")
+    logger.info(f"Exclude Features: {args.exclude_features}")
 
     try:
         # Determine target_dataset for output directory
@@ -134,6 +157,7 @@ def main():
             model_names=model_names,
             architectures=architectures,
             datasets=datasets,
+            exclude_features=args.exclude_features,
         )
 
         # Run the analysis based on the specified type

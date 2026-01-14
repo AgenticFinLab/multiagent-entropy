@@ -35,6 +35,7 @@ from utils import (
     determine_output_directory,
     get_default_data_path,
     filter_dataframe,
+    get_exclude_columns_from_config,
 )
 
 # Try to import XGBoost and LightGBM
@@ -72,6 +73,7 @@ class ClassificationAnalyzer:
         model_names: List[str] = None,
         architectures: List[str] = None,
         datasets: List[str] = None,
+        exclude_features: str = "default",
     ):
         """
         Initialize the ClassificationAnalyzer.
@@ -83,6 +85,7 @@ class ClassificationAnalyzer:
             model_names: List of model names to filter (None or ['*'] for all)
             architectures: List of architectures to filter (None or ['*'] for all)
             datasets: List of datasets to filter (None or ['*'] for all)
+            exclude_features: Feature exclusion configuration ('*', 'default', or feature group names)
         """
         if data_path is None:
             data_path = get_default_data_path()
@@ -99,6 +102,7 @@ class ClassificationAnalyzer:
         self.model_names = model_names
         self.architectures = architectures
         self.datasets = datasets
+        self.exclude_features = exclude_features
         self.df = None
         self.results = {}
 
@@ -161,7 +165,11 @@ class ClassificationAnalyzer:
         self.df = self.encode_categorical_features(self.df)
 
         if exclude_columns is None:
-            exclude_columns = EXCLUDE_COLUMNS.copy()
+            # Use the configured exclude features
+            exclude_columns = get_exclude_columns_from_config(self.exclude_features)
+
+        # Always exclude the target column and dataset identifier from features
+        exclude_columns = exclude_columns + [target_column]
 
         # Use utility function to prepare features
         X, y = prepare_features(self.df, target_column, exclude_columns)

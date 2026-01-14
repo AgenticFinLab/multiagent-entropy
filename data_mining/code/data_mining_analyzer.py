@@ -51,6 +51,7 @@ class DataMiningAnalyzer:
         model_names: List[str] = None,
         architectures: List[str] = None,
         datasets: List[str] = None,
+        exclude_features: str = "default",
     ):
         """
         Initialize the DataMiningAnalyzer.
@@ -64,6 +65,7 @@ class DataMiningAnalyzer:
             model_names: List of model names to filter (None or ['*'] for all)
             architectures: List of architectures to filter (None or ['*'] for all)
             datasets: List of datasets to filter (None or ['*'] for all)
+            exclude_features: Feature exclusion configuration ('*', 'default', or feature group names)
         """
         if data_path is None:
             data_path = get_default_data_path()
@@ -91,6 +93,7 @@ class DataMiningAnalyzer:
         self.model_names = model_names
         self.architectures = architectures
         self.datasets = datasets
+        self.exclude_features = exclude_features
         self.results = {}
         self.run_shap = run_shap
 
@@ -105,6 +108,7 @@ class DataMiningAnalyzer:
             model_names=model_names,
             architectures=architectures,
             datasets=datasets,
+            exclude_features=exclude_features,
         )
         
         self.classification_analyzer = ClassificationAnalyzer(
@@ -114,6 +118,7 @@ class DataMiningAnalyzer:
             model_names=model_names,
             architectures=architectures,
             datasets=datasets,
+            exclude_features=exclude_features,
         )
         
         # Initialize SHAP analyzer if available

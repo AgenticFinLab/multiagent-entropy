@@ -313,3 +313,67 @@ def generate_filter_suffix(
         suffix_parts.append(f"dataset_{dataset_str}")
     
     return "_".join(suffix_parts) if suffix_parts else ""
+
+
+def get_exclude_columns_from_config(exclude_features: str) -> List[str]:
+    """
+    Get exclude columns list based on configuration.
+    
+    Args:
+        exclude_features: Configuration string that can be:
+            - '*': Use no exclusions (empty list)
+            - 'default': Use DEFAULT_EXCLUDE_COLUMNS from features.py
+            - Feature group name(s) from features.py (comma-separated)
+            - Can also use '+' to combine multiple groups
+    
+    Returns:
+        List of column names to exclude
+    
+    Examples:
+        - '*' -> [] (no exclusions, use all features)
+        - 'default' -> DEFAULT_EXCLUDE_COLUMNS
+        - 'base_model_metrics' -> BASE_MODEL_METRICS columns
+        - 'base_model_metrics,experiment_identifier' -> combined columns
+        - 'default+base_model_metrics' -> DEFAULT_EXCLUDE_COLUMNS + BASE_MODEL_METRICS
+    """
+    from features import FEATURE_GROUPS, DEFAULT_EXCLUDE_COLUMNS
+    
+    # Handle wildcard - no exclusions
+    if exclude_features == '*':
+        logger.info("Using all features (no exclusions)")
+        return []
+    
+    # Handle default configuration
+    if exclude_features == 'default' or exclude_features is None:
+        logger.info(f"Using default exclusions: {len(DEFAULT_EXCLUDE_COLUMNS)} columns")
+        return DEFAULT_EXCLUDE_COLUMNS.copy()
+    
+    # Parse configuration string
+    exclude_list = []
+    
+    # Split by '+' for combining with default
+    if '+' in exclude_features:
+        parts = [p.strip() for p in exclude_features.split('+')]
+        if 'default' in parts:
+            exclude_list.extend(DEFAULT_EXCLUDE_COLUMNS)
+            parts.remove('default')
+        exclude_features = ','.join(parts)
+    
+    # Split by comma for multiple groups
+    feature_groups = [fg.strip() for fg in exclude_features.split(',') if fg.strip()]
+    
+    # Collect columns from specified feature groups
+    for group_name in feature_groups:
+        if group_name in FEATURE_GROUPS:
+            group_columns = FEATURE_GROUPS[group_name]
+            exclude_list.extend(group_columns)
+            logger.info(f"Adding feature group '{group_name}': {len(group_columns)} columns")
+        else:
+            logger.warning(f"Unknown feature group: '{group_name}'")
+            logger.info(f"Available groups: {', '.join(FEATURE_GROUPS.keys())}")
+    
+    # Remove duplicates while preserving order
+    exclude_list = list(dict.fromkeys(exclude_list))
+    
+    logger.info(f"Total exclusions configured: {len(exclude_list)} columns")
+    return exclude_list
