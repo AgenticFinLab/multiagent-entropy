@@ -269,17 +269,21 @@ class ShapAnalyzer:
                 # Create a temporary explainer for the dependence plot
                 if isinstance(shap_values, list):
                     # Handle multi-output case
-                    shap.dependence_plot(
-                        feature_name, 
-                        shap_values[0] if len(shap_values) > 0 else shap_values,
-                        X_test, 
+                    shap.plots.scatter(
+                        shap.Explanation(
+                            values=shap_values[0] if len(shap_values) > 0 else shap_values,
+                            data=X_test.values,
+                            feature_names=list(X_test.columns)
+                        )[:, feature_name],
                         show=False
                     )
                 else:
-                    shap.dependence_plot(
-                        feature_name, 
-                        shap_values, 
-                        X_test, 
+                    shap.plots.scatter(
+                        shap.Explanation(
+                            values=shap_values,
+                            data=X_test.values,
+                            feature_names=list(X_test.columns)
+                        )[:, feature_name],
                         show=False
                     )
                 

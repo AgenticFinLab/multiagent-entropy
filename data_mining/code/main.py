@@ -57,9 +57,15 @@ def main():
     )
     parser.add_argument(
         "--run-shap",
-        type=bool,
+        action="store_true",
         default=True,
         help="Run SHAP analysis (default: True)",
+    )
+    parser.add_argument(
+        "--no-shap",
+        dest="run_shap",
+        action="store_false",
+        help="Skip SHAP analysis",
     )
     args = parser.parse_args()
     

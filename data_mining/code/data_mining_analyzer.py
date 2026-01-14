@@ -91,11 +91,16 @@ class DataMiningAnalyzer:
         
         # Initialize SHAP analyzer if available
         if self.run_shap:
-            self.shap_analyzer = ShapAnalyzer(
-                data_path=str(self.data_path),
-                output_dir=str(self.output_dir / "shap"),
-                target_dataset=target_dataset,
-            )
+            try:
+                self.shap_analyzer = ShapAnalyzer(
+                    data_path=str(self.data_path),
+                    output_dir=str(self.output_dir / "shap"),
+                    target_dataset=target_dataset,
+                )
+            except ImportError:
+                self.shap_analyzer = None
+                print("Warning: SHAP not available. Install with: pip install shap")
+                self.run_shap = False
 
 
 
@@ -329,7 +334,7 @@ class DataMiningAnalyzer:
             self.run_sample_level_analysis()
 
         # Run SHAP analysis if requested and available
-        if self.run_shap and "shap" in self.results:
+        if self.run_shap and hasattr(self, 'shap_analyzer') and self.shap_analyzer is not None:
             # Determine which SHAP analyses to run based on what was run above
             include_regression = analysis_type in ["all", "regression"]
             include_classification = analysis_type in ["all", "classification"]
