@@ -83,10 +83,10 @@ class ClassificationAnalyzer:
             data_path: Path to the merged dataset CSV file
             output_dir: Directory to save analysis results
             target_dataset: Target dataset name for determining output directory
-            model_names: List of model names to filter (None or ['*'] for all)
-            architectures: List of architectures to filter (None or ['*'] for all)
-            datasets: List of datasets to filter (None or ['*'] for all)
-            exclude_features: Feature exclusion configuration ('*', 'default', or feature group names)
+            model_names: List of model names to filter (None or ['all'] for all)
+            architectures: List of architectures to filter (None or ['all'] for all)
+            datasets: List of datasets to filter (None or ['all'] for all)
+            exclude_features: Feature exclusion configuration ('all', 'default', or feature group names)
         """
         if data_path is None:
             data_path = get_default_data_path()
@@ -382,7 +382,7 @@ class ClassificationAnalyzer:
 
         # Prepare features for classification
         X, y = self.prepare_features(
-            target_column="is_finally_correct", exclude_columns=self.exclude_columns
+            target_column="is_finally_correct"
         )
 
         # Train models
