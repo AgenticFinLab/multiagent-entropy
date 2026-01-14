@@ -334,7 +334,7 @@ class ClassificationAnalyzer:
             square=True,
             linewidths=0.5,
             cbar_kws={"shrink": 0.8},
-            annot_kws={"size": 6},
+            annot_kws={"size": 2},
         )
         plt.title(title, fontsize=16, fontweight="bold")
         plt.tight_layout()

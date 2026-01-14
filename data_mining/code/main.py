@@ -67,6 +67,11 @@ def main():
         action="store_false",
         help="Skip SHAP analysis",
     )
+    parser.add_argument(
+        "--only-shap",
+        default=True,
+        help="Run only SHAP analysis",
+    )
     args = parser.parse_args()
     
     # Handle the case where user specifies '*' to collect all available datasets
@@ -105,10 +110,13 @@ def main():
         )
 
         # Run the analysis based on the specified type
-        results, report_paths = analyzer.run_full_analysis(
-            analysis_type=args.analysis_type,
-            target_datasets=target_datasets if not args.skip_collection else None
-        )
+        if args.only_shap:
+            results, report_paths = analyzer.run_only_shap_analysis()
+        else:
+            results, report_paths = analyzer.run_full_analysis(
+                analysis_type=args.analysis_type,
+                target_datasets=target_datasets if not args.skip_collection else None
+            )
 
         # Print summary of results
         logger.info("\n[ANALYSIS SUMMARY]")

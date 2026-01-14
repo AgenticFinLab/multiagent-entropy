@@ -351,6 +351,70 @@ class DataMiningAnalyzer:
 
         return self.results, report_path
 
+    def run_only_shap_analysis(self):
+        """
+        Run only the SHAP analysis without running regression or classification first.
+        This assumes that regression and classification results already exist or will be loaded.
+        """
+        logger.info("Starting SHAP-only analysis...")
+        
+        # Initialize SHAP analyzer if not already done
+        if not hasattr(self, 'shap_analyzer') or self.shap_analyzer is None:
+            if self.run_shap:
+                try:
+                    self.shap_analyzer = ShapAnalyzer(
+                        data_path=str(self.data_path),
+                        output_dir=str(self.output_dir / "shap"),
+                        target_dataset=self.target_dataset,
+                    )
+                except ImportError:
+                    self.shap_analyzer = None
+                    print("Warning: SHAP not available. Install with: pip install shap")
+                    return {}, []
+            else:
+                print("SHAP analysis is disabled.")
+                return {}, []
+
+        # Check if regression and classification results are already available
+        regression_results = self.results.get("experiment_level")
+        classification_results = self.results.get("sample_level")
+        
+        # Load data if not already loaded to check for target columns
+        if not regression_results:
+            # Ensure regression analyzer has loaded data
+            if self.regression_analyzer.df is None:
+                self.regression_analyzer.load_data()
+            # Check if 'exp_accuracy' column exists and run minimal regression if needed
+            if 'exp_accuracy' in self.regression_analyzer.df.columns:
+                logger.info("Running minimal regression analysis for SHAP...")
+                regression_results, _ = self.regression_analyzer.run_full_pipeline()
+                self.results["experiment_level"] = regression_results
+        
+        if not classification_results:
+            # Ensure classification analyzer has loaded data
+            if self.classification_analyzer.df is None:
+                self.classification_analyzer.load_data()
+            # Check if 'is_finally_correct' column exists and run minimal classification if needed
+            if 'is_finally_correct' in self.classification_analyzer.df.columns:
+                logger.info("Running minimal classification analysis for SHAP...")
+                classification_results, _ = self.classification_analyzer.run_full_pipeline()
+                self.results["sample_level"] = classification_results
+        
+        # Run SHAP analysis
+        shap_results, shap_report_path = self.shap_analyzer.run_full_analysis(
+            regression_results=regression_results,
+            classification_results=classification_results
+        )
+        
+        self.results["shap"] = shap_results
+        
+        # Generate report
+        report_path = self.generate_report()
+        
+        logger.info("SHAP-only analysis completed successfully!")
+        
+        return self.results, report_path
+
 
 def main():
     """Main function to execute the data mining analysis."""

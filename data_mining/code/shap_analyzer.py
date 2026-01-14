@@ -285,6 +285,9 @@ class ShapAnalyzer:
                 feature_name = X_test.columns[idx_scalar]
                 
                 plt.figure(figsize=(10, 6))
+                # Get index of the feature
+                feature_idx = list(X_test.columns).index(feature_name)
+                
                 # Create a temporary explainer for the dependence plot
                 if isinstance(shap_values, list):
                     # Handle multi-output case
@@ -292,21 +295,19 @@ class ShapAnalyzer:
                     # Ensure it's an array
                     if isinstance(temp_shap_values, list):
                         temp_shap_values = np.asarray(temp_shap_values)
+                    # Extract values for the specific feature
+                    feature_shap_values = temp_shap_values[:, feature_idx] if temp_shap_values.ndim > 1 else temp_shap_values
                     shap.plots.scatter(
-                        shap.Explanation(
-                            values=temp_shap_values,
-                            data=X_test.values,
-                            feature_names=list(X_test.columns)
-                        )[:, feature_name],
+                        feature_shap_values,
+                        X_test[feature_name].values,
                         show=False
                     )
                 else:
+                    # Extract values for the specific feature
+                    feature_shap_values = shap_values[:, feature_idx] if shap_values.ndim > 1 else shap_values
                     shap.plots.scatter(
-                        shap.Explanation(
-                            values=shap_values,
-                            data=X_test.values,
-                            feature_names=list(X_test.columns)
-                        )[:, feature_name],
+                        feature_shap_values,
+                        X_test[feature_name].values,
                         show=False
                     )
                 
