@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 class DataMiningAnalyzer:
     """Unified entry point for comprehensive data mining analysis.
-    
+
     Delegates to RegressionAnalyzer and ClassificationAnalyzer for specialized tasks.
     Supports both programmatic usage and command-line interface.
     """
@@ -99,7 +99,7 @@ class DataMiningAnalyzer:
 
         # Create output directory if it doesn't exist
         create_output_directory(self.output_dir)
-        
+
         # Initialize specialized analyzers
         self.regression_analyzer = RegressionAnalyzer(
             data_path=str(self.data_path),
@@ -110,7 +110,7 @@ class DataMiningAnalyzer:
             datasets=datasets,
             exclude_features=exclude_features,
         )
-        
+
         self.classification_analyzer = ClassificationAnalyzer(
             data_path=str(self.data_path),
             output_dir=str(self.output_dir / "classification"),
@@ -120,7 +120,7 @@ class DataMiningAnalyzer:
             datasets=datasets,
             exclude_features=exclude_features,
         )
-        
+
         # Initialize SHAP analyzer if available
         if self.run_shap:
             try:
@@ -134,12 +134,10 @@ class DataMiningAnalyzer:
                 print("Warning: SHAP not available. Install with: pip install shap")
                 self.run_shap = False
 
-
-
     def run_experiment_level_analysis(self):
         """
         Perform experiment-level analysis (regression on exp_accuracy).
-        
+
         Delegates to RegressionAnalyzer.
         """
         regression_results, _ = self.regression_analyzer.run_full_pipeline()
@@ -149,7 +147,7 @@ class DataMiningAnalyzer:
     def run_sample_level_analysis(self):
         """
         Perform sample-level analysis (classification on is_finally_correct).
-        
+
         Delegates to ClassificationAnalyzer.
         """
         classification_results, _ = self.classification_analyzer.run_full_pipeline()
@@ -159,43 +157,45 @@ class DataMiningAnalyzer:
     def run_shap_analysis(self, include_regression=True, include_classification=True):
         """
         Perform SHAP analysis for interpretability of models.
-        
+
         Args:
             include_regression: Whether to run SHAP analysis for regression models
             include_classification: Whether to run SHAP analysis for classification models
-        
+
         Note:
             This method passes the full results dictionaries to ShapAnalyzer,
             which will automatically extract X_train, X_test, and trained models.
             This ensures SHAP analysis uses the same data splits as model training.
-        """            
+        """
         if self.shap_analyzer is None:
             print("SHAP analyzer not initialized.")
             return None
-            
+
         logger.info("Running SHAP analysis...")
-        
+
         # Get results from previous analyses
         # These contain models, X_train, X_test, y_train, y_test
         regression_results = self.results.get("experiment_level")
         classification_results = self.results.get("sample_level")
-        
+
         # Run SHAP analysis - data splits will be extracted from results
         shap_results, shap_report_path = self.shap_analyzer.run_full_analysis(
             regression_results=regression_results if include_regression else None,
-            classification_results=classification_results if include_classification else None
+            classification_results=(
+                classification_results if include_classification else None
+            ),
         )
-        
+
         self.results["shap"] = shap_results
-        
+
         logger.info("SHAP analysis completed.")
-        
+
         return self.results["shap"]
 
     def generate_report(self):
         """
         Generate a unified comprehensive analysis report.
-        
+
         Combines results from regression, classification, and SHAP analyzers.
         """
         logger.info("Generating comprehensive analysis report...")
@@ -206,15 +206,21 @@ class DataMiningAnalyzer:
             f.write("=" * 80 + "\n")
             f.write("UNIFIED DATA MINING ANALYSIS REPORT\n")
             f.write("=" * 80 + "\n\n")
-            
+
             f.write("This report consolidates results from:\n")
-            f.write(f"  - Regression Analysis: {self.output_dir / 'regression' / 'regression_report.txt'}\n")
-            f.write(f"  - Classification Analysis: {self.output_dir / 'classification' / 'classification_report.txt'}\n")
+            f.write(
+                f"  - Regression Analysis: {self.output_dir / 'regression' / 'regression_report.txt'}\n"
+            )
+            f.write(
+                f"  - Classification Analysis: {self.output_dir / 'classification' / 'classification_report.txt'}\n"
+            )
             if "shap" in self.results:
-                f.write(f"  - SHAP Analysis: {self.output_dir / 'shap' / 'shap_analysis_report.txt'}\n\n")
+                f.write(
+                    f"  - SHAP Analysis: {self.output_dir / 'shap' / 'shap_analysis_report.txt'}\n\n"
+                )
             else:
                 f.write("\n")
-            
+
             # Experiment-level results
             if "experiment_level" in self.results:
                 f.write("EXPERIMENT-LEVEL ANALYSIS (Regression on exp_accuracy)\n")
@@ -268,30 +274,50 @@ class DataMiningAnalyzer:
                     for idx, row in importance_df.head(10).iterrows():
                         f.write(f"  {row['Feature']}: {row['Importance']:.6f}\n")
                     f.write("\n")
-            
+
             # SHAP Analysis results
             if "shap" in self.results:
                 f.write("\n" + "=" * 80 + "\n")
                 f.write("SHAP ANALYSIS RESULTS\n")
                 f.write("-" * 80 + "\n\n")
-                
+
                 if "regression_shap" in self.results["shap"]:
                     f.write("SHAP ANALYSIS FOR REGRESSION MODELS:\n\n")
-                    for model_name, shap_result in self.results["shap"]["regression_shap"].items():
+                    for model_name, shap_result in self.results["shap"][
+                        "regression_shap"
+                    ].items():
                         f.write(f"{model_name} (Regression):\n")
-                        f.write(f"  Summary Plot: {shap_result['plots_info']['summary_plot']}\n")
-                        f.write(f"  Importance Plot: {shap_result['plots_info']['importance_plot']}\n")
-                        f.write(f"  Waterfall Plot: {shap_result['plots_info']['waterfall_plot']}\n")
-                        f.write(f"  Dependence Plots: {len(shap_result['plots_info']['dependence_plots'])} plots\n\n")
-                
+                        f.write(
+                            f"  Summary Plot: {shap_result['plots_info']['summary_plot']}\n"
+                        )
+                        f.write(
+                            f"  Importance Plot: {shap_result['plots_info']['importance_plot']}\n"
+                        )
+                        f.write(
+                            f"  Waterfall Plot: {shap_result['plots_info']['waterfall_plot']}\n"
+                        )
+                        f.write(
+                            f"  Dependence Plots: {len(shap_result['plots_info']['dependence_plots'])} plots\n\n"
+                        )
+
                 if "classification_shap" in self.results["shap"]:
                     f.write("SHAP ANALYSIS FOR CLASSIFICATION MODELS:\n\n")
-                    for model_name, shap_result in self.results["shap"]["classification_shap"].items():
+                    for model_name, shap_result in self.results["shap"][
+                        "classification_shap"
+                    ].items():
                         f.write(f"{model_name} (Classification):\n")
-                        f.write(f"  Summary Plot: {shap_result['plots_info']['summary_plot']}\n")
-                        f.write(f"  Importance Plot: {shap_result['plots_info']['importance_plot']}\n")
-                        f.write(f"  Waterfall Plot: {shap_result['plots_info']['waterfall_plot']}\n")
-                        f.write(f"  Dependence Plots: {len(shap_result['plots_info']['dependence_plots'])} plots\n\n")
+                        f.write(
+                            f"  Summary Plot: {shap_result['plots_info']['summary_plot']}\n"
+                        )
+                        f.write(
+                            f"  Importance Plot: {shap_result['plots_info']['importance_plot']}\n"
+                        )
+                        f.write(
+                            f"  Waterfall Plot: {shap_result['plots_info']['waterfall_plot']}\n"
+                        )
+                        f.write(
+                            f"  Dependence Plots: {len(shap_result['plots_info']['dependence_plots'])} plots\n\n"
+                        )
 
         logger.info(f"Unified analysis report saved: {report_path}")
 
@@ -300,12 +326,14 @@ class DataMiningAnalyzer:
     def run_data_collection(self, target_datasets: Optional[List[str]] = None):
         """
         Run data collection and merging.
-        
+
         Args:
             target_datasets: List of datasets to collect (None for all)
         """
-        from data_collector import DataCollector  # Import here to avoid circular imports
-        
+        from data_collector import (
+            DataCollector,
+        )  # Import here to avoid circular imports
+
         logger.info("[STEP 1] Data Collection and Merging")
         logger.info("-" * 80)
 
@@ -330,25 +358,24 @@ class DataMiningAnalyzer:
         logger.info(f"  Total Columns: {summary['total_columns']}")
         logger.info(f"  Datasets: {summary['datasets']}")
         logger.info(f"  Records per Dataset: {summary['dataset_counts']}")
-        
+
         return merged_data_path
 
     def run_full_analysis(
-        self, 
-        analysis_type: str = "all", 
-        target_datasets: Optional[List[str]] = None):
+        self, analysis_type: str = "all", target_datasets: Optional[List[str]] = None
+    ):
         """
         Run complete analysis pipeline.
-        
+
         Executes both regression and classification analyses via specialized analyzers.
-        
+
         Args:
             analysis_type: Type of analysis to run ('all', 'regression', or 'classification')
             target_datasets: List of datasets to collect (None for all)
             run_shap: Whether to run SHAP analysis after regression/classification
         """
         logger.info("Starting full data mining analysis pipeline...")
-        
+
         # Run data collection if not skipping
         if not self.skip_collection:
             merged_data_path = self.run_data_collection(target_datasets)
@@ -374,14 +401,18 @@ class DataMiningAnalyzer:
             self.run_sample_level_analysis()
 
         # Run SHAP analysis if requested and available
-        if self.run_shap and hasattr(self, 'shap_analyzer') and self.shap_analyzer is not None:
+        if (
+            self.run_shap
+            and hasattr(self, "shap_analyzer")
+            and self.shap_analyzer is not None
+        ):
             # Determine which SHAP analyses to run based on what was run above
             include_regression = analysis_type in ["all", "regression"]
             include_classification = analysis_type in ["all", "classification"]
-            
+
             self.run_shap_analysis(
                 include_regression=include_regression,
-                include_classification=include_classification
+                include_classification=include_classification,
             )
 
         # Generate unified report

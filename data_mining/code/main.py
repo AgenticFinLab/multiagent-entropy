@@ -92,16 +92,13 @@ def main():
         "--exclude-features",
         type=str,
         default="default",
-        help="""Feature exclusion configuration. Options:
+        help="""Feature exclusion configuration. 
+            Options:
             '*' - Use all features (no exclusions)
             'default' - Use default exclusions (recommended)
             Feature group name(s) - Specify groups from features.py (comma-separated)
-            Available groups: base_model_metrics, experiment_identifier, sample_identifier,
-                experiment_statistics, unseen_features, round_statistics, sample_statistics,
-                sample_distribution_shape, sample_baseline_entropy, aggregation_over_agents,
-                sample_round_wise_aggregated, cross_round_aggregated,
-                intra_round_agent_distribution, cross_round_agent_spread_change,
-                sample_round1_agent_statistics, sample_round2_agent_statistics
+            Available groups: 
+            base_model_metrics, experiment_identifier, sample_identifier, experiment_statistics, unseen_features, round_statistics, sample_statistics, sample_distribution_shape, sample_baseline_entropy, aggregation_over_agents, sample_round_wise_aggregated, cross_round_aggregated, intra_round_agent_distribution, cross_round_agent_spread_change, sample_round1_agent_statistics, sample_round2_agent_statistics
             Examples:
                 --exclude-features '*' (use all features)
                 --exclude-features 'default' (default exclusions)
@@ -111,31 +108,36 @@ def main():
         """,
     )
     args = parser.parse_args()
-    
+
     # Handle the case where user specifies '*' to collect all available datasets
-    if args.merged_datasets == ['*']:
+    if args.merged_datasets == ["*"]:
         from data_collector import DataCollector
+
         collector = DataCollector()
         discovered_datasets = collector.discover_datasets()
         logger.info(f"Auto-discovered datasets: {discovered_datasets}")
         merged_datasets = discovered_datasets
     else:
         # Filter out empty strings and handle default case
-        filtered_datasets = [ds for ds in args.merged_datasets if ds]  # Remove empty strings
+        filtered_datasets = [
+            ds for ds in args.merged_datasets if ds
+        ]  # Remove empty strings
         if not filtered_datasets:
             filtered_datasets = ["aime2025"]  # Default to aime2025 if none provided
         merged_datasets = filtered_datasets
-    
+
     # Process filter arguments
-    model_names = None if args.model_name == ['*'] else args.model_name
-    architectures = None if args.architecture == ['*'] else args.architecture
-    datasets = None if args.dataset == ['*'] else args.dataset
+    model_names = None if args.model_name == ["*"] else args.model_name
+    architectures = None if args.architecture == ["*"] else args.architecture
+    datasets = None if args.dataset == ["*"] else args.dataset
 
     logger.info("=" * 80)
     logger.info("MULTI-AGENT ENTROPY DATA MINING ANALYSIS")
     logger.info("=" * 80)
     logger.info(f"Analysis Type: {args.analysis_type}")
-    logger.info(f"Merged Datasets (for collection): {', '.join(merged_datasets) if merged_datasets else 'None (will auto-discover)'}")
+    logger.info(
+        f"Merged Datasets (for collection): {', '.join(merged_datasets) if merged_datasets else 'None (will auto-discover)'}"
+    )
     logger.info(f"Skip Collection: {args.skip_collection}")
     logger.info(f"Filter - Model Names: {model_names if model_names else 'All'}")
     logger.info(f"Filter - Architectures: {architectures if architectures else 'All'}")
@@ -163,7 +165,7 @@ def main():
         # Run the analysis based on the specified type
         results, report_paths = analyzer.run_full_analysis(
             analysis_type=args.analysis_type,
-            target_datasets=merged_datasets if not args.skip_collection else None
+            target_datasets=merged_datasets if not args.skip_collection else None,
         )
 
         # Print summary of results
@@ -172,13 +174,23 @@ def main():
 
         if "experiment_level" in results:
             logger.info("Experiment-Level Analysis (Regression on exp_accuracy):")
-            for model_name, metrics in results["experiment_level"]["regression_results"]["metrics"].items():
-                logger.info(f"  {model_name}: R2 = {metrics['R2']:.4f}, MAE = {metrics['MAE']:.4f}")
+            for model_name, metrics in results["experiment_level"][
+                "regression_results"
+            ]["metrics"].items():
+                logger.info(
+                    f"  {model_name}: R2 = {metrics['R2']:.4f}, MAE = {metrics['MAE']:.4f}"
+                )
 
         if "sample_level" in results:
-            logger.info("\nSample-Level Analysis (Classification on is_finally_correct):")
-            for model_name, metrics in results["sample_level"]["classification_results"]["metrics"].items():
-                logger.info(f"  {model_name}: Accuracy = {metrics['Accuracy']:.4f}, F1 = {metrics['F1']:.4f}")
+            logger.info(
+                "\nSample-Level Analysis (Classification on is_finally_correct):"
+            )
+            for model_name, metrics in results["sample_level"][
+                "classification_results"
+            ]["metrics"].items():
+                logger.info(
+                    f"  {model_name}: Accuracy = {metrics['Accuracy']:.4f}, F1 = {metrics['F1']:.4f}"
+                )
 
         logger.info("\nAnalysis reports saved to:")
         if isinstance(report_paths, list):

@@ -20,24 +20,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Common constants
-EXCLUDE_COLUMNS = [
-    # ignored identifier
-    "dataset",
-    "model_name",
-    # "architecture",
-    "sample_id",
-    # useless data
-    "num_rounds",
-    "exp_num_inferences",
-    "round_1_num_inferences",
-    "round_2_num_inferences",
-    # base model metrics
-    "base_model_accuracy",
-    "base_model_is_finally_correct",
-    "base_model_format_compliance",
-    "base_model_format_compliance_rate",
-]
 
 # Visualization settings
 VISUALIZATION_STYLE = "seaborn-v0_8"
@@ -260,22 +242,32 @@ def filter_dataframe(
         Filtered DataFrame
     """
     filtered_df = df.copy()
-    
+
     # Filter by model names
-    if model_names and model_names != ['*'] and 'model_name' in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df['model_name'].isin(model_names)]
-        logger.info(f"Filtered by model_names: {model_names}, remaining records: {len(filtered_df)}")
-    
+    if model_names and model_names != ["*"] and "model_name" in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df["model_name"].isin(model_names)]
+        logger.info(
+            f"Filtered by model_names: {model_names}, remaining records: {len(filtered_df)}"
+        )
+
     # Filter by architectures
-    if architectures and architectures != ['*'] and 'architecture' in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df['architecture'].isin(architectures)]
-        logger.info(f"Filtered by architectures: {architectures}, remaining records: {len(filtered_df)}")
-    
+    if (
+        architectures
+        and architectures != ["*"]
+        and "architecture" in filtered_df.columns
+    ):
+        filtered_df = filtered_df[filtered_df["architecture"].isin(architectures)]
+        logger.info(
+            f"Filtered by architectures: {architectures}, remaining records: {len(filtered_df)}"
+        )
+
     # Filter by datasets
-    if datasets and datasets != ['*'] and 'dataset' in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df['dataset'].isin(datasets)]
-        logger.info(f"Filtered by datasets: {datasets}, remaining records: {len(filtered_df)}")
-    
+    if datasets and datasets != ["*"] and "dataset" in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df["dataset"].isin(datasets)]
+        logger.info(
+            f"Filtered by datasets: {datasets}, remaining records: {len(filtered_df)}"
+        )
+
     return filtered_df
 
 
@@ -296,39 +288,39 @@ def generate_filter_suffix(
         Directory suffix string (e.g., "model_gpt4_arch_react_dataset_aime2025")
     """
     suffix_parts = []
-    
+
     # Add model names to suffix
-    if model_names and model_names != ['*']:
+    if model_names and model_names != ["*"]:
         model_str = "_".join(model_names)
         suffix_parts.append(f"model_{model_str}")
-    
+
     # Add architectures to suffix
-    if architectures and architectures != ['*']:
+    if architectures and architectures != ["*"]:
         arch_str = "_".join(architectures)
         suffix_parts.append(f"arch_{arch_str}")
-    
+
     # Add datasets to suffix
-    if datasets and datasets != ['*']:
+    if datasets and datasets != ["*"]:
         dataset_str = "_".join(datasets)
         suffix_parts.append(f"dataset_{dataset_str}")
-    
+
     return "_".join(suffix_parts) if suffix_parts else ""
 
 
 def get_exclude_columns_from_config(exclude_features: str) -> List[str]:
     """
     Get exclude columns list based on configuration.
-    
+
     Args:
         exclude_features: Configuration string that can be:
             - '*': Use no exclusions (empty list)
             - 'default': Use DEFAULT_EXCLUDE_COLUMNS from features.py
             - Feature group name(s) from features.py (comma-separated)
             - Can also use '+' to combine multiple groups
-    
+
     Returns:
         List of column names to exclude
-    
+
     Examples:
         - '*' -> [] (no exclusions, use all features)
         - 'default' -> DEFAULT_EXCLUDE_COLUMNS
@@ -337,43 +329,45 @@ def get_exclude_columns_from_config(exclude_features: str) -> List[str]:
         - 'default+base_model_metrics' -> DEFAULT_EXCLUDE_COLUMNS + BASE_MODEL_METRICS
     """
     from features import FEATURE_GROUPS, DEFAULT_EXCLUDE_COLUMNS
-    
+
     # Handle wildcard - no exclusions
-    if exclude_features == '*':
+    if exclude_features == "*":
         logger.info("Using all features (no exclusions)")
         return []
-    
+
     # Handle default configuration
-    if exclude_features == 'default' or exclude_features is None:
+    if exclude_features == "default" or exclude_features is None:
         logger.info(f"Using default exclusions: {len(DEFAULT_EXCLUDE_COLUMNS)} columns")
         return DEFAULT_EXCLUDE_COLUMNS.copy()
-    
+
     # Parse configuration string
     exclude_list = []
-    
+
     # Split by '+' for combining with default
-    if '+' in exclude_features:
-        parts = [p.strip() for p in exclude_features.split('+')]
-        if 'default' in parts:
+    if "+" in exclude_features:
+        parts = [p.strip() for p in exclude_features.split("+")]
+        if "default" in parts:
             exclude_list.extend(DEFAULT_EXCLUDE_COLUMNS)
-            parts.remove('default')
-        exclude_features = ','.join(parts)
-    
+            parts.remove("default")
+        exclude_features = ",".join(parts)
+
     # Split by comma for multiple groups
-    feature_groups = [fg.strip() for fg in exclude_features.split(',') if fg.strip()]
-    
+    feature_groups = [fg.strip() for fg in exclude_features.split(",") if fg.strip()]
+
     # Collect columns from specified feature groups
     for group_name in feature_groups:
         if group_name in FEATURE_GROUPS:
             group_columns = FEATURE_GROUPS[group_name]
             exclude_list.extend(group_columns)
-            logger.info(f"Adding feature group '{group_name}': {len(group_columns)} columns")
+            logger.info(
+                f"Adding feature group '{group_name}': {len(group_columns)} columns"
+            )
         else:
             logger.warning(f"Unknown feature group: '{group_name}'")
             logger.info(f"Available groups: {', '.join(FEATURE_GROUPS.keys())}")
-    
+
     # Remove duplicates while preserving order
     exclude_list = list(dict.fromkeys(exclude_list))
-    
+
     logger.info(f"Total exclusions configured: {len(exclude_list)} columns")
     return exclude_list

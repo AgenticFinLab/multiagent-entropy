@@ -13,8 +13,8 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib.pyplot as plt
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import (
@@ -41,6 +41,7 @@ from utils import (
 # Try to import XGBoost and LightGBM
 try:
     import xgboost as xgb
+
     XGBOOST_AVAILABLE = True
 except ImportError:
     XGBOOST_AVAILABLE = False
@@ -48,6 +49,7 @@ except ImportError:
 
 try:
     import lightgbm as lgb
+
     LIGHTGBM_AVAILABLE = True
 except ImportError:
     LIGHTGBM_AVAILABLE = False
@@ -120,7 +122,7 @@ class RegressionAnalyzer:
             Loaded and filtered DataFrame
         """
         self.df = load_data_from_path(self.data_path)
-        
+
         # Apply filters if specified
         self.df = filter_dataframe(
             self.df,
@@ -128,7 +130,7 @@ class RegressionAnalyzer:
             architectures=self.architectures,
             datasets=self.datasets,
         )
-        
+
         return self.df
 
     def encode_categorical_features(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -426,7 +428,9 @@ class RegressionAnalyzer:
             f.write("REGRESSION ANALYSIS (Predicting exp_accuracy)\n")
             f.write("-" * 80 + "\n\n")
 
-            for model_name, metrics in self.results["regression_results"]["metrics"].items():
+            for model_name, metrics in self.results["regression_results"][
+                "metrics"
+            ].items():
                 f.write(f"{model_name}:\n")
                 f.write(f"  Mean Squared Error (MSE): {metrics['MSE']:.6f}\n")
                 f.write(f"  Mean Absolute Error (MAE): {metrics['MAE']:.6f}\n")

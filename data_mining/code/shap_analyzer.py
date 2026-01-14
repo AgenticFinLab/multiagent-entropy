@@ -1,7 +1,7 @@
 """
 SHAP Analyzer for Multi-Agent Entropy Analysis
 
-This module performs SHAP (SHapley Additive exPlanations) analysis to interpret 
+This module performs SHAP (SHapley Additive exPlanations) analysis to interpret
 machine learning model predictions for both regression and classification tasks.
 """
 
@@ -21,11 +21,12 @@ from utils import (
     prepare_features,
     create_output_directory,
     determine_output_directory,
-    get_default_data_path
+    get_default_data_path,
 )
 
 try:
     import shap
+
     SHAP_AVAILABLE = True
 except ImportError:
     SHAP_AVAILABLE = False
@@ -56,8 +57,10 @@ class ShapAnalyzer:
             target_dataset: Target dataset name for determining output directory
         """
         if not SHAP_AVAILABLE:
-            raise ImportError("SHAP is not installed. Please install it with: pip install shap")
-        
+            raise ImportError(
+                "SHAP is not installed. Please install it with: pip install shap"
+            )
+
         if data_path is None:
             data_path = get_default_data_path()
 
@@ -87,7 +90,7 @@ class ShapAnalyzer:
             Loaded DataFrame
         """
         self.df = load_data_from_path(self.data_path)
-        
+
         return self.df
 
     def encode_categorical_features(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -111,7 +114,7 @@ class ShapAnalyzer:
         Prepare features and target for SHAP analysis.
 
         Args:
-            target_column: Name of the target column 
+            target_column: Name of the target column
             exclude_columns: List of columns to exclude from features
 
         Returns:
@@ -125,9 +128,7 @@ class ShapAnalyzer:
 
         if exclude_columns is None:
             # Use the same exclude columns as other analyzers
-            exclude_columns = [
-                "dataset", "model_name", "sample_id"
-            ]
+            exclude_columns = ["dataset", "model_name", "sample_id"]
 
         # Use utility function to prepare features
         X, y = prepare_features(self.df, target_column, exclude_columns)
@@ -135,12 +136,12 @@ class ShapAnalyzer:
         return X, y
 
     def explain_model(
-        self, 
-        model, 
-        X_train: pd.DataFrame, 
-        X_test: pd.DataFrame, 
+        self,
+        model,
+        X_train: pd.DataFrame,
+        X_test: pd.DataFrame,
         model_name: str,
-        task_type: str = "regression"
+        task_type: str = "regression",
     ) -> Dict:
         """
         Generate SHAP explanations for a trained model.
@@ -163,10 +164,10 @@ class ShapAnalyzer:
 
         # Create SHAP explainer based on model type
         X_test_for_plots = X_test  # Keep track of X_test used for SHAP values
-        if hasattr(model, 'feature_importances_'):
+        if hasattr(model, "feature_importances_"):
             explainer = shap.TreeExplainer(model)
             shap_values = explainer.shap_values(X_test)
-            
+
             # For binary classification, TreeExplainer returns a list of arrays
             if task_type == "classification" and isinstance(shap_values, list):
                 # For binary classification, take the positive class
@@ -178,7 +179,9 @@ class ShapAnalyzer:
             # Use KernelExplainer as fallback for other model types
             # Sample X_test to reduce computation time
             X_test_sampled = X_test.sample(min(100, len(X_test)), random_state=42)
-            explainer = shap.KernelExplainer(model.predict, X_train.sample(min(100, len(X_train)), random_state=42))
+            explainer = shap.KernelExplainer(
+                model.predict, X_train.sample(min(100, len(X_train)), random_state=42)
+            )
             shap_values = explainer.shap_values(X_test_sampled)
             X_test_for_plots = X_test_sampled  # Use the sampled data for plots
 
@@ -191,15 +194,11 @@ class ShapAnalyzer:
             "explainer": explainer,
             "shap_values": shap_values,
             "plots_info": plots_info,
-            "feature_names": list(X_test.columns)
+            "feature_names": list(X_test.columns),
         }
 
     def _generate_shap_plots(
-        self, 
-        shap_values, 
-        X_test: pd.DataFrame, 
-        model_name: str, 
-        task_type: str
+        self, shap_values, X_test: pd.DataFrame, model_name: str, task_type: str
     ) -> Dict:
         """
         Generate various SHAP plots for model interpretation.
@@ -214,36 +213,42 @@ class ShapAnalyzer:
             Dictionary with paths to saved plots
         """
         plots_info = {}
-        
+
         # Ensure shap_values is properly formatted and matches X_test dimensions
         if isinstance(shap_values, list):
             # For multi-output models, use the first output
-            shap_values_for_plots = shap_values[0] if len(shap_values) > 0 else shap_values
+            shap_values_for_plots = (
+                shap_values[0] if len(shap_values) > 0 else shap_values
+            )
             if isinstance(shap_values_for_plots, list):
                 shap_values_for_plots = np.asarray(shap_values_for_plots)
         else:
             shap_values_for_plots = shap_values
-        
+
         # Ensure it's a numpy array
         if not isinstance(shap_values_for_plots, np.ndarray):
             shap_values_for_plots = np.asarray(shap_values_for_plots)
-        
+
         # Verify dimensions
         if shap_values_for_plots.shape[0] != len(X_test):
-            logger.error(f"Critical shape mismatch: shap_values has {shap_values_for_plots.shape[0]} samples, X_test has {len(X_test)} samples")
+            logger.error(
+                f"Critical shape mismatch: shap_values has {shap_values_for_plots.shape[0]} samples, X_test has {len(X_test)} samples"
+            )
             return plots_info
 
         # 1. SHAP Summary Plot
         try:
             plt.figure(figsize=(12, 8))
             shap.summary_plot(
-                shap_values_for_plots, 
-                X_test, 
-                plot_type="bar", 
+                shap_values_for_plots,
+                X_test,
+                plot_type="bar",
                 show=False,
-                max_display=20
+                max_display=20,
             )
-            summary_plot_path = self.output_dir / f"shap_summary_{model_name}_{task_type}.png"
+            summary_plot_path = (
+                self.output_dir / f"shap_summary_{model_name}_{task_type}.png"
+            )
             plt.savefig(summary_plot_path, dpi=300, bbox_inches="tight")
             plt.close()
             plots_info["summary_plot"] = str(summary_plot_path)
@@ -256,13 +261,15 @@ class ShapAnalyzer:
         try:
             plt.figure(figsize=(12, 8))
             shap.summary_plot(
-                shap_values_for_plots, 
-                X_test, 
-                plot_type="dot", 
+                shap_values_for_plots,
+                X_test,
+                plot_type="dot",
                 show=False,
-                max_display=20
+                max_display=20,
             )
-            importance_plot_path = self.output_dir / f"shap_importance_{model_name}_{task_type}.png"
+            importance_plot_path = (
+                self.output_dir / f"shap_importance_{model_name}_{task_type}.png"
+            )
             plt.savefig(importance_plot_path, dpi=300, bbox_inches="tight")
             plt.close()
             plots_info["importance_plot"] = str(importance_plot_path)
@@ -274,62 +281,70 @@ class ShapAnalyzer:
         # 3. SHAP Dependence Plots for top 5 important features
         # Calculate mean absolute SHAP values for feature importance
         abs_shap_values = np.abs(shap_values_for_plots)
-        
+
         # Calculate mean absolute SHAP values for each feature
         if abs_shap_values.ndim > 1:
             feature_importance = abs_shap_values.mean(0)
         else:
             feature_importance = abs_shap_values
-        
+
         # Get top 5 features based on mean absolute SHAP value
         if isinstance(feature_importance, np.ndarray) and len(feature_importance) > 0:
             top_indices = np.argsort(feature_importance)[-5:][::-1]
             # Ensure top_indices is a list of scalars
-            if hasattr(top_indices, '__iter__') and not isinstance(top_indices, (str, bytes)):
+            if hasattr(top_indices, "__iter__") and not isinstance(
+                top_indices, (str, bytes)
+            ):
                 top_indices = [int(i) for i in top_indices.flatten()]
             else:
                 top_indices = [int(top_indices)]
         else:
             # If we can't determine importance, just take the first few features
             top_indices = range(min(5, len(X_test.columns)))
-        
+
         dependence_plots = []
         for idx in top_indices:
             # Convert idx to integer if it's an array-like object
-            if hasattr(idx, 'item'):
+            if hasattr(idx, "item"):
                 idx_scalar = int(idx.item())
-            elif hasattr(idx, '__int__'):
+            elif hasattr(idx, "__int__"):
                 idx_scalar = int(idx)
             else:
                 idx_scalar = int(idx)
             if idx_scalar < len(X_test.columns):
                 feature_name = X_test.columns[idx_scalar]
-                
+
                 try:
                     plt.figure(figsize=(10, 6))
                     # Get index of the feature
                     feature_idx = list(X_test.columns).index(feature_name)
-                    
+
                     # Use shap.dependence_plot
                     shap.dependence_plot(
-                        feature_idx, 
-                        shap_values_for_plots, 
-                        X_test, 
+                        feature_idx,
+                        shap_values_for_plots,
+                        X_test,
                         show=False,
-                        ax=plt.gca()
+                        ax=plt.gca(),
                     )
-                    
+
                     # Create subdirectory for dependence plots
                     (self.output_dir / "shap_dependence_plots").mkdir(exist_ok=True)
-                    dep_plot_path = self.output_dir / "shap_dependence_plots" / f"shap_dependence_{feature_name}_{model_name}_{task_type}.png"
+                    dep_plot_path = (
+                        self.output_dir
+                        / "shap_dependence_plots"
+                        / f"shap_dependence_{feature_name}_{model_name}_{task_type}.png"
+                    )
                     plt.savefig(dep_plot_path, dpi=300, bbox_inches="tight")
                     plt.close()
                     dependence_plots.append(str(dep_plot_path))
                     logger.info(f"SHAP dependence plot saved: {dep_plot_path}")
                 except Exception as e:
-                    logger.warning(f"Could not create dependence plot for {feature_name}: {str(e)}")
+                    logger.warning(
+                        f"Could not create dependence plot for {feature_name}: {str(e)}"
+                    )
                     plt.close()
-        
+
         plots_info["dependence_plots"] = dependence_plots
 
         # 4. SHAP Waterfall Plot for a sample prediction (first test instance)
@@ -342,7 +357,7 @@ class ShapAnalyzer:
                     values=shap_values_for_plots,
                     base_values=0,  # This might need adjustment based on model
                     data=X_test.iloc[0].values,
-                    feature_names=list(X_test.columns)
+                    feature_names=list(X_test.columns),
                 )
             else:
                 # Multiple instances - take first instance
@@ -350,18 +365,26 @@ class ShapAnalyzer:
                     values=shap_values_for_plots[0],
                     base_values=0,  # This might need adjustment based on model
                     data=X_test.iloc[0].values,
-                    feature_names=list(X_test.columns)
+                    feature_names=list(X_test.columns),
                 )
-            
+
             shap.waterfall_plot(explanation, max_display=15, show=False)
         except Exception as e:
             logger.warning(f"Could not create waterfall plot: {str(e)}")
             # Create a fallback plot
-            plt.text(0.5, 0.5, f"Waterfall plot not available:\n{str(e)}", 
-                    horizontalalignment='center', verticalalignment='center',
-                    transform=plt.gca().transAxes, fontsize=12)
-        
-        waterfall_plot_path = self.output_dir / f"shap_waterfall_sample_{model_name}_{task_type}.png"
+            plt.text(
+                0.5,
+                0.5,
+                f"Waterfall plot not available:\n{str(e)}",
+                horizontalalignment="center",
+                verticalalignment="center",
+                transform=plt.gca().transAxes,
+                fontsize=12,
+            )
+
+        waterfall_plot_path = (
+            self.output_dir / f"shap_waterfall_sample_{model_name}_{task_type}.png"
+        )
         plt.savefig(waterfall_plot_path, dpi=300, bbox_inches="tight")
         plt.close()
         plots_info["waterfall_plot"] = str(waterfall_plot_path)
@@ -370,11 +393,11 @@ class ShapAnalyzer:
         return plots_info
 
     def analyze_regression_models(
-        self, 
+        self,
         regression_results: Dict,
         X_train: pd.DataFrame = None,
         X_test: pd.DataFrame = None,
-        target_column: str = "exp_accuracy"
+        target_column: str = "exp_accuracy",
     ) -> Dict:
         """
         Perform SHAP analysis on regression models.
@@ -389,12 +412,15 @@ class ShapAnalyzer:
             Dictionary containing SHAP analysis results for regression
         """
         logger.info("Starting SHAP analysis for regression models...")
-        
+
         shap_results = {}
-        
+
         # Check if regression_results is the full results dict or just the models dict
         models_dict = None
-        if "regression_results" in regression_results and "models" in regression_results["regression_results"]:
+        if (
+            "regression_results" in regression_results
+            and "models" in regression_results["regression_results"]
+        ):
             # Case: full results dict passed from RegressionAnalyzer.run_full_pipeline()
             models_dict = regression_results["regression_results"]["models"]
             # Extract X_train and X_test if not provided
@@ -411,33 +437,36 @@ class ShapAnalyzer:
         else:
             logger.warning("No models found in regression_results for SHAP analysis")
             return shap_results
-        
+
         # Fallback: prepare features if X_train/X_test are still None
         if X_train is None or X_test is None:
-            logger.warning("X_train or X_test not provided, preparing features from scratch")
+            logger.warning(
+                "X_train or X_test not provided, preparing features from scratch"
+            )
             X, y = self.prepare_features(target_column=target_column)
             from sklearn.model_selection import train_test_split
+
             X_train, X_test, y_train, y_test = train_test_split(
                 X, y, test_size=0.2, random_state=42
             )
-        
+
         for model_name, model in models_dict.items():
             shap_result = self.explain_model(
                 model, X_train, X_test, model_name, "regression"
             )
             shap_results[model_name] = shap_result
-            
+
         self.results["regression_shap"] = shap_results
         logger.info("SHAP analysis completed for regression models")
-        
+
         return shap_results
 
     def analyze_classification_models(
-        self, 
+        self,
         classification_results: Dict,
         X_train: pd.DataFrame = None,
         X_test: pd.DataFrame = None,
-        target_column: str = "is_finally_correct"
+        target_column: str = "is_finally_correct",
     ) -> Dict:
         """
         Perform SHAP analysis on classification models.
@@ -452,17 +481,22 @@ class ShapAnalyzer:
             Dictionary containing SHAP analysis results for classification
         """
         logger.info("Starting SHAP analysis for classification models...")
-        
+
         shap_results = {}
-        
+
         # Check if classification_results is the full results dict or just the models dict
         models_dict = None
-        if "classification_results" in classification_results and "models" in classification_results["classification_results"]:
+        if (
+            "classification_results" in classification_results
+            and "models" in classification_results["classification_results"]
+        ):
             # Case: full results dict passed from ClassificationAnalyzer.run_full_pipeline()
             models_dict = classification_results["classification_results"]["models"]
             # Extract X_train and X_test if not provided
             if X_train is None or X_test is None:
-                X_train = classification_results["classification_results"].get("X_train")
+                X_train = classification_results["classification_results"].get(
+                    "X_train"
+                )
                 X_test = classification_results["classification_results"].get("X_test")
         elif "models" in classification_results:
             # Case: just the models dict passed directly
@@ -472,27 +506,32 @@ class ShapAnalyzer:
                 X_train = classification_results.get("X_train")
                 X_test = classification_results.get("X_test")
         else:
-            logger.warning("No models found in classification_results for SHAP analysis")
+            logger.warning(
+                "No models found in classification_results for SHAP analysis"
+            )
             return shap_results
-        
+
         # Fallback: prepare features if X_train/X_test are still None
         if X_train is None or X_test is None:
-            logger.warning("X_train or X_test not provided, preparing features from scratch")
+            logger.warning(
+                "X_train or X_test not provided, preparing features from scratch"
+            )
             X, y = self.prepare_features(target_column=target_column)
             from sklearn.model_selection import train_test_split
+
             X_train, X_test, y_train, y_test = train_test_split(
                 X, y, test_size=0.2, random_state=42, stratify=y
             )
-        
+
         for model_name, model in models_dict.items():
             shap_result = self.explain_model(
                 model, X_train, X_test, model_name, "classification"
             )
             shap_results[model_name] = shap_result
-            
+
         self.results["classification_shap"] = shap_results
         logger.info("SHAP analysis completed for classification models")
-        
+
         return shap_results
 
     def generate_report(self):
@@ -511,34 +550,52 @@ class ShapAnalyzer:
             if "regression_shap" in self.results:
                 f.write("SHAP ANALYSIS FOR REGRESSION MODELS\n")
                 f.write("-" * 80 + "\n\n")
-                
+
                 for model_name, shap_result in self.results["regression_shap"].items():
                     f.write(f"{model_name} (Regression):\n")
-                    f.write(f"  Summary Plot: {shap_result['plots_info']['summary_plot']}\n")
-                    f.write(f"  Importance Plot: {shap_result['plots_info']['importance_plot']}\n")
-                    f.write(f"  Waterfall Plot: {shap_result['plots_info']['waterfall_plot']}\n")
-                    f.write(f"  Dependence Plots: {len(shap_result['plots_info']['dependence_plots'])} plots\n\n")
+                    f.write(
+                        f"  Summary Plot: {shap_result['plots_info']['summary_plot']}\n"
+                    )
+                    f.write(
+                        f"  Importance Plot: {shap_result['plots_info']['importance_plot']}\n"
+                    )
+                    f.write(
+                        f"  Waterfall Plot: {shap_result['plots_info']['waterfall_plot']}\n"
+                    )
+                    f.write(
+                        f"  Dependence Plots: {len(shap_result['plots_info']['dependence_plots'])} plots\n\n"
+                    )
 
             if "classification_shap" in self.results:
                 f.write("\n" + "=" * 80 + "\n")
                 f.write("SHAP ANALYSIS FOR CLASSIFICATION MODELS\n")
                 f.write("-" * 80 + "\n\n")
-                
-                for model_name, shap_result in self.results["classification_shap"].items():
+
+                for model_name, shap_result in self.results[
+                    "classification_shap"
+                ].items():
                     f.write(f"{model_name} (Classification):\n")
-                    f.write(f"  Summary Plot: {shap_result['plots_info']['summary_plot']}\n")
-                    f.write(f"  Importance Plot: {shap_result['plots_info']['importance_plot']}\n")
-                    f.write(f"  Waterfall Plot: {shap_result['plots_info']['waterfall_plot']}\n")
-                    f.write(f"  Dependence Plots: {len(shap_result['plots_info']['dependence_plots'])} plots\n\n")
+                    f.write(
+                        f"  Summary Plot: {shap_result['plots_info']['summary_plot']}\n"
+                    )
+                    f.write(
+                        f"  Importance Plot: {shap_result['plots_info']['importance_plot']}\n"
+                    )
+                    f.write(
+                        f"  Waterfall Plot: {shap_result['plots_info']['waterfall_plot']}\n"
+                    )
+                    f.write(
+                        f"  Dependence Plots: {len(shap_result['plots_info']['dependence_plots'])} plots\n\n"
+                    )
 
         logger.info(f"SHAP analysis report saved: {report_path}")
 
         return report_path
 
     def run_full_analysis(
-        self, 
-        regression_results: Optional[Dict] = None, 
-        classification_results: Optional[Dict] = None
+        self,
+        regression_results: Optional[Dict] = None,
+        classification_results: Optional[Dict] = None,
     ):
         """
         Run complete SHAP analysis pipeline.
@@ -571,8 +628,8 @@ class ShapAnalyzer:
 def main():
     """Main function to execute the SHAP analysis."""
     logger.info("Initializing SHAP Analyzer...")
-    
-    # Note: This is mainly for testing - in practice, SHAP analyzer 
+
+    # Note: This is mainly for testing - in practice, SHAP analyzer
     # would be used with results from other analyzers
     analyzer = ShapAnalyzer()
 

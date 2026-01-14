@@ -13,7 +13,6 @@ from typing import List, Dict, Optional
 
 import pandas as pd
 
-
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -25,8 +24,9 @@ class DataCollector:
     """Collects and merges data from multiple dataset folders."""
 
     def __init__(
-        self, base_dir: str = "evaluation/results",
-        target_datasets: Optional[List[str]] = None
+        self,
+        base_dir: str = "evaluation/results",
+        target_datasets: Optional[List[str]] = None,
     ):
         """
         Initialize the DataCollector.
@@ -59,7 +59,7 @@ class DataCollector:
             for dataset_name in self.target_datasets:
                 dataset_path = self.base_dir / dataset_name
                 csv_file = dataset_path / "all_aggregated_data_exclude_agent.csv"
-                
+
                 if not dataset_path.exists():
                     logger.warning(f"Target dataset folder not found: {dataset_name}")
                 elif not csv_file.exists():
@@ -67,7 +67,7 @@ class DataCollector:
                 else:
                     datasets.append(dataset_name)
                     logger.info(f"Found target dataset: {dataset_name}")
-            
+
             self.datasets = datasets
         else:
             # Find all subdirectories that contain the target CSV file
@@ -80,7 +80,7 @@ class DataCollector:
                         logger.info(f"Found dataset: {item.name}")
 
             self.datasets = sorted(datasets)
-        
+
         return self.datasets
 
     def load_dataset(self, dataset_name: str) -> Optional[pd.DataFrame]:
@@ -151,7 +151,7 @@ class DataCollector:
 
         Args:
             output_path: Path to save the merged data. If None, uses default path.
-                        If target_datasets contains single dataset, saves to 
+                        If target_datasets contains single dataset, saves to
                         data_mining/results/{dataset_name}/merged_datasets.csv
 
         Returns:
@@ -163,7 +163,9 @@ class DataCollector:
         if output_path is None:
             # If single target dataset specified, save to its results folder
             if self.target_datasets and len(self.target_datasets) == 1:
-                output_path = f"data_mining/results/{self.target_datasets[0]}/merged_datasets.csv"
+                output_path = (
+                    f"data_mining/results/{self.target_datasets[0]}/merged_datasets.csv"
+                )
             else:
                 output_path = "data_mining/data/merged_datasets.csv"
 
