@@ -12,7 +12,8 @@ The evaluation module provides comprehensive tools for analyzing multi-agent exp
 - **[MetricsCalculator](../evaluation/metrics_calculator.py)**: Calculates performance metrics
 - **[ExperimentAnalyzer](../evaluation/experiment_analyzer.py)**: Analyzes experiment results
 - **[EntropyStatistic](../evaluation/entropy_statistic.py)**: Analyzes entropy statistics and change trends
-- **[Aggregator](../evaluation/aggregator.py)**: Aggregates metrics and entropy data into unified CSV format
+- **[FeatureEnhancer](../evaluation/feature_enhancer.py)**: Applies advanced feature engineering on aggregated metrics and entropy data (sample-level entropy features, cross-round dynamics, intra-round agent distribution, etc.)
+- **[Aggregator](../evaluation/aggregator.py)**: Loads JSON results, performs basic data aggregation, and delegates advanced feature computation to `FeatureEnhancer` before writing unified CSVs
 - **[evaluator.py](../evaluation/evaluator.py)**: Main entry point for evaluation
 - **[utils.py](../evaluation/utils.py)**: Utility functions for saving results
 
