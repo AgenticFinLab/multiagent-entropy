@@ -377,6 +377,8 @@ class ShapAnalyzer:
     def analyze_regression_models(
         self, 
         regression_results: Dict,
+        X_train: pd.DataFrame = None,
+        X_test: pd.DataFrame = None,
         target_column: str = "exp_accuracy"
     ) -> Dict:
         """
@@ -384,20 +386,14 @@ class ShapAnalyzer:
 
         Args:
             regression_results: Results dictionary from RegressionAnalyzer
-            target_column: Target column name
+            X_train: Training features (if None, will be extracted from regression_results)
+            X_test: Test features (if None, will be extracted from regression_results)
+            target_column: Target column name (only used if X_train/X_test are None)
 
         Returns:
             Dictionary containing SHAP analysis results for regression
         """
         logger.info("Starting SHAP analysis for regression models...")
-        
-        X, y = self.prepare_features(target_column=target_column)
-        
-        # Split data to match training data from regression analyzer
-        from sklearn.model_selection import train_test_split
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
-        )
         
         shap_results = {}
         
@@ -406,12 +402,29 @@ class ShapAnalyzer:
         if "regression_results" in regression_results and "models" in regression_results["regression_results"]:
             # Case: full results dict passed from RegressionAnalyzer.run_full_pipeline()
             models_dict = regression_results["regression_results"]["models"]
+            # Extract X_train and X_test if not provided
+            if X_train is None or X_test is None:
+                X_train = regression_results["regression_results"].get("X_train")
+                X_test = regression_results["regression_results"].get("X_test")
         elif "models" in regression_results:
             # Case: just the models dict passed directly
             models_dict = regression_results["models"]
+            # Extract X_train and X_test if not provided
+            if X_train is None or X_test is None:
+                X_train = regression_results.get("X_train")
+                X_test = regression_results.get("X_test")
         else:
             logger.warning("No models found in regression_results for SHAP analysis")
             return shap_results
+        
+        # Fallback: prepare features if X_train/X_test are still None
+        if X_train is None or X_test is None:
+            logger.warning("X_train or X_test not provided, preparing features from scratch")
+            X, y = self.prepare_features(target_column=target_column)
+            from sklearn.model_selection import train_test_split
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42
+            )
         
         for model_name, model in models_dict.items():
             shap_result = self.explain_model(
@@ -427,6 +440,8 @@ class ShapAnalyzer:
     def analyze_classification_models(
         self, 
         classification_results: Dict,
+        X_train: pd.DataFrame = None,
+        X_test: pd.DataFrame = None,
         target_column: str = "is_finally_correct"
     ) -> Dict:
         """
@@ -434,20 +449,14 @@ class ShapAnalyzer:
 
         Args:
             classification_results: Results dictionary from ClassificationAnalyzer
-            target_column: Target column name
+            X_train: Training features (if None, will be extracted from classification_results)
+            X_test: Test features (if None, will be extracted from classification_results)
+            target_column: Target column name (only used if X_train/X_test are None)
 
         Returns:
             Dictionary containing SHAP analysis results for classification
         """
         logger.info("Starting SHAP analysis for classification models...")
-        
-        X, y = self.prepare_features(target_column=target_column)
-        
-        # Split data to match training data from classification analyzer
-        from sklearn.model_selection import train_test_split
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42, stratify=y
-        )
         
         shap_results = {}
         
@@ -456,12 +465,29 @@ class ShapAnalyzer:
         if "classification_results" in classification_results and "models" in classification_results["classification_results"]:
             # Case: full results dict passed from ClassificationAnalyzer.run_full_pipeline()
             models_dict = classification_results["classification_results"]["models"]
+            # Extract X_train and X_test if not provided
+            if X_train is None or X_test is None:
+                X_train = classification_results["classification_results"].get("X_train")
+                X_test = classification_results["classification_results"].get("X_test")
         elif "models" in classification_results:
             # Case: just the models dict passed directly
             models_dict = classification_results["models"]
+            # Extract X_train and X_test if not provided
+            if X_train is None or X_test is None:
+                X_train = classification_results.get("X_train")
+                X_test = classification_results.get("X_test")
         else:
             logger.warning("No models found in classification_results for SHAP analysis")
             return shap_results
+        
+        # Fallback: prepare features if X_train/X_test are still None
+        if X_train is None or X_test is None:
+            logger.warning("X_train or X_test not provided, preparing features from scratch")
+            X, y = self.prepare_features(target_column=target_column)
+            from sklearn.model_selection import train_test_split
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42, stratify=y
+            )
         
         for model_name, model in models_dict.items():
             shap_result = self.explain_model(
@@ -523,18 +549,16 @@ class ShapAnalyzer:
         Run complete SHAP analysis pipeline.
 
         Args:
-            regression_results: Results from RegressionAnalyzer
-            classification_results: Results from ClassificationAnalyzer
+            regression_results: Results from RegressionAnalyzer (should include X_train, X_test)
+            classification_results: Results from ClassificationAnalyzer (should include X_train, X_test)
 
         Returns:
             Tuple of (results, report_path)
         """
         logger.info("Starting SHAP analysis pipeline...")
 
-        # Load data
-        self.load_data()
-
         # Perform SHAP analysis if results are provided
+        # Note: X_train and X_test will be extracted from regression_results/classification_results
         if regression_results is not None:
             self.analyze_regression_models(regression_results)
 

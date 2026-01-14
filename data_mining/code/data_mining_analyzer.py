@@ -131,6 +131,11 @@ class DataMiningAnalyzer:
         Args:
             include_regression: Whether to run SHAP analysis for regression models
             include_classification: Whether to run SHAP analysis for classification models
+        
+        Note:
+            This method passes the full results dictionaries to ShapAnalyzer,
+            which will automatically extract X_train, X_test, and trained models.
+            This ensures SHAP analysis uses the same data splits as model training.
         """            
         if self.shap_analyzer is None:
             print("SHAP analyzer not initialized.")
@@ -138,9 +143,12 @@ class DataMiningAnalyzer:
             
         logger.info("Running SHAP analysis...")
         
+        # Get results from previous analyses
+        # These contain models, X_train, X_test, y_train, y_test
         regression_results = self.results.get("experiment_level")
         classification_results = self.results.get("sample_level")
         
+        # Run SHAP analysis - data splits will be extracted from results
         shap_results, shap_report_path = self.shap_analyzer.run_full_analysis(
             regression_results=regression_results if include_regression else None,
             classification_results=classification_results if include_classification else None
@@ -349,70 +357,6 @@ class DataMiningAnalyzer:
 
         logger.info("Full analysis pipeline completed successfully!")
 
-        return self.results, report_path
-
-    def run_only_shap_analysis(self):
-        """
-        Run only the SHAP analysis without running regression or classification first.
-        This assumes that regression and classification results already exist or will be loaded.
-        """
-        logger.info("Starting SHAP-only analysis...")
-        
-        # Initialize SHAP analyzer if not already done
-        if not hasattr(self, 'shap_analyzer') or self.shap_analyzer is None:
-            if self.run_shap:
-                try:
-                    self.shap_analyzer = ShapAnalyzer(
-                        data_path=str(self.data_path),
-                        output_dir=str(self.output_dir / "shap"),
-                        target_dataset=self.target_dataset,
-                    )
-                except ImportError:
-                    self.shap_analyzer = None
-                    print("Warning: SHAP not available. Install with: pip install shap")
-                    return {}, []
-            else:
-                print("SHAP analysis is disabled.")
-                return {}, []
-
-        # Check if regression and classification results are already available
-        regression_results = self.results.get("experiment_level")
-        classification_results = self.results.get("sample_level")
-        
-        # Load data if not already loaded to check for target columns
-        if not regression_results:
-            # Ensure regression analyzer has loaded data
-            if self.regression_analyzer.df is None:
-                self.regression_analyzer.load_data()
-            # Check if 'exp_accuracy' column exists and run minimal regression if needed
-            if 'exp_accuracy' in self.regression_analyzer.df.columns:
-                logger.info("Running minimal regression analysis for SHAP...")
-                regression_results, _ = self.regression_analyzer.run_full_pipeline()
-                self.results["experiment_level"] = regression_results
-        
-        if not classification_results:
-            # Ensure classification analyzer has loaded data
-            if self.classification_analyzer.df is None:
-                self.classification_analyzer.load_data()
-            # Check if 'is_finally_correct' column exists and run minimal classification if needed
-            if 'is_finally_correct' in self.classification_analyzer.df.columns:
-                logger.info("Running minimal classification analysis for SHAP...")
-                classification_results, _ = self.classification_analyzer.run_full_pipeline()
-                self.results["sample_level"] = classification_results
-        
-        # Run SHAP analysis
-        shap_results, shap_report_path = self.shap_analyzer.run_full_analysis(
-            regression_results=regression_results,
-            classification_results=classification_results
-        )
-        
-        self.results["shap"] = shap_results
-        
-        # Generate report
-        report_path = self.generate_report()
-        
-        logger.info("SHAP-only analysis completed successfully!")
-        
         return self.results, report_path
 
 
