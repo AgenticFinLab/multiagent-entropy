@@ -17,7 +17,8 @@ from typing import List, Optional
 from utils import (
     create_output_directory,
     determine_output_directory,
-    get_default_data_path
+    get_default_data_path,
+    generate_filter_suffix,
 )
 
 from shap_analyzer import ShapAnalyzer
@@ -47,6 +48,9 @@ class DataMiningAnalyzer:
         target_dataset: str = None,
         skip_collection: bool = False,
         run_shap: bool = True,
+        model_names: List[str] = None,
+        architectures: List[str] = None,
+        datasets: List[str] = None,
     ):
         """
         Initialize the DataMiningAnalyzer.
@@ -56,20 +60,37 @@ class DataMiningAnalyzer:
             output_dir: Directory to save analysis results
             target_dataset: Target dataset name for determining output directory
             skip_collection: Whether to skip data collection and use existing data
+            run_shap: Whether to run SHAP analysis
+            model_names: List of model names to filter (None or ['*'] for all)
+            architectures: List of architectures to filter (None or ['*'] for all)
+            datasets: List of datasets to filter (None or ['*'] for all)
         """
         if data_path is None:
             data_path = get_default_data_path()
 
-        # Determine output directory based on target_dataset
+        # Determine output directory based on target_dataset and filters
         if output_dir is None:
-            output_dir = determine_output_directory(
+            base_output_dir = determine_output_directory(
                 "data_mining/results", target_dataset
             )
+            # Add filter suffix to output directory
+            filter_suffix = generate_filter_suffix(
+                model_names=model_names,
+                architectures=architectures,
+                datasets=datasets,
+            )
+            if filter_suffix:
+                output_dir = f"{base_output_dir}/{filter_suffix}"
+            else:
+                output_dir = base_output_dir
 
         self.data_path = Path(data_path)
         self.output_dir = Path(output_dir)
         self.target_dataset = target_dataset
         self.skip_collection = skip_collection
+        self.model_names = model_names
+        self.architectures = architectures
+        self.datasets = datasets
         self.results = {}
         self.run_shap = run_shap
 
@@ -81,12 +102,18 @@ class DataMiningAnalyzer:
             data_path=str(self.data_path),
             output_dir=str(self.output_dir / "regression"),
             target_dataset=target_dataset,
+            model_names=model_names,
+            architectures=architectures,
+            datasets=datasets,
         )
         
         self.classification_analyzer = ClassificationAnalyzer(
             data_path=str(self.data_path),
             output_dir=str(self.output_dir / "classification"),
             target_dataset=target_dataset,
+            model_names=model_names,
+            architectures=architectures,
+            datasets=datasets,
         )
         
         # Initialize SHAP analyzer if available

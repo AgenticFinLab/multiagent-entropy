@@ -33,7 +33,8 @@ from utils import (
     create_output_directory,
     split_data,
     determine_output_directory,
-    get_default_data_path
+    get_default_data_path,
+    filter_dataframe,
 )
 
 # Try to import XGBoost and LightGBM
@@ -68,6 +69,9 @@ class ClassificationAnalyzer:
         data_path: str = None,
         output_dir: str = None,
         target_dataset: str = None,
+        model_names: List[str] = None,
+        architectures: List[str] = None,
+        datasets: List[str] = None,
     ):
         """
         Initialize the ClassificationAnalyzer.
@@ -76,6 +80,9 @@ class ClassificationAnalyzer:
             data_path: Path to the merged dataset CSV file
             output_dir: Directory to save analysis results
             target_dataset: Target dataset name for determining output directory
+            model_names: List of model names to filter (None or ['*'] for all)
+            architectures: List of architectures to filter (None or ['*'] for all)
+            datasets: List of datasets to filter (None or ['*'] for all)
         """
         if data_path is None:
             data_path = get_default_data_path()
@@ -89,6 +96,9 @@ class ClassificationAnalyzer:
         self.data_path = Path(data_path)
         self.output_dir = Path(output_dir)
         self.target_dataset = target_dataset
+        self.model_names = model_names
+        self.architectures = architectures
+        self.datasets = datasets
         self.df = None
         self.results = {}
 
@@ -100,12 +110,20 @@ class ClassificationAnalyzer:
 
     def load_data(self) -> pd.DataFrame:
         """
-        Load the merged dataset.
+        Load the merged dataset and apply filters.
 
         Returns:
-            Loaded DataFrame
+            Loaded and filtered DataFrame
         """
         self.df = load_data_from_path(self.data_path)
+        
+        # Apply filters if specified
+        self.df = filter_dataframe(
+            self.df,
+            model_names=self.model_names,
+            architectures=self.architectures,
+            datasets=self.datasets,
+        )
         
         return self.df
 

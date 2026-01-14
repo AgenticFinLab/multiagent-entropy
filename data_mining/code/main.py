@@ -38,11 +38,32 @@ def main():
         help="Type of analysis to run: all (default), regression, or classification",
     )
     parser.add_argument(
-        "--datasets",
+        "--merged-datasets",
         type=str,
         nargs="*",
         default=["*"],
-        help="Target datasets to analyze (use '*' for all available datasets, default: aime2025)",
+        help="Datasets to merge during data collection (use '*' for all available datasets). Only effective when --skip-collection is not used.",
+    )
+    parser.add_argument(
+        "--model-name",
+        type=str,
+        nargs="*",
+        default=["*"],
+        help="Filter by specific model name(s) for analysis (use '*' for all models)",
+    )
+    parser.add_argument(
+        "--architecture",
+        type=str,
+        nargs="*",
+        default=["*"],
+        help="Filter by specific architecture(s) for analysis (use '*' for all architectures)",
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        nargs="*",
+        default=["*"],
+        help="Filter by specific dataset(s) for analysis (use '*' for all datasets)",
     )
     parser.add_argument(
         "--skip-collection",
@@ -70,31 +91,39 @@ def main():
     args = parser.parse_args()
     
     # Handle the case where user specifies '*' to collect all available datasets
-    if args.datasets == ['*']:
+    if args.merged_datasets == ['*']:
         from data_collector import DataCollector
         collector = DataCollector()
         discovered_datasets = collector.discover_datasets()
         logger.info(f"Auto-discovered datasets: {discovered_datasets}")
-        target_datasets = discovered_datasets
+        merged_datasets = discovered_datasets
     else:
         # Filter out empty strings and handle default case
-        filtered_datasets = [ds for ds in args.datasets if ds]  # Remove empty strings
+        filtered_datasets = [ds for ds in args.merged_datasets if ds]  # Remove empty strings
         if not filtered_datasets:
             filtered_datasets = ["aime2025"]  # Default to aime2025 if none provided
-        target_datasets = filtered_datasets
+        merged_datasets = filtered_datasets
+    
+    # Process filter arguments
+    model_names = None if args.model_name == ['*'] else args.model_name
+    architectures = None if args.architecture == ['*'] else args.architecture
+    datasets = None if args.dataset == ['*'] else args.dataset
 
     logger.info("=" * 80)
     logger.info("MULTI-AGENT ENTROPY DATA MINING ANALYSIS")
     logger.info("=" * 80)
     logger.info(f"Analysis Type: {args.analysis_type}")
-    logger.info(f"Target Datasets: {', '.join(target_datasets) if target_datasets else 'None (will auto-discover)'}")
+    logger.info(f"Merged Datasets (for collection): {', '.join(merged_datasets) if merged_datasets else 'None (will auto-discover)'}")
     logger.info(f"Skip Collection: {args.skip_collection}")
+    logger.info(f"Filter - Model Names: {model_names if model_names else 'All'}")
+    logger.info(f"Filter - Architectures: {architectures if architectures else 'All'}")
+    logger.info(f"Filter - Datasets: {datasets if datasets else 'All'}")
 
     try:
         # Determine target_dataset for output directory
         target_dataset = None
-        if target_datasets and len(target_datasets) == 1:
-            target_dataset = target_datasets[0]
+        if merged_datasets and len(merged_datasets) == 1:
+            target_dataset = merged_datasets[0]
 
         # Initialize the analyzer with appropriate parameters
         analyzer = DataMiningAnalyzer(
@@ -102,12 +131,15 @@ def main():
             target_dataset=target_dataset,
             skip_collection=args.skip_collection,
             run_shap=args.run_shap,
+            model_names=model_names,
+            architectures=architectures,
+            datasets=datasets,
         )
 
         # Run the analysis based on the specified type
         results, report_paths = analyzer.run_full_analysis(
             analysis_type=args.analysis_type,
-            target_datasets=target_datasets if not args.skip_collection else None
+            target_datasets=merged_datasets if not args.skip_collection else None
         )
 
         # Print summary of results
