@@ -329,3 +329,42 @@ ALL_FEATURES = (
     SAMPLE_ROUND1_AGENT_STATISTICS +
     SAMPLE_ROUND2_AGENT_STATISTICS
 )
+
+# Feature group mapping for exclusion configuration
+FEATURE_GROUPS = {
+    "base_model_metrics": BASE_MODEL_METRICS,
+    "experiment_identifier": EXPERIMENT_IDENTIFIER,
+    "sample_identifier": SAMPLE_IDENTIFIER,
+    "experiment_statistics": EXPERIMENT_STATISTICS,
+    "unseen_features": UNSEEN_FEATURES,
+    "round_statistics": ROUND_STATISTICS,
+    "sample_statistics": SAMPLE_STATISTICS,
+    "sample_distribution_shape": SAMPLE_DISTRIBUTION_SHAPE,
+    "sample_baseline_entropy": SAMPLE_BASELINE_ENTROPY,
+    "aggregation_over_agents": AGGREGATION_OVER_AGENTS,
+    "sample_round_wise_aggregated": SAMPLE_ROUND_WISE_AGGREGATED,
+    "cross_round_aggregated": CROSS_ROUND_AGGREGATED,
+    "intra_round_agent_distribution": INTRA_ROUND_AGENT_DISTRIBUTION,
+    "cross_round_agent_spread_change": CROSS_ROUND_AGENT_SPREAD_CHANGE,
+    "sample_round1_agent_statistics": SAMPLE_ROUND1_AGENT_STATISTICS,
+    "sample_round2_agent_statistics": SAMPLE_ROUND2_AGENT_STATISTICS,
+}
+
+# Default exclude columns configuration (same as the original EXCLUDE_COLUMNS in utils.py)
+DEFAULT_EXCLUDE_COLUMNS = [
+    # ignored identifier
+    "dataset",
+    "model_name",
+    # "architecture",
+    "sample_id",
+    # useless data
+    "num_rounds",
+    "exp_num_inferences",
+    "round_1_num_inferences",
+    "round_2_num_inferences",
+    # base model metrics
+    "base_model_accuracy",
+    "base_model_is_finally_correct",
+    "base_model_format_compliance",
+    "base_model_format_compliance_rate",
+]
