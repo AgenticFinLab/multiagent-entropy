@@ -17,11 +17,11 @@ DATASETS = [
     "gsm8k",
     "humaneval",
     "mmlu",
-    "aime2024",
-    "aime2025",
     "math500",
     "aime2024_8192",
     "aime2025_8192",
+    "aime2024_16384",
+    "aime2025_16384",
 ]
 
 
@@ -50,7 +50,7 @@ def main():
         type=str,
         nargs="*",
         choices=DATASETS,
-        default=["gsm8k", "aime2024_8192", "aime2025_8192"],
+        default=["aime2024_16384", "aime2025_16384"],
         help="Datasets to analyze (space-separated list)",
     )
     
