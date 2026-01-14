@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Data Mining Analyzer Module for Multi-Agent Entropy Analysis
 
@@ -12,6 +11,7 @@ Delegates to specialized analyzers while maintaining backward compatibility.
 import logging
 import warnings
 from pathlib import Path
+from typing import List, Optional
 
 from regression_analyzer import RegressionAnalyzer
 from classification_analyzer import ClassificationAnalyzer
@@ -29,6 +29,7 @@ class DataMiningAnalyzer:
     """Unified entry point for comprehensive data mining analysis.
     
     Delegates to RegressionAnalyzer and ClassificationAnalyzer for specialized tasks.
+    Supports both programmatic usage and command-line interface.
     """
 
     def __init__(
@@ -36,6 +37,7 @@ class DataMiningAnalyzer:
         data_path: str = None,
         output_dir: str = None,
         target_dataset: str = None,
+        skip_collection: bool = False,
     ):
         """
         Initialize the DataMiningAnalyzer.
@@ -44,6 +46,7 @@ class DataMiningAnalyzer:
             data_path: Path to the merged dataset CSV file
             output_dir: Directory to save analysis results
             target_dataset: Target dataset name for determining output directory
+            skip_collection: Whether to skip data collection and use existing data
         """
         if data_path is None:
             data_path = "data_mining/data/merged_datasets.csv"
@@ -58,6 +61,7 @@ class DataMiningAnalyzer:
         self.data_path = Path(data_path)
         self.output_dir = Path(output_dir)
         self.target_dataset = target_dataset
+        self.skip_collection = skip_collection
         self.results = {}
 
         # Create output directory if it doesn't exist
@@ -75,7 +79,6 @@ class DataMiningAnalyzer:
             output_dir=str(self.output_dir / "classification"),
             target_dataset=target_dataset,
         )
-
 
 
     def run_experiment_level_analysis(self):
@@ -175,19 +178,77 @@ class DataMiningAnalyzer:
 
         return report_path
 
-    def run_full_analysis(self):
+    def run_data_collection(self, target_datasets: Optional[List[str]] = None):
+        """
+        Run data collection and merging.
+        
+        Args:
+            target_datasets: List of datasets to collect (None for all)
+        """
+        from data_collector import DataCollector  # Import here to avoid circular imports
+        
+        logger.info("[STEP 1] Data Collection and Merging")
+        logger.info("-" * 80)
+
+        collector = DataCollector(target_datasets=target_datasets)
+
+        # Discover datasets
+        datasets = collector.discover_datasets()
+        logger.info(f"Discovered {len(datasets)} datasets: {', '.join(datasets)}")
+
+        # Merge datasets
+        merged_data = collector.merge_datasets()
+        logger.info(f"Merged {len(merged_data)} records from {len(datasets)} datasets")
+
+        # Save merged data
+        merged_data_path = collector.save_merged_data()
+        logger.info(f"Merged data saved to: {merged_data_path}")
+
+        # Print data summary
+        summary = collector.get_data_summary()
+        logger.info(f"Data Summary:")
+        logger.info(f"  Total Records: {summary['total_records']}")
+        logger.info(f"  Total Columns: {summary['total_columns']}")
+        logger.info(f"  Datasets: {summary['datasets']}")
+        logger.info(f"  Records per Dataset: {summary['dataset_counts']}")
+        
+        return merged_data_path
+
+    def run_full_analysis(self, analysis_type: str = "all", target_datasets: Optional[List[str]] = None):
         """
         Run complete analysis pipeline.
         
         Executes both regression and classification analyses via specialized analyzers.
+        
+        Args:
+            analysis_type: Type of analysis to run ('all', 'regression', or 'classification')
+            target_datasets: List of datasets to collect (None for all)
         """
         logger.info("Starting full data mining analysis pipeline...")
+        
+        # Run data collection if not skipping
+        if not self.skip_collection:
+            merged_data_path = self.run_data_collection(target_datasets)
+            # Update analyzers with the new path
+            self.regression_analyzer.data_path = str(merged_data_path)
+            self.classification_analyzer.data_path = str(merged_data_path)
+        else:
+            logger.info("Skipping data collection step")
+            merged_data_path = self.data_path
 
-        # Run experiment-level analysis (regression)
-        self.run_experiment_level_analysis()
+        # Run analysis based on type
+        if analysis_type == "all":
+            # Run experiment-level analysis (regression)
+            self.run_experiment_level_analysis()
 
-        # Run sample-level analysis (classification)
-        self.run_sample_level_analysis()
+            # Run sample-level analysis (classification)
+            self.run_sample_level_analysis()
+
+        elif analysis_type == "regression":
+            self.run_experiment_level_analysis()
+
+        elif analysis_type == "classification":
+            self.run_sample_level_analysis()
 
         # Generate unified report
         report_path = self.generate_report()
@@ -201,11 +262,11 @@ def main():
     """Main function to execute the data mining analysis."""
     logger.info("Initializing Data Mining Analyzer...")
 
-    # Initialize analyzer
+    # Initialize analyzer with default settings
     analyzer = DataMiningAnalyzer()
 
-    # Run full analysis
-    results, report_path = analyzer.run_full_analysis()
+    # Run full analysis with defaults
+    results, report_path = analyzer.run_full_analysis(analysis_type="all")
 
     logger.info(f"Analysis complete. Report saved to: {report_path}")
 
