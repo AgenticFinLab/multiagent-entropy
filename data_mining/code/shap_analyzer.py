@@ -214,49 +214,66 @@ class ShapAnalyzer:
             Dictionary with paths to saved plots
         """
         plots_info = {}
+        
+        # Ensure shap_values is properly formatted and matches X_test dimensions
+        if isinstance(shap_values, list):
+            # For multi-output models, use the first output
+            shap_values_for_plots = shap_values[0] if len(shap_values) > 0 else shap_values
+            if isinstance(shap_values_for_plots, list):
+                shap_values_for_plots = np.asarray(shap_values_for_plots)
+        else:
+            shap_values_for_plots = shap_values
+        
+        # Ensure it's a numpy array
+        if not isinstance(shap_values_for_plots, np.ndarray):
+            shap_values_for_plots = np.asarray(shap_values_for_plots)
+        
+        # Verify dimensions
+        if shap_values_for_plots.shape[0] != len(X_test):
+            logger.error(f"Critical shape mismatch: shap_values has {shap_values_for_plots.shape[0]} samples, X_test has {len(X_test)} samples")
+            return plots_info
 
         # 1. SHAP Summary Plot
-        plt.figure(figsize=(12, 8))
-        shap.summary_plot(
-            shap_values, 
-            X_test, 
-            plot_type="bar", 
-            show=False,
-            max_display=20
-        )
-        summary_plot_path = self.output_dir / f"shap_summary_{model_name}_{task_type}.png"
-        plt.savefig(summary_plot_path, dpi=300, bbox_inches="tight")
-        plt.close()
-        plots_info["summary_plot"] = str(summary_plot_path)
-        logger.info(f"SHAP summary plot saved: {summary_plot_path}")
+        try:
+            plt.figure(figsize=(12, 8))
+            shap.summary_plot(
+                shap_values_for_plots, 
+                X_test, 
+                plot_type="bar", 
+                show=False,
+                max_display=20
+            )
+            summary_plot_path = self.output_dir / f"shap_summary_{model_name}_{task_type}.png"
+            plt.savefig(summary_plot_path, dpi=300, bbox_inches="tight")
+            plt.close()
+            plots_info["summary_plot"] = str(summary_plot_path)
+            logger.info(f"SHAP summary plot saved: {summary_plot_path}")
+        except Exception as e:
+            logger.warning(f"Could not create summary plot: {str(e)}")
+            plt.close()
 
         # 2. SHAP Feature Importance Plot (dot plot)
-        plt.figure(figsize=(12, 8))
-        shap.summary_plot(
-            shap_values, 
-            X_test, 
-            plot_type="dot", 
-            show=False,
-            max_display=20
-        )
-        importance_plot_path = self.output_dir / f"shap_importance_{model_name}_{task_type}.png"
-        plt.savefig(importance_plot_path, dpi=300, bbox_inches="tight")
-        plt.close()
-        plots_info["importance_plot"] = str(importance_plot_path)
-        logger.info(f"SHAP importance plot saved: {importance_plot_path}")
+        try:
+            plt.figure(figsize=(12, 8))
+            shap.summary_plot(
+                shap_values_for_plots, 
+                X_test, 
+                plot_type="dot", 
+                show=False,
+                max_display=20
+            )
+            importance_plot_path = self.output_dir / f"shap_importance_{model_name}_{task_type}.png"
+            plt.savefig(importance_plot_path, dpi=300, bbox_inches="tight")
+            plt.close()
+            plots_info["importance_plot"] = str(importance_plot_path)
+            logger.info(f"SHAP importance plot saved: {importance_plot_path}")
+        except Exception as e:
+            logger.warning(f"Could not create importance plot: {str(e)}")
+            plt.close()
 
         # 3. SHAP Dependence Plots for top 5 important features
         # Calculate mean absolute SHAP values for feature importance
-        if isinstance(shap_values, list):
-            # For multi-output models (e.g., multi-class classification)
-            # Use the first output for feature importance calculation
-            abs_shap_values = np.abs(shap_values[0]) if len(shap_values) > 0 else np.abs(shap_values)
-        else:
-            abs_shap_values = np.abs(shap_values)
-        
-        # Ensure abs_shap_values is a numpy array
-        if isinstance(abs_shap_values, list):
-            abs_shap_values = np.asarray(abs_shap_values)
+        abs_shap_values = np.abs(shap_values_for_plots)
         
         # Calculate mean absolute SHAP values for each feature
         if abs_shap_values.ndim > 1:
@@ -288,63 +305,41 @@ class ShapAnalyzer:
             if idx_scalar < len(X_test.columns):
                 feature_name = X_test.columns[idx_scalar]
                 
-                plt.figure(figsize=(10, 6))
-                # Get index of the feature
-                feature_idx = list(X_test.columns).index(feature_name)
-                
-                # Create a temporary explainer for the dependence plot
-                if isinstance(shap_values, list):
-                    # Handle multi-output case
-                    temp_shap_values = shap_values[0] if len(shap_values) > 0 else shap_values
-                    # Ensure it's an array
-                    if isinstance(temp_shap_values, list):
-                        temp_shap_values = np.asarray(temp_shap_values)
-                    # Use shap.dependence_plot instead of shap.plots.scatter
+                try:
+                    plt.figure(figsize=(10, 6))
+                    # Get index of the feature
+                    feature_idx = list(X_test.columns).index(feature_name)
+                    
+                    # Use shap.dependence_plot
                     shap.dependence_plot(
                         feature_idx, 
-                        temp_shap_values, 
+                        shap_values_for_plots, 
                         X_test, 
                         show=False,
                         ax=plt.gca()
                     )
-                else:
-                    # Use shap.dependence_plot instead of shap.plots.scatter
-                    shap.dependence_plot(
-                        feature_idx, 
-                        shap_values, 
-                        X_test, 
-                        show=False,
-                        ax=plt.gca()
-                    )
-                
-                # Create subdirectory for dependence plots
-                (self.output_dir / "shap_dependence_plots").mkdir(exist_ok=True)
-                dep_plot_path = self.output_dir / "shap_dependence_plots" / f"shap_dependence_{feature_name}_{model_name}_{task_type}.png"
-                plt.savefig(dep_plot_path, dpi=300, bbox_inches="tight")
-                plt.close()
-                dependence_plots.append(str(dep_plot_path))
-                logger.info(f"SHAP dependence plot saved: {dep_plot_path}")
+                    
+                    # Create subdirectory for dependence plots
+                    (self.output_dir / "shap_dependence_plots").mkdir(exist_ok=True)
+                    dep_plot_path = self.output_dir / "shap_dependence_plots" / f"shap_dependence_{feature_name}_{model_name}_{task_type}.png"
+                    plt.savefig(dep_plot_path, dpi=300, bbox_inches="tight")
+                    plt.close()
+                    dependence_plots.append(str(dep_plot_path))
+                    logger.info(f"SHAP dependence plot saved: {dep_plot_path}")
+                except Exception as e:
+                    logger.warning(f"Could not create dependence plot for {feature_name}: {str(e)}")
+                    plt.close()
         
         plots_info["dependence_plots"] = dependence_plots
 
         # 4. SHAP Waterfall Plot for a sample prediction (first test instance)
         plt.figure(figsize=(12, 8))
         try:
-            if isinstance(shap_values, list):
-                # Handle multi-output case (e.g., classification)
-                shap_values_for_plot = shap_values[0] if len(shap_values) > 0 else shap_values
-            else:
-                shap_values_for_plot = shap_values
-            
-            # Ensure shap_values_for_plot is a numpy array
-            if isinstance(shap_values_for_plot, list):
-                shap_values_for_plot = np.asarray(shap_values_for_plot)
-            
             # Check dimensions and create appropriate explanation object
-            if shap_values_for_plot.ndim == 1:
+            if shap_values_for_plots.ndim == 1:
                 # Single instance, single output
                 explanation = shap.Explanation(
-                    values=shap_values_for_plot,
+                    values=shap_values_for_plots,
                     base_values=0,  # This might need adjustment based on model
                     data=X_test.iloc[0].values,
                     feature_names=list(X_test.columns)
@@ -352,7 +347,7 @@ class ShapAnalyzer:
             else:
                 # Multiple instances - take first instance
                 explanation = shap.Explanation(
-                    values=shap_values_for_plot[0],
+                    values=shap_values_for_plots[0],
                     base_values=0,  # This might need adjustment based on model
                     data=X_test.iloc[0].values,
                     feature_names=list(X_test.columns)
