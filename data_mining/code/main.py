@@ -55,6 +55,12 @@ def main():
         default="data_mining/data/merged_datasets.csv",
         help="Path to merged data file (used when skip-collection is True)",
     )
+    parser.add_argument(
+        "--run-shap",
+        type=bool,
+        default=True,
+        help="Run SHAP analysis (default: True)",
+    )
     args = parser.parse_args()
     
     # Handle the case where user specifies '*' to collect all available datasets
@@ -89,6 +95,7 @@ def main():
             data_path=args.data_path,
             target_dataset=target_dataset,
             skip_collection=args.skip_collection,
+            run_shap=args.run_shap,
         )
 
         # Run the analysis based on the specified type
