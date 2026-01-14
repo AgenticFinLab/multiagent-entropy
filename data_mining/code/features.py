@@ -1,17 +1,45 @@
-ALL_FEATURES = [
-    # base model metrics
-    ## experiment-level
+# Base model metrics
+BASE_MODEL_METRICS_EXPERIMENT_LEVEL = [
     "base_model_accuracy",
     "base_model_format_compliance_rate",
-    ## sample-level
+]
+
+BASE_MODEL_METRICS_SAMPLE_LEVEL = [
     "base_model_is_finally_correct",
     "base_model_format_compliance",
-    # experiment identifier
+]
+
+# Sample-level baseline entropy features relative to single-agent base model
+SAMPLE_BASELINE_ENTROPY = [
+    "base_sample_total_entropy",
+    "base_sample_token_count",
+    "base_sample_avg_entropy_per_token",
+    "sample_entropy_ratio_vs_base_total",
+    "sample_entropy_reduction_vs_base_total",
+    "sample_avg_entropy_per_token_ratio_vs_base",
+    "sample_avg_entropy_per_token_diff_vs_base",
+]
+
+BASE_MODEL_METRICS = BASE_MODEL_METRICS_EXPERIMENT_LEVEL + BASE_MODEL_METRICS_SAMPLE_LEVEL + SAMPLE_BASELINE_ENTROPY
+
+
+
+# Experiment identifier features
+EXPERIMENT_IDENTIFIER = [
     "model_name",
     "sample_id",
     "architecture",
     "num_rounds",
-    # experiment statistics
+]
+
+# Sample identifier
+SAMPLE_IDENTIFIER = [
+    "is_finally_correct",
+    "final_format_compliance",
+]
+
+# Experiment statistics
+EXPERIMENT_STATISTICS = [
     "exp_total_entropy",
     "exp_infer_average_entropy",
     "exp_num_inferences",
@@ -19,7 +47,13 @@ ALL_FEATURES = [
     "exp_format_compliance_rate",
     "exp_total_time",
     "exp_total_token",
-    # round statistics
+]
+
+UNSEEN_FEATURES = EXPERIMENT_IDENTIFIER + SAMPLE_IDENTIFIER + EXPERIMENT_STATISTICS
+
+
+# Round statistics
+ROUND_STATISTICS = [
     "round_1_2_change_entropy",
     "round_1_2_change_tokens",
     "round_1_infer_avg_entropy",
@@ -32,10 +66,10 @@ ALL_FEATURES = [
     "round_2_total_entropy",
     "round_2_total_time",
     "round_2_total_token",
-    # sample identifier
-    "is_finally_correct",
-    "final_format_compliance",
-    # sample statistics
+]
+
+# Sample statistics
+SAMPLE_STATISTICS = [
     "sample_total_entropy",
     "sample_max_entropy",
     "sample_min_entropy",
@@ -49,7 +83,11 @@ ALL_FEATURES = [
     "sample_all_agents_token_count",
     "sample_avg_entropy_per_token",
     "sample_entropy_stability_index",
-    # sample distribution shape features
+]
+
+
+# Sample distribution shape features
+SAMPLE_DISTRIBUTION_SHAPE = [
     "sample_entropy_range",
     "sample_entropy_iqr",
     "sample_entropy_relative_iqr_mean",
@@ -58,18 +96,17 @@ ALL_FEATURES = [
     "sample_entropy_median_over_mean",
     "sample_entropy_tail_weight",
     "sample_entropy_cv",
-    # sample-level baseline entropy features 
-    # relative to single-agent base model
-    "base_sample_total_entropy",
-    "base_sample_token_count",
-    "base_sample_avg_entropy_per_token",
-    "sample_entropy_ratio_vs_base_total",
-    "sample_entropy_reduction_vs_base_total",
-    "sample_avg_entropy_per_token_ratio_vs_base",
-    "sample_avg_entropy_per_token_diff_vs_base",
-    # aggregation over agents
+]
+
+
+# Aggregation over agents
+AGGREGATION_OVER_AGENTS = [
     "sample_avg_entropy_per_agent",
-    # sample-level round-wise aggregated features over all agents
+]
+
+
+# Sample-level round-wise aggregated features over all agents
+SAMPLE_ROUND_WISE_AGGREGATED = [
     "sample_round_1_all_agents_total_entropy",
     "sample_round_1_all_agents_total_token",
     "sample_round_1_all_agents_entropy_per_token",
@@ -86,7 +123,11 @@ ALL_FEATURES = [
     "sample_round_all_agents_entropy_per_token_volatility",
     "sample_round_1_2_change_tokens",
     "sample_round_1_2_change_entropy",
-    # cross-round features based on aggregated agent mean and total entropy
+]
+
+
+# Cross-round features based on aggregated agent mean and total entropy
+CROSS_ROUND_AGGREGATED = [
     "sample_round_mean_agent_mean_entropy_first_last_diff",
     "sample_round_mean_agent_mean_entropy_first_last_ratio",
     "sample_round_mean_agent_mean_entropy_slope_per_round",
@@ -96,7 +137,11 @@ ALL_FEATURES = [
     "sample_round_mean_agent_total_entropy_first_last_ratio",
     "sample_round_mean_agent_total_entropy_slope_per_round",
     "sample_round_mean_agent_total_entropy_volatility",
-    # intra-round agent distribution features (per round)
+]
+
+
+# Intra-round agent distribution features (per round)
+INTRA_ROUND_AGENT_DISTRIBUTION = [
     "sample_round_1_agent_mean_entropy_spread",
     "sample_round_1_agent_mean_entropy_cv",
     "sample_round_1_agent_mean_entropy_bowley_skewness",
@@ -105,11 +150,18 @@ ALL_FEATURES = [
     "sample_round_2_agent_mean_entropy_cv",
     "sample_round_2_agent_mean_entropy_bowley_skewness",
     "sample_round_2_agent_total_entropy_spread",
-    # cross-round change of agent entropy spread
+]
+
+
+# Cross-round change of agent entropy spread
+CROSS_ROUND_AGENT_SPREAD_CHANGE = [
     "sample_round_agent_mean_entropy_spread_first_last_diff",
     "sample_round_agent_total_entropy_spread_first_last_diff",
-    ## sample round1 statistics
-    ## based on every agent statistics
+]
+
+
+# Sample round1 statistics based on every agent statistics
+SAMPLE_ROUND1_AGENT_STATISTICS = [
     "sample_round_1_max_agent_max_entropy",
     "sample_round_1_max_agent_mean_entropy",
     "sample_round_1_max_agent_median_entropy",
@@ -182,8 +234,11 @@ ALL_FEATURES = [
     "sample_round_1_variance_agent_std_entropy",
     "sample_round_1_variance_agent_total_entropy",
     "sample_round_1_variance_agent_variance_entropy",
-    ## sample round2 statistics
-    ## based on every agent statistics
+]
+
+
+# Sample round2 statistics based on every agent statistics
+SAMPLE_ROUND2_AGENT_STATISTICS = [
     "sample_round_2_max_agent_max_entropy",
     "sample_round_2_max_agent_mean_entropy",
     "sample_round_2_max_agent_median_entropy",
@@ -257,3 +312,20 @@ ALL_FEATURES = [
     "sample_round_2_variance_agent_total_entropy",
     "sample_round_2_variance_agent_variance_entropy",
 ]
+
+# All features combined
+ALL_FEATURES = (
+    BASE_MODEL_METRICS +
+    UNSEEN_FEATURES +
+    ROUND_STATISTICS +
+    SAMPLE_STATISTICS +
+    SAMPLE_DISTRIBUTION_SHAPE +
+    SAMPLE_BASELINE_ENTROPY +
+    AGGREGATION_OVER_AGENTS +
+    SAMPLE_ROUND_WISE_AGGREGATED +
+    CROSS_ROUND_AGGREGATED +
+    INTRA_ROUND_AGENT_DISTRIBUTION +
+    CROSS_ROUND_AGENT_SPREAD_CHANGE +
+    SAMPLE_ROUND1_AGENT_STATISTICS +
+    SAMPLE_ROUND2_AGENT_STATISTICS
+)
