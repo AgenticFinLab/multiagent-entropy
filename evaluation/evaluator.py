@@ -40,7 +40,7 @@ def main():
         "--dataset",
         type=str,
         choices=DATASETS,
-        default="aime2025",
+        default="aime2025_8192",
         help="Dataset to analyze",
     )
     # Add model argument for specifying which model to analyze
