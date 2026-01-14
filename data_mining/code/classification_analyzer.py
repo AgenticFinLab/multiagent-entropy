@@ -16,12 +16,24 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     accuracy_score,
     precision_score,
     recall_score,
     f1_score,
+)
+
+# Import utilities
+from utils import (
+    EXCLUDE_COLUMNS,
+    setup_visualization_style,
+    load_data_from_path,
+    encode_categorical_features,
+    prepare_features,
+    create_output_directory,
+    split_data,
+    determine_output_directory,
+    get_default_data_path
 )
 
 # Try to import XGBoost and LightGBM
@@ -47,24 +59,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-EXCLUDE_COLUMNS = [
-    # ignored identifier
-    "dataset",
-    "model_name",
-    # "architecture",
-    "sample_id",
-    # useless data
-    "num_rounds",
-    "exp_num_inferences",
-    "round_1_num_inferences",
-    "round_2_num_inferences",
-    # base model metrics
-    "base_model_accuracy",
-    "base_model_is_finally_correct",
-    "base_model_format_compliance",
-    "base_model_format_compliance_rate",
-]
-
 
 class ClassificationAnalyzer:
     """Performs sample-level classification analysis on multi-agent entropy data."""
@@ -84,14 +78,13 @@ class ClassificationAnalyzer:
             target_dataset: Target dataset name for determining output directory
         """
         if data_path is None:
-            data_path = "data_mining/data/merged_datasets.csv"
+            data_path = get_default_data_path()
 
         # Determine output directory based on target_dataset
         if output_dir is None:
-            if target_dataset:
-                output_dir = f"data_mining/results/{target_dataset}/classification"
-            else:
-                output_dir = "data_mining/results/classification"
+            output_dir = determine_output_directory(
+                "data_mining/results", target_dataset, "classification"
+            )
 
         self.data_path = Path(data_path)
         self.output_dir = Path(output_dir)
@@ -100,11 +93,10 @@ class ClassificationAnalyzer:
         self.results = {}
 
         # Create output directory if it doesn't exist
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        create_output_directory(self.output_dir)
 
         # Set style for better visualizations
-        plt.style.use("seaborn-v0_8")
-        sns.set_palette("husl")
+        setup_visualization_style()
 
     def load_data(self) -> pd.DataFrame:
         """
@@ -113,14 +105,8 @@ class ClassificationAnalyzer:
         Returns:
             Loaded DataFrame
         """
-        if not self.data_path.exists():
-            raise FileNotFoundError(f"Data file not found: {self.data_path}")
-
-        self.df = pd.read_csv(self.data_path)
-        logger.info(
-            f"Loaded data: {len(self.df)} records, {len(self.df.columns)} columns"
-        )
-
+        self.df = load_data_from_path(self.data_path)
+        
         return self.df
 
     def encode_categorical_features(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -133,27 +119,7 @@ class ClassificationAnalyzer:
         Returns:
             DataFrame with encoded categorical features
         """
-        df_encoded = df.copy()
-
-        # Identify categorical columns (non-numeric)
-        categorical_cols = df_encoded.select_dtypes(
-            exclude=[np.number]
-        ).columns.tolist()
-
-        # Encode each categorical column
-        for col in categorical_cols:
-            if col == "dataset":
-                # Skip dataset column as it's used for identification
-                continue
-
-            # Get unique values and create mapping
-            unique_values = df_encoded[col].unique()
-            value_mapping = {val: idx for idx, val in enumerate(sorted(unique_values))}
-
-            # Apply encoding
-            df_encoded[col] = df_encoded[col].map(value_mapping)
-
-        return df_encoded
+        return encode_categorical_features(df)
 
     def prepare_features(
         self,
@@ -179,25 +145,8 @@ class ClassificationAnalyzer:
         if exclude_columns is None:
             exclude_columns = EXCLUDE_COLUMNS.copy()
 
-        # Always exclude the target column and dataset identifier from features
-        exclude_columns = exclude_columns + [target_column]
-
-        # Get feature columns (all columns except excluded ones)
-        feature_columns = [col for col in self.df.columns if col not in exclude_columns]
-
-        # Select only numeric features
-        numeric_features = (
-            self.df[feature_columns].select_dtypes(include=[np.number]).columns.tolist()
-        )
-
-        X = self.df[numeric_features].copy()
-        y = self.df[target_column].copy()
-
-        # Handle missing values
-        X = X.fillna(X.median())
-
-        logger.info(f"Prepared features: {len(numeric_features)} numeric features")
-        logger.info(f"Target variable: {target_column}, shape: {y.shape}")
+        # Use utility function to prepare features
+        X, y = prepare_features(self.df, target_column, exclude_columns)
 
         return X, y
 
@@ -215,7 +164,7 @@ class ClassificationAnalyzer:
         logger.info("Training classification models...")
 
         # Split data
-        X_train, X_test, y_train, y_test = train_test_split(
+        X_train, X_test, y_train, y_test = split_data(
             X, y, test_size=0.2, random_state=42, stratify=y
         )
 
