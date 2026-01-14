@@ -256,14 +256,21 @@ class ShapAnalyzer:
         # Get top 5 features based on mean absolute SHAP value
         if isinstance(feature_importance, np.ndarray) and len(feature_importance) > 0:
             top_indices = np.argsort(feature_importance)[-5:][::-1]
+            # Ensure top_indices is a list of scalars
+            if hasattr(top_indices, '__iter__') and not isinstance(top_indices, (str, bytes)):
+                top_indices = [int(idx) for idx in top_indices]
+            else:
+                top_indices = [int(top_indices)]
         else:
             # If we can't determine importance, just take the first few features
             top_indices = range(min(5, len(X_test.columns)))
         
         dependence_plots = []
         for idx in top_indices:
-            if idx < len(X_test.columns):
-                feature_name = X_test.columns[idx]
+            # Convert idx to integer if it's an array-like object
+            idx_scalar = int(idx) if hasattr(idx, '__int__') else idx
+            if idx_scalar < len(X_test.columns):
+                feature_name = X_test.columns[idx_scalar]
                 
                 plt.figure(figsize=(10, 6))
                 # Create a temporary explainer for the dependence plot
@@ -287,7 +294,9 @@ class ShapAnalyzer:
                         show=False
                     )
                 
-                dep_plot_path = self.output_dir / f"shap_dependence_{feature_name}_{model_name}_{task_type}.png"
+                # Create subdirectory for dependence plots
+                (self.output_dir / "shap_dependence_plots").mkdir(exist_ok=True)
+                dep_plot_path = self.output_dir / "shap_dependence_plots" / f"shap_dependence_{feature_name}_{model_name}_{task_type}.png"
                 plt.savefig(dep_plot_path, dpi=300, bbox_inches="tight")
                 plt.close()
                 dependence_plots.append(str(dep_plot_path))
@@ -365,7 +374,19 @@ class ShapAnalyzer:
         
         shap_results = {}
         
-        for model_name, model in regression_results["models"].items():
+        # Check if regression_results is the full results dict or just the models dict
+        models_dict = None
+        if "regression_results" in regression_results and "models" in regression_results["regression_results"]:
+            # Case: full results dict passed from RegressionAnalyzer.run_full_pipeline()
+            models_dict = regression_results["regression_results"]["models"]
+        elif "models" in regression_results:
+            # Case: just the models dict passed directly
+            models_dict = regression_results["models"]
+        else:
+            logger.warning("No models found in regression_results for SHAP analysis")
+            return shap_results
+        
+        for model_name, model in models_dict.items():
             shap_result = self.explain_model(
                 model, X_train, X_test, model_name, "regression"
             )
@@ -403,7 +424,19 @@ class ShapAnalyzer:
         
         shap_results = {}
         
-        for model_name, model in classification_results["models"].items():
+        # Check if classification_results is the full results dict or just the models dict
+        models_dict = None
+        if "classification_results" in classification_results and "models" in classification_results["classification_results"]:
+            # Case: full results dict passed from ClassificationAnalyzer.run_full_pipeline()
+            models_dict = classification_results["classification_results"]["models"]
+        elif "models" in classification_results:
+            # Case: just the models dict passed directly
+            models_dict = classification_results["models"]
+        else:
+            logger.warning("No models found in classification_results for SHAP analysis")
+            return shap_results
+        
+        for model_name, model in models_dict.items():
             shap_result = self.explain_model(
                 model, X_train, X_test, model_name, "classification"
             )
