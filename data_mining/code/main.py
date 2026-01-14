@@ -41,29 +41,29 @@ def main():
         "--merged-datasets",
         type=str,
         nargs="*",
-        default=["*"],
-        help="Datasets to merge during data collection (use '*' for all available datasets). Only effective when --skip-collection is not used.",
+        default=["all"],
+        help="Datasets to merge during data collection (use 'all' for all available datasets). Only effective when --skip-collection is not used.",
     )
     parser.add_argument(
         "--model-name",
         type=str,
         nargs="*",
-        default=["*"],
-        help="Filter by specific model name(s) for analysis (use '*' for all models)",
+        default=["all"],
+        help="Filter by specific model name(s) for analysis (use 'all' for all models)",
     )
     parser.add_argument(
         "--architecture",
         type=str,
         nargs="*",
-        default=["*"],
-        help="Filter by specific architecture(s) for analysis (use '*' for all architectures)",
+        default=["all"],
+        help="Filter by specific architecture(s) for analysis (use 'all' for all architectures)",
     )
     parser.add_argument(
         "--dataset",
         type=str,
         nargs="*",
-        default=["*"],
-        help="Filter by specific dataset(s) for analysis (use '*' for all datasets)",
+        default=["all"],
+        help="Filter by specific dataset(s) for analysis (use 'all' for all datasets)",
     )
     parser.add_argument(
         "--skip-collection",
@@ -94,13 +94,13 @@ def main():
         default="default",
         help="""Feature exclusion configuration. 
             Options:
-            '*' - Use all features (no exclusions)
+            'all' - Use all features (no exclusions)
             'default' - Use default exclusions (recommended)
             Feature group name(s) - Specify groups from features.py (comma-separated)
             Available groups: 
             base_model_metrics, experiment_identifier, sample_identifier, experiment_statistics, unseen_features, round_statistics, sample_statistics, sample_distribution_shape, sample_baseline_entropy, aggregation_over_agents, sample_round_wise_aggregated, cross_round_aggregated, intra_round_agent_distribution, cross_round_agent_spread_change, sample_round1_agent_statistics, sample_round2_agent_statistics
             Examples:
-                --exclude-features '*' (use all features)
+                --exclude-features 'all' (use all features)
                 --exclude-features 'default' (default exclusions)
                 --exclude-features 'base_model_metrics' (exclude base model metrics only)
                 --exclude-features 'base_model_metrics,experiment_identifier' (exclude multiple groups)
@@ -109,8 +109,8 @@ def main():
     )
     args = parser.parse_args()
 
-    # Handle the case where user specifies '*' to collect all available datasets
-    if args.merged_datasets == ["*"]:
+    # Handle the case where user specifies 'all' to collect all available datasets
+    if args.merged_datasets == ["all"]:
         from data_collector import DataCollector
 
         collector = DataCollector()
@@ -127,9 +127,9 @@ def main():
         merged_datasets = filtered_datasets
 
     # Process filter arguments
-    model_names = None if args.model_name == ["*"] else args.model_name
-    architectures = None if args.architecture == ["*"] else args.architecture
-    datasets = None if args.dataset == ["*"] else args.dataset
+    model_names = None if args.model_name == ["all"] else args.model_name
+    architectures = None if args.architecture == ["all"] else args.architecture
+    datasets = None if args.dataset == ["all"] else args.dataset
 
     logger.info("=" * 80)
     logger.info("MULTI-AGENT ENTROPY DATA MINING ANALYSIS")

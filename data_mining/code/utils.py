@@ -238,9 +238,9 @@ def filter_dataframe(
 
     Args:
         df: Input DataFrame
-        model_names: List of model names to filter (None or ['*'] for all)
-        architectures: List of architectures to filter (None or ['*'] for all)
-        datasets: List of datasets to filter (None or ['*'] for all)
+        model_names: List of model names to filter (None or ['all'] for all)
+        architectures: List of architectures to filter (None or ['all'] for all)
+        datasets: List of datasets to filter (None or ['all'] for all)
 
     Returns:
         Filtered DataFrame
@@ -248,7 +248,7 @@ def filter_dataframe(
     filtered_df = df.copy()
 
     # Filter by model names
-    if model_names and model_names != ["*"] and "model_name" in filtered_df.columns:
+    if model_names and model_names != ["all"] and "model_name" in filtered_df.columns:
         filtered_df = filtered_df[filtered_df["model_name"].isin(model_names)]
         logger.info(
             f"Filtered by model_names: {model_names}, remaining records: {len(filtered_df)}"
@@ -257,7 +257,7 @@ def filter_dataframe(
     # Filter by architectures
     if (
         architectures
-        and architectures != ["*"]
+        and architectures != ["all"]
         and "architecture" in filtered_df.columns
     ):
         filtered_df = filtered_df[filtered_df["architecture"].isin(architectures)]
@@ -266,7 +266,7 @@ def filter_dataframe(
         )
 
     # Filter by datasets
-    if datasets and datasets != ["*"] and "dataset" in filtered_df.columns:
+    if datasets and datasets != ["all"] and "dataset" in filtered_df.columns:
         filtered_df = filtered_df[filtered_df["dataset"].isin(datasets)]
         logger.info(
             f"Filtered by datasets: {datasets}, remaining records: {len(filtered_df)}"
@@ -294,17 +294,17 @@ def generate_filter_suffix(
     suffix_parts = []
 
     # Add model names to suffix
-    if model_names and model_names != ["*"]:
+    if model_names and model_names != ["all"]:
         model_str = "_".join(model_names)
         suffix_parts.append(f"model_{model_str}")
 
     # Add architectures to suffix
-    if architectures and architectures != ["*"]:
+    if architectures and architectures != ["all"]:
         arch_str = "_".join(architectures)
         suffix_parts.append(f"arch_{arch_str}")
 
     # Add datasets to suffix
-    if datasets and datasets != ["*"]:
+    if datasets and datasets != ["all"]:
         dataset_str = "_".join(datasets)
         suffix_parts.append(f"dataset_{dataset_str}")
 
@@ -317,7 +317,7 @@ def get_exclude_columns_from_config(exclude_features: str) -> List[str]:
 
     Args:
         exclude_features: Configuration string that can be:
-            - '*': Use no exclusions (empty list)
+            - 'all': Use no exclusions (empty list)
             - 'default': Use DEFAULT_EXCLUDE_COLUMNS from features.py
             - Feature group name(s) from features.py (comma-separated)
             - Can also use '+' to combine multiple groups
@@ -326,7 +326,7 @@ def get_exclude_columns_from_config(exclude_features: str) -> List[str]:
         List of column names to exclude
 
     Examples:
-        - '*' -> [] (no exclusions, use all features)
+        - 'all' -> [] (no exclusions, use all features)
         - 'default' -> DEFAULT_EXCLUDE_COLUMNS
         - 'base_model_metrics' -> BASE_MODEL_METRICS columns
         - 'base_model_metrics,experiment_identifier' -> combined columns
@@ -335,7 +335,7 @@ def get_exclude_columns_from_config(exclude_features: str) -> List[str]:
     from features import FEATURE_GROUPS, DEFAULT_EXCLUDE_COLUMNS
 
     # Handle wildcard - no exclusions
-    if exclude_features == "*":
+    if exclude_features == "all":
         logger.info("Using all features (no exclusions)")
         return []
 
