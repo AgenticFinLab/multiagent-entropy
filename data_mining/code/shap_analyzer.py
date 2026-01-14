@@ -162,6 +162,7 @@ class ShapAnalyzer:
         logger.info(f"Generating SHAP explanations for {model_name} ({task_type})...")
 
         # Create SHAP explainer based on model type
+        X_test_for_plots = X_test  # Keep track of X_test used for SHAP values
         if hasattr(model, 'feature_importances_'):
             explainer = shap.TreeExplainer(model)
             shap_values = explainer.shap_values(X_test)
@@ -175,12 +176,15 @@ class ShapAnalyzer:
                     shap_values = np.asarray(shap_values[0])
         else:
             # Use KernelExplainer as fallback for other model types
-            explainer = shap.KernelExplainer(model.predict, X_train.sample(min(100, len(X_train))))
-            shap_values = explainer.shap_values(X_test.sample(min(100, len(X_test))))
+            # Sample X_test to reduce computation time
+            X_test_sampled = X_test.sample(min(100, len(X_test)), random_state=42)
+            explainer = shap.KernelExplainer(model.predict, X_train.sample(min(100, len(X_train)), random_state=42))
+            shap_values = explainer.shap_values(X_test_sampled)
+            X_test_for_plots = X_test_sampled  # Use the sampled data for plots
 
         # Generate SHAP plots
         plots_info = self._generate_shap_plots(
-            shap_values, X_test, model_name, task_type
+            shap_values, X_test_for_plots, model_name, task_type
         )
 
         return {
@@ -295,27 +299,23 @@ class ShapAnalyzer:
                     # Ensure it's an array
                     if isinstance(temp_shap_values, list):
                         temp_shap_values = np.asarray(temp_shap_values)
-                    # Extract values for the specific feature
-                    feature_shap_values = temp_shap_values[:, feature_idx] if temp_shap_values.ndim > 1 else temp_shap_values
-                    # Create Explanation object for shap.plots.scatter
-                    explanation = shap.Explanation(
-                        values=feature_shap_values,
-                        base_values=np.zeros(len(feature_shap_values)),
-                        data=X_test[feature_name].values,
-                        feature_names=[feature_name]
+                    # Use shap.dependence_plot instead of shap.plots.scatter
+                    shap.dependence_plot(
+                        feature_idx, 
+                        temp_shap_values, 
+                        X_test, 
+                        show=False,
+                        ax=plt.gca()
                     )
-                    shap.plots.scatter(explanation, show=False)
                 else:
-                    # Extract values for the specific feature
-                    feature_shap_values = shap_values[:, feature_idx] if shap_values.ndim > 1 else shap_values
-                    # Create Explanation object for shap.plots.scatter
-                    explanation = shap.Explanation(
-                        values=feature_shap_values,
-                        base_values=np.zeros(len(feature_shap_values)),
-                        data=X_test[feature_name].values,
-                        feature_names=[feature_name]
+                    # Use shap.dependence_plot instead of shap.plots.scatter
+                    shap.dependence_plot(
+                        feature_idx, 
+                        shap_values, 
+                        X_test, 
+                        show=False,
+                        ax=plt.gca()
                     )
-                    shap.plots.scatter(explanation, show=False)
                 
                 # Create subdirectory for dependence plots
                 (self.output_dir / "shap_dependence_plots").mkdir(exist_ok=True)
