@@ -170,6 +170,9 @@ class ShapAnalyzer:
             if task_type == "classification" and isinstance(shap_values, list):
                 # For binary classification, take the positive class
                 shap_values = shap_values[1] if len(shap_values) > 1 else shap_values[0]
+                # Ensure shap_values is a numpy array after extraction
+                if isinstance(shap_values, list) and len(shap_values) > 0:
+                    shap_values = np.asarray(shap_values[0])
         else:
             # Use KernelExplainer as fallback for other model types
             explainer = shap.KernelExplainer(model.predict, X_train.sample(min(100, len(X_train))))
@@ -247,6 +250,10 @@ class ShapAnalyzer:
         else:
             abs_shap_values = np.abs(shap_values)
         
+        # Ensure abs_shap_values is a numpy array
+        if isinstance(abs_shap_values, list):
+            abs_shap_values = np.asarray(abs_shap_values)
+        
         # Calculate mean absolute SHAP values for each feature
         if abs_shap_values.ndim > 1:
             feature_importance = abs_shap_values.mean(0)
@@ -258,7 +265,7 @@ class ShapAnalyzer:
             top_indices = np.argsort(feature_importance)[-5:][::-1]
             # Ensure top_indices is a list of scalars
             if hasattr(top_indices, '__iter__') and not isinstance(top_indices, (str, bytes)):
-                top_indices = [int(idx) for idx in top_indices]
+                top_indices = [int(i) for i in top_indices.flatten()]
             else:
                 top_indices = [int(top_indices)]
         else:
@@ -268,7 +275,12 @@ class ShapAnalyzer:
         dependence_plots = []
         for idx in top_indices:
             # Convert idx to integer if it's an array-like object
-            idx_scalar = int(idx) if hasattr(idx, '__int__') else idx
+            if hasattr(idx, 'item'):
+                idx_scalar = int(idx.item())
+            elif hasattr(idx, '__int__'):
+                idx_scalar = int(idx)
+            else:
+                idx_scalar = int(idx)
             if idx_scalar < len(X_test.columns):
                 feature_name = X_test.columns[idx_scalar]
                 
@@ -276,9 +288,13 @@ class ShapAnalyzer:
                 # Create a temporary explainer for the dependence plot
                 if isinstance(shap_values, list):
                     # Handle multi-output case
+                    temp_shap_values = shap_values[0] if len(shap_values) > 0 else shap_values
+                    # Ensure it's an array
+                    if isinstance(temp_shap_values, list):
+                        temp_shap_values = np.asarray(temp_shap_values)
                     shap.plots.scatter(
                         shap.Explanation(
-                            values=shap_values[0] if len(shap_values) > 0 else shap_values,
+                            values=temp_shap_values,
                             data=X_test.values,
                             feature_names=list(X_test.columns)
                         )[:, feature_name],
@@ -312,6 +328,10 @@ class ShapAnalyzer:
                 shap_values_for_plot = shap_values[0] if len(shap_values) > 0 else shap_values
             else:
                 shap_values_for_plot = shap_values
+            
+            # Ensure shap_values_for_plot is a numpy array
+            if isinstance(shap_values_for_plot, list):
+                shap_values_for_plot = np.asarray(shap_values_for_plot)
             
             # Check dimensions and create appropriate explanation object
             if shap_values_for_plot.ndim == 1:
