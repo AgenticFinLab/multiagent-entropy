@@ -25,7 +25,6 @@ from sklearn.metrics import (
 
 # Import utilities
 from utils import (
-    EXCLUDE_COLUMNS,
     setup_visualization_style,
     load_data_from_path,
     encode_categorical_features,
@@ -383,7 +382,7 @@ class ClassificationAnalyzer:
 
         # Prepare features for classification
         X, y = self.prepare_features(
-            target_column="is_finally_correct", exclude_columns=EXCLUDE_COLUMNS
+            target_column="is_finally_correct", exclude_columns=self.exclude_columns
         )
 
         # Train models

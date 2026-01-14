@@ -11,8 +11,12 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-
 from sklearn.model_selection import train_test_split
+
+from features import EXPERIMENT_IDENTIFIER, DEFAULT_EXCLUDE_COLUMNS
+
+# Define EXCLUDE_COLUMNS for backward compatibility
+EXCLUDE_COLUMNS = EXPERIMENT_IDENTIFIER
 
 # Configure logging
 logging.basicConfig(
@@ -99,7 +103,7 @@ def prepare_features(
         Tuple of (features DataFrame, target Series)
     """
     if exclude_columns is None:
-        exclude_columns = EXCLUDE_COLUMNS.copy()
+        exclude_columns = DEFAULT_EXCLUDE_COLUMNS.copy()
 
     # Always exclude the target column and dataset identifier from features
     exclude_columns = exclude_columns + [target_column]

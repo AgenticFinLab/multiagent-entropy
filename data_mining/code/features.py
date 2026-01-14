@@ -1,3 +1,14 @@
+# Experiment identifier features
+EXPERIMENT_IDENTIFIER = [
+    "model_name",
+    "sample_id",
+    # "architecture",
+    "num_rounds",
+]
+
+# Default exclusions for analysis
+DEFAULT_EXCLUDE_COLUMNS = EXPERIMENT_IDENTIFIER
+
 # Base model metrics
 BASE_MODEL_METRICS_EXPERIMENT_LEVEL = [
     "base_model_accuracy",
@@ -20,20 +31,8 @@ SAMPLE_BASELINE_ENTROPY = [
     "sample_avg_entropy_per_token_diff_vs_base",
 ]
 
-BASE_MODEL_METRICS = (
-    BASE_MODEL_METRICS_EXPERIMENT_LEVEL
-    + BASE_MODEL_METRICS_SAMPLE_LEVEL
-    + SAMPLE_BASELINE_ENTROPY
-)
+BASE_MODEL_METRICS = DEFAULT_EXCLUDE_COLUMNS + BASE_MODEL_METRICS_EXPERIMENT_LEVEL + BASE_MODEL_METRICS_SAMPLE_LEVEL + SAMPLE_BASELINE_ENTROPY
 
-
-# Experiment identifier features
-EXPERIMENT_IDENTIFIER = [
-    "model_name",
-    "sample_id",
-    "architecture",
-    "num_rounds",
-]
 
 # Sample identifier
 SAMPLE_IDENTIFIER = [
@@ -52,7 +51,8 @@ EXPERIMENT_STATISTICS = [
     "exp_total_token",
 ]
 
-UNSEEN_FEATURES = EXPERIMENT_IDENTIFIER + SAMPLE_IDENTIFIER + EXPERIMENT_STATISTICS
+# Exclude identifiers and statistics that would leak target information
+UNSEEN_FEATURES = DEFAULT_EXCLUDE_COLUMNS + SAMPLE_IDENTIFIER + EXPERIMENT_STATISTICS
 
 
 # Round statistics
@@ -318,32 +318,33 @@ SAMPLE_ROUND2_AGENT_STATISTICS = [
 
 # All features combined
 ALL_FEATURES = (
-    BASE_MODEL_METRICS
-    + UNSEEN_FEATURES
-    + ROUND_STATISTICS
-    + SAMPLE_STATISTICS
-    + SAMPLE_DISTRIBUTION_SHAPE
-    + SAMPLE_BASELINE_ENTROPY
-    + AGGREGATION_OVER_AGENTS
-    + SAMPLE_ROUND_WISE_AGGREGATED
-    + CROSS_ROUND_AGGREGATED
-    + INTRA_ROUND_AGENT_DISTRIBUTION
-    + CROSS_ROUND_AGENT_SPREAD_CHANGE
-    + SAMPLE_ROUND1_AGENT_STATISTICS
-    + SAMPLE_ROUND2_AGENT_STATISTICS
+    BASE_MODEL_METRICS +
+    UNSEEN_FEATURES +
+    ROUND_STATISTICS +
+    SAMPLE_STATISTICS +
+    SAMPLE_DISTRIBUTION_SHAPE +
+    SAMPLE_BASELINE_ENTROPY +
+    AGGREGATION_OVER_AGENTS +
+    SAMPLE_ROUND_WISE_AGGREGATED +
+    CROSS_ROUND_AGGREGATED +
+    INTRA_ROUND_AGENT_DISTRIBUTION +
+    CROSS_ROUND_AGENT_SPREAD_CHANGE +
+    SAMPLE_ROUND1_AGENT_STATISTICS +
+    SAMPLE_ROUND2_AGENT_STATISTICS
 )
 
-# Feature group mapping for exclusion configuration
+
+# Define feature groups for easy access
 FEATURE_GROUPS = {
-    "base_model_metrics": BASE_MODEL_METRICS,
     "experiment_identifier": EXPERIMENT_IDENTIFIER,
     "sample_identifier": SAMPLE_IDENTIFIER,
     "experiment_statistics": EXPERIMENT_STATISTICS,
-    "unseen_features": UNSEEN_FEATURES,
     "round_statistics": ROUND_STATISTICS,
     "sample_statistics": SAMPLE_STATISTICS,
     "sample_distribution_shape": SAMPLE_DISTRIBUTION_SHAPE,
     "sample_baseline_entropy": SAMPLE_BASELINE_ENTROPY,
+    "base_model_metrics": BASE_MODEL_METRICS,
+    "unseen_features": UNSEEN_FEATURES,
     "aggregation_over_agents": AGGREGATION_OVER_AGENTS,
     "sample_round_wise_aggregated": SAMPLE_ROUND_WISE_AGGREGATED,
     "cross_round_aggregated": CROSS_ROUND_AGGREGATED,
@@ -351,23 +352,5 @@ FEATURE_GROUPS = {
     "cross_round_agent_spread_change": CROSS_ROUND_AGENT_SPREAD_CHANGE,
     "sample_round1_agent_statistics": SAMPLE_ROUND1_AGENT_STATISTICS,
     "sample_round2_agent_statistics": SAMPLE_ROUND2_AGENT_STATISTICS,
+    "all_features": ALL_FEATURES,
 }
-
-# Default exclude columns configuration (same as the original EXCLUDE_COLUMNS in utils.py)
-DEFAULT_EXCLUDE_COLUMNS = [
-    # ignored identifier
-    "dataset",
-    "model_name",
-    # "architecture",
-    "sample_id",
-    # useless data
-    "num_rounds",
-    "exp_num_inferences",
-    "round_1_num_inferences",
-    "round_2_num_inferences",
-    # base model metrics
-    "base_model_accuracy",
-    "base_model_is_finally_correct",
-    "base_model_format_compliance",
-    "base_model_format_compliance_rate",
-]

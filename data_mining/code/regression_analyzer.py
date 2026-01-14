@@ -25,7 +25,6 @@ from sklearn.metrics import (
 
 # Import utilities
 from utils import (
-    EXCLUDE_COLUMNS,
     setup_visualization_style,
     load_data_from_path,
     encode_categorical_features,
@@ -376,7 +375,7 @@ class RegressionAnalyzer:
         # Prepare features for regression
         # Exclude is_finally_correct as it's used to calculate exp_accuracy
         X, y = self.prepare_features(
-            target_column="exp_accuracy", exclude_columns=EXCLUDE_COLUMNS
+            target_column="exp_accuracy", exclude_columns=self.exclude_columns
         )
 
         # Train models
