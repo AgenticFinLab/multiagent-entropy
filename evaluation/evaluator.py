@@ -35,13 +35,30 @@ def main():
     parser = argparse.ArgumentParser(
         description="Analyze multi-agent experiment results"
     )
-    # Add dataset argument with choices and default value
+    # Add dataset argument for single dataset (kept for backward compatibility)
     parser.add_argument(
         "--dataset",
         type=str,
         choices=DATASETS,
-        default="aime2025_8192",
-        help="Dataset to analyze",
+        default=None,
+        help="Single dataset to analyze (deprecated: use --datasets instead)",
+    )
+    
+    # Add datasets argument with multiple choices
+    parser.add_argument(
+        "--datasets",
+        type=str,
+        nargs="*",
+        choices=DATASETS,
+        default=["gsm8k", "aime2024_8192", "aime2025_8192"],
+        help="Datasets to analyze (space-separated list)",
+    )
+    
+    # Add flag to analyze all datasets
+    parser.add_argument(
+        "--all-datasets",
+        action="store_true",
+        help="Analyze all available datasets",
     )
     # Add model argument for specifying which model to analyze
     parser.add_argument(
@@ -124,154 +141,171 @@ def main():
     # Parse command-line arguments
     args = parser.parse_args()
 
+    # Determine which datasets to analyze
+    if args.all_datasets:
+        datasets_to_analyze = DATASETS
+    elif args.dataset:
+        # For backward compatibility
+        datasets_to_analyze = [args.dataset]
+    elif args.datasets:
+        datasets_to_analyze = args.datasets
+    else:
+        # Default to aime2025_8192 if nothing specified
+        datasets_to_analyze = ["aime2025_8192"]
+
     # Get base path to project directory
     base_path = str(Path(__file__).parent.parent)
-    # Initialize experiment analyzer with base path
-    analyzer = ExperimentAnalyzer(base_path)
-    # Initialize entropy statistic if needed
-    entropy_statistic = None
+    
+    # Process each dataset
+    for dataset in datasets_to_analyze:
+        print(f"\nProcessing dataset: {dataset}")
+        
+        # Initialize experiment analyzer with base path
+        analyzer = ExperimentAnalyzer(base_path)
+        # Initialize entropy statistic if needed
+        entropy_statistic = None
 
-    # Create entropy statistic instance if entropy or trend analysis is requested
-    if args.analyze_entropy or args.analyze_trends:
-        entropy_statistic = EntropyStatistic(base_path)
+        # Create entropy statistic instance if entropy or trend analysis is requested
+        if args.analyze_entropy or args.analyze_trends:
+            entropy_statistic = EntropyStatistic(base_path)
 
-    # Analyze a specific experiment if experiment name is provided
-    if args.experiment:
-        # Require model name when analyzing specific experiment
-        if not args.model:
-            print("Error: --model is required when analyzing a specific experiment")
-            return
+        # Analyze a specific experiment if experiment name is provided
+        if args.experiment:
+            # Require model name when analyzing specific experiment
+            if not args.model:
+                print("Error: --model is required when analyzing a specific experiment")
+                return
 
-        print(f"Analyzing experiment: {args.model}/{args.experiment}")
-        try:
-            # Analyze the specified experiment
-            metrics = analyzer.analyze_experiment(
-                args.dataset, args.model, args.experiment, args.task_type
-            )
+            print(f"Analyzing experiment: {args.model}/{args.experiment}")
+            try:
+                # Analyze the specified experiment
+                metrics = analyzer.analyze_experiment(
+                    dataset, args.model, args.experiment, args.task_type
+                )
 
-            # Determine output path for results
-            if args.output:
-                output_path = args.output
-            else:
-                output_dir = (
+                # Determine output path for results
+                if args.output:
+                    output_path = args.output
+                else:
+                    output_dir = (
+                        Path(base_path)
+                        / "evaluation"
+                        / "results"
+                        / dataset
+                        / args.model
+                    )
+                    output_dir.mkdir(parents=True, exist_ok=True)
+                    output_path = output_dir / f"{args.experiment}_metrics.json"
+
+                # Save analysis results to JSON file
+                analyzer.save_results(metrics, output_path)
+                print(f"Results saved to: {output_path}")
+            except Exception as e:
+                print(f"Warning: Experiment analysis failed: {e}")
+                print("Continuing with entropy and trend analysis...")
+
+            # Perform entropy analysis if entropy statistic is available
+            if entropy_statistic:
+                print(f"\nAnalyzing entropy for experiment: {args.model}/{args.experiment}")
+                entropy_results = entropy_statistic.analyze_experiment_entropy(
+                    dataset, args.model, args.experiment
+                )
+
+                # Create output directory for entropy results
+                entropy_output_dir = (
                     Path(base_path)
                     / "evaluation"
                     / "results"
-                    / args.dataset
+                    / dataset
                     / args.model
+                    / "entropy"
                 )
-                output_dir.mkdir(parents=True, exist_ok=True)
-                output_path = output_dir / f"{args.experiment}_metrics.json"
+                entropy_output_dir.mkdir(parents=True, exist_ok=True)
 
-            # Save analysis results to JSON file
-            analyzer.save_results(metrics, output_path)
-            print(f"Results saved to: {output_path}")
-        except Exception as e:
-            print(f"Warning: Experiment analysis failed: {e}")
-            print("Continuing with entropy and trend analysis...")
+                # Save entropy results to JSON if requested
+                if args.save_entropy_json:
+                    json_output_path = (
+                        entropy_output_dir / f"{args.experiment}_entropy.json"
+                    )
+                    with open(json_output_path, "w", encoding="utf-8") as f:
+                        json.dump(entropy_results, f, indent=2, ensure_ascii=False)
+                    print(f"Entropy JSON saved to: {json_output_path}")
 
-        # Perform entropy analysis if entropy statistic is available
-        if entropy_statistic:
-            print(f"\nAnalyzing entropy for experiment: {args.model}/{args.experiment}")
-            entropy_results = entropy_statistic.analyze_experiment_entropy(
-                args.dataset, args.model, args.experiment
-            )
+                # Analyze entropy change trends if requested
+                if args.analyze_trends:
+                    print(
+                        f"\nAnalyzing entropy change trends for experiment: {args.model}/{args.experiment}"
+                    )
+                    trend_results = entropy_statistic.analyze_entropy_change_trends(
+                        dataset, args.model, args.experiment
+                    )
 
-            # Create output directory for entropy results
-            entropy_output_dir = (
-                Path(base_path)
-                / "evaluation"
-                / "results"
-                / args.dataset
-                / args.model
-                / "entropy"
-            )
-            entropy_output_dir.mkdir(parents=True, exist_ok=True)
-
-            # Save entropy results to JSON if requested
-            if args.save_entropy_json:
-                json_output_path = (
-                    entropy_output_dir / f"{args.experiment}_entropy.json"
-                )
-                with open(json_output_path, "w", encoding="utf-8") as f:
-                    json.dump(entropy_results, f, indent=2, ensure_ascii=False)
-                print(f"Entropy JSON saved to: {json_output_path}")
-
-            # Analyze entropy change trends if requested
-            if args.analyze_trends:
-                print(
-                    f"\nAnalyzing entropy change trends for experiment: {args.model}/{args.experiment}"
-                )
-                trend_results = entropy_statistic.analyze_entropy_change_trends(
-                    args.dataset, args.model, args.experiment
-                )
-
-    # Analyze all experiments if no specific experiment is provided
-    else:
-        print(f"Analyzing all experiments for dataset: {args.dataset}")
-        # Analyze all experiments in the dataset
-        all_metrics = analyzer.analyze_all_experiments(args.dataset, args.task_type)
-
-        # Determine output path for all metrics
-        if args.output:
-            output_path = args.output
+        # Analyze all experiments if no specific experiment is provided
         else:
-            output_dir = Path(base_path) / "evaluation" / "results" / args.dataset
-            output_dir.mkdir(parents=True, exist_ok=True)
-            output_path = output_dir / "all_metrics.json"
+            print(f"Analyzing all experiments for dataset: {dataset}")
+            # Analyze all experiments in the dataset
+            all_metrics = analyzer.analyze_all_experiments(dataset, args.task_type)
 
-        # Save all metrics to JSON file
-        analyzer.save_results(all_metrics, output_path)
-        print(f"All metrics saved to: {output_path}")
+            # Determine output path for all metrics
+            if args.output:
+                output_path = args.output
+            else:
+                output_dir = Path(base_path) / "evaluation" / "results" / dataset
+                output_dir.mkdir(parents=True, exist_ok=True)
+                output_path = output_dir / "all_metrics.json"
 
-        # Perform entropy analysis for all experiments if entropy statistic is available
-        if entropy_statistic:
-            print(f"\nAnalyzing entropy for all experiments in dataset: {args.dataset}")
-            entropy_results = entropy_statistic.analyze_all_experiments_entropy(
-                args.dataset
-            )
+            # Save all metrics to JSON file
+            analyzer.save_results(all_metrics, output_path)
+            print(f"All metrics saved to: {output_path}")
 
-            # Create output directory for entropy results
-            entropy_output_dir = (
-                Path(base_path) / "evaluation" / "results" / args.dataset
-            )
-            entropy_output_dir.mkdir(parents=True, exist_ok=True)
+            # Perform entropy analysis for all experiments if entropy statistic is available
+            if entropy_statistic:
+                print(f"\nAnalyzing entropy for all experiments in dataset: {dataset}")
+                entropy_results = entropy_statistic.analyze_all_experiments_entropy(
+                    dataset
+                )
 
-            # Save entropy results to JSON if requested
-            if args.save_entropy_json:
-                json_output_path = entropy_output_dir / "all_entropy_results.json"
-                with open(json_output_path, "w", encoding="utf-8") as f:
-                    json.dump(entropy_results, f, indent=2, ensure_ascii=False)
-                print(f"Entropy JSON saved to: {json_output_path}")
+                # Create output directory for entropy results
+                entropy_output_dir = (
+                    Path(base_path) / "evaluation" / "results" / dataset
+                )
+                entropy_output_dir.mkdir(parents=True, exist_ok=True)
 
-            # Analyze entropy change trends for each experiment if requested
-            if args.analyze_trends:
-                for model_name, model_data in entropy_results["models"].items():
-                    for exp_name in model_data["experiments"].keys():
-                        # Skip experiments with errors
-                        if "error" not in model_data["experiments"][exp_name]:
-                            try:
-                                trend_results = (
-                                    entropy_statistic.analyze_entropy_change_trends(
-                                        args.dataset, model_name, exp_name
-                                    )
-                                )
-                                model_data["experiments"][exp_name][
-                                    "trend_analysis"
-                                ] = trend_results
-                            except Exception as e:
-                                print(
-                                    f"Error analyzing trends for {model_name}/{exp_name}: {e}"
-                                )
-                                model_data["experiments"][exp_name][
-                                    "trend_analysis"
-                                ] = {"error": str(e)}
-
-                # Save updated entropy results with trend analysis
+                # Save entropy results to JSON if requested
                 if args.save_entropy_json:
                     json_output_path = entropy_output_dir / "all_entropy_results.json"
                     with open(json_output_path, "w", encoding="utf-8") as f:
                         json.dump(entropy_results, f, indent=2, ensure_ascii=False)
+                    print(f"Entropy JSON saved to: {json_output_path}")
+
+                # Analyze entropy change trends for each experiment if requested
+                if args.analyze_trends:
+                    for model_name, model_data in entropy_results["models"].items():
+                        for exp_name in model_data["experiments"].keys():
+                            # Skip experiments with errors
+                            if "error" not in model_data["experiments"][exp_name]:
+                                try:
+                                    trend_results = (
+                                        entropy_statistic.analyze_entropy_change_trends(
+                                            dataset, model_name, exp_name
+                                        )
+                                    )
+                                    model_data["experiments"][exp_name][
+                                        "trend_analysis"
+                                    ] = trend_results
+                                except Exception as e:
+                                    print(
+                                        f"Error analyzing trends for {model_name}/{exp_name}: {e}"
+                                    )
+                                    model_data["experiments"][exp_name][
+                                        "trend_analysis"
+                                    ] = {"error": str(e)}
+
+                    # Save updated entropy results with trend analysis
+                    if args.save_entropy_json:
+                        json_output_path = entropy_output_dir / "all_entropy_results.json"
+                        with open(json_output_path, "w", encoding="utf-8") as f:
+                            json.dump(entropy_results, f, indent=2, ensure_ascii=False)
 
     # Run aggregator to combine metrics and entropy data if requested
     if args.run_aggregator or args.aggregate_all:
@@ -293,20 +327,21 @@ def main():
                     )
                     converter.generate_aggregated_csvs()
                     print(f"CSV generated for {dataset}: {output_csv}")
-        # Aggregate only the specified dataset
+        # Aggregate only the specified datasets
         else:
-            dataset_path = base_results_path / args.dataset
-            entropy_file = dataset_path / "all_entropy_results.json"
-            metrics_file = dataset_path / "all_metrics.json"
-            output_csv = dataset_path
+            for dataset in datasets_to_analyze:
+                dataset_path = base_results_path / dataset
+                entropy_file = dataset_path / "all_entropy_results.json"
+                metrics_file = dataset_path / "all_metrics.json"
+                output_csv = dataset_path
 
-            # Run aggregator if both files exist
-            if entropy_file.exists() and metrics_file.exists():
-                aggregator = Aggregator(
-                    str(entropy_file), str(metrics_file), str(output_csv)
-                )
-                aggregator.generate_aggregated_csvs()
-                print(f"CSV generated for {args.dataset}: {output_csv}")
+                # Run aggregator if both files exist
+                if entropy_file.exists() and metrics_file.exists():
+                    aggregator = Aggregator(
+                        str(entropy_file), str(metrics_file), str(output_csv)
+                    )
+                    aggregator.generate_aggregated_csvs()
+                    print(f"CSV generated for {dataset}: {output_csv}")
 
     # Generate summary CSV from aggregated data if requested
     if args.generate_summary:
@@ -324,16 +359,17 @@ def main():
                 if input_csv.exists():
                     print(f"\nGenerating summary for {dataset}...")
                     extract_summary_fields(input_csv, output_csv)
-        # Generate summary only for the specified dataset
+        # Generate summary only for the specified datasets
         else:
-            dataset_path = base_results_path / args.dataset
-            input_csv = dataset_path / "all_aggregated_data.csv"
-            output_csv = dataset_path / "all_summary_data.csv"
+            for dataset in datasets_to_analyze:
+                dataset_path = base_results_path / dataset
+                input_csv = dataset_path / "all_aggregated_data.csv"
+                output_csv = dataset_path / "all_summary_data.csv"
 
-            # Generate summary if input CSV exists
-            if input_csv.exists():
-                print(f"\nGenerating summary for {args.dataset}...")
-                extract_summary_fields(input_csv, output_csv)
+                # Generate summary if input CSV exists
+                if input_csv.exists():
+                    print(f"\nGenerating summary for {dataset}...")
+                    extract_summary_fields(input_csv, output_csv)
 
 
 if __name__ == "__main__":
