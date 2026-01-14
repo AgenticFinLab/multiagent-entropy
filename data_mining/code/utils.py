@@ -28,15 +28,15 @@ EXCLUDE_COLUMNS = [
     # "architecture",
     "sample_id",
     # useless data
-    # "num_rounds",
-    # "exp_num_inferences",
-    # "round_1_num_inferences",
-    # "round_2_num_inferences",
+    "num_rounds",
+    "exp_num_inferences",
+    "round_1_num_inferences",
+    "round_2_num_inferences",
     # base model metrics
-    # "base_model_accuracy",
-    # "base_model_is_finally_correct",
-    # "base_model_format_compliance",
-    # "base_model_format_compliance_rate",
+    "base_model_accuracy",
+    "base_model_is_finally_correct",
+    "base_model_format_compliance",
+    "base_model_format_compliance_rate",
 ]
 
 # Visualization settings
@@ -239,3 +239,77 @@ def validate_dataframe(df: pd.DataFrame, required_columns: List[str] = None) -> 
             return False
 
     return True
+
+
+def filter_dataframe(
+    df: pd.DataFrame,
+    model_names: Optional[List[str]] = None,
+    architectures: Optional[List[str]] = None,
+    datasets: Optional[List[str]] = None,
+) -> pd.DataFrame:
+    """
+    Filter dataframe based on model names, architectures, and datasets.
+
+    Args:
+        df: Input DataFrame
+        model_names: List of model names to filter (None or ['*'] for all)
+        architectures: List of architectures to filter (None or ['*'] for all)
+        datasets: List of datasets to filter (None or ['*'] for all)
+
+    Returns:
+        Filtered DataFrame
+    """
+    filtered_df = df.copy()
+    
+    # Filter by model names
+    if model_names and model_names != ['*'] and 'model_name' in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df['model_name'].isin(model_names)]
+        logger.info(f"Filtered by model_names: {model_names}, remaining records: {len(filtered_df)}")
+    
+    # Filter by architectures
+    if architectures and architectures != ['*'] and 'architecture' in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df['architecture'].isin(architectures)]
+        logger.info(f"Filtered by architectures: {architectures}, remaining records: {len(filtered_df)}")
+    
+    # Filter by datasets
+    if datasets and datasets != ['*'] and 'dataset' in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df['dataset'].isin(datasets)]
+        logger.info(f"Filtered by datasets: {datasets}, remaining records: {len(filtered_df)}")
+    
+    return filtered_df
+
+
+def generate_filter_suffix(
+    model_names: Optional[List[str]] = None,
+    architectures: Optional[List[str]] = None,
+    datasets: Optional[List[str]] = None,
+) -> str:
+    """
+    Generate a suffix for output directory based on filter parameters.
+
+    Args:
+        model_names: List of model names to filter
+        architectures: List of architectures to filter
+        datasets: List of datasets to filter
+
+    Returns:
+        Directory suffix string (e.g., "model_gpt4_arch_react_dataset_aime2025")
+    """
+    suffix_parts = []
+    
+    # Add model names to suffix
+    if model_names and model_names != ['*']:
+        model_str = "_".join(model_names)
+        suffix_parts.append(f"model_{model_str}")
+    
+    # Add architectures to suffix
+    if architectures and architectures != ['*']:
+        arch_str = "_".join(architectures)
+        suffix_parts.append(f"arch_{arch_str}")
+    
+    # Add datasets to suffix
+    if datasets and datasets != ['*']:
+        dataset_str = "_".join(datasets)
+        suffix_parts.append(f"dataset_{dataset_str}")
+    
+    return "_".join(suffix_parts) if suffix_parts else ""
