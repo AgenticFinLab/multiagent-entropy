@@ -12,25 +12,32 @@ data_mining/
 │   └── merged_datasets.csv         # Merged dataset from all sources
 ├── code/                           # Source code
 │   ├── data_collector.py           # Data collection and merging module
-│   ├── data_mining_analyzer.py     # Main analysis module
-│   ├── main.py                     # Entry point
+│   ├── regression_analyzer.py      # Experiment-level regression analysis module
+│   ├── classification_analyzer.py  # Sample-level classification analysis module
+│   ├── data_mining_analyzer.py     # Unified entry point (delegates to specialized analyzers)
+│   ├── main.py                     # Entry point with command-line interface
 │   └── data_mining_analysis.log    # Execution log
 └── results/                        # Analysis outputs
-    ├── analysis_report.txt         # Comprehensive analysis report
-    ├── Feature_Correlation_Heatmap_-_Experiment_Level.png
-    ├── Feature_Importance_-_RandomForest_(Regression).png
-    ├── Feature_Importance_-_XGBoost_(Regression).png
-    ├── Feature_Importance_-_LightGBM_(Regression).png
-    ├── Feature_Importance_-_RandomForest_(Classification).png
-    ├── Feature_Importance_-_XGBoost_(Classification).png
-    └── Feature_Importance_-_LightGBM_(Classification).png
+    └── {dataset}/
+        ├── unified_analysis_report.txt
+        ├── regression/
+        │   ├── regression_report.txt
+        │   ├── Feature_Correlation_Heatmap_-_Experiment_Level_Regression.png
+        │   ├── Feature_Importance_-_RandomForest_(Regression).png
+        │   ├── Feature_Importance_-_XGBoost_(Regression).png
+        │   └── Feature_Importance_-_LightGBM_(Regression).png
+        └── classification/
+            ├── classification_report.txt
+            ├── Feature_Correlation_Heatmap_-_Sample_Level_Classification.png
+            ├── Feature_Importance_-_RandomForest_(Classification).png
+            ├── Feature_Importance_-_XGBoost_(Classification).png
+            └── Feature_Importance_-_LightGBM_(Classification).png
 ```
 
 ## Data Sources
 
 The analysis uses data from:
-- `/home/yuxuanzhao/multiagent-entropy/evaluation/results/aime2024/all_aggregated_data_exclude_agent.csv`
-- `/home/yuxuanzhao/multiagent-entropy/evaluation/results/gsm8k/all_aggregated_data_exclude_agent.csv`
+- `multiagent-entropy/evaluation/results/{dataset_name}/all_aggregated_data_exclude_agent.csv`
 
 ## Key Features
 
@@ -44,12 +51,18 @@ The analysis uses data from:
 - **Target Variable**: `exp_accuracy` (experiment accuracy)
 - **Algorithms**: Random Forest, XGBoost, LightGBM
 - **Excluded Features**: `is_finally_correct` (used to calculate target), `dataset`
-- **Metrics**: MSE, MAE, R²
+- **Metrics**: MSE, MAE, R^2
+- **Module**: [regression_analyzer.py](../data_mining/code/regression_analyzer.py)
 
 ### Sample-Level Analysis (Classification)
 - **Target Variable**: `is_finally_correct` (sample correctness)
 - **Algorithms**: Random Forest, XGBoost, LightGBM
 - **Metrics**: Accuracy, Precision, Recall, F1-Score
+- **Module**: [classification_analyzer.py](../data_mining/code/classification_analyzer.py)
+
+### Unified Analysis
+- **Module**: [data_mining_analyzer.py](../data_mining/code/data_mining_analyzer.py) - serves as a unified entry point that delegates to specialized analyzers
+- **Features**: Backward compatibility with existing code
 
 ### Visualization
 - Feature importance rankings (top 20 features)
@@ -71,8 +84,29 @@ pip install pandas numpy matplotlib seaborn scikit-learn xgboost lightgbm
 Navigate to the code directory and run:
 
 ```bash
-cd /home/yuxuanzhao/multiagent-entropy/data_mining/code
-python3 main.py
+cd multiagent-entropy/data_mining/code
+python main.py
+```
+
+### Running Individual Analysis Types
+
+The main.py script now supports command-line arguments:
+
+```bash
+# Run full analysis (default)
+python main.py --analysis-type all --datasets aime2025
+
+# Run only regression analysis
+python main.py --analysis-type regression --datasets aime2025
+
+# Run only classification analysis
+python main.py --analysis-type classification --datasets aime2025
+
+# Skip data collection step (use existing merged data)
+python main.py --skip-collection --analysis-type regression
+
+# Specify multiple datasets
+python main.py --analysis-type all --datasets aime2025 gsm8k
 ```
 
 ### Running Individual Modules
@@ -80,48 +114,26 @@ python3 main.py
 #### Data Collection Only
 
 ```bash
-python3 data_collector.py
+python data_collector.py
 ```
 
-#### Analysis Only (requires merged data)
+#### Regression Analysis Only (requires merged data)
 
 ```bash
-python3 data_mining_analyzer.py
+python regression_analyzer.py
 ```
 
-## Analysis Results
+#### Classification Analysis Only (requires merged data)
 
-### Experiment-Level Findings
+```bash
+python classification_analyzer.py
+```
 
-All three regression models achieved near-perfect performance (R² = 1.0000), indicating that the features can perfectly predict experiment accuracy.
+#### Unified Analysis (via delegation)
 
-**Top Important Features (Random Forest)**:
-1. `round_1_total_time` (75.78%)
-2. `round_2_total_time` (16.72%)
-3. `round_1_2_change_entropy` (1.19%)
-4. `round_1_2_change_tokens` (0.83%)
-5. `exp_total_time` (0.82%)
-
-### Sample-Level Findings
-
-Classification models achieved excellent performance:
-- Random Forest: Accuracy = 91.92%, F1 = 95.52%
-- XGBoost: Accuracy = 90.38%, F1 = 94.65%
-- LightGBM: Accuracy = 91.92%, F1 = 95.52%
-
-**Top Important Features (Random Forest)**:
-1. `sample_total_entropy` (10.68%)
-2. `sample_entropy_stability_index` (10.45%)
-3. `sample_variance_entropy` (10.15%)
-4. `sample_avg_entropy_per_token` (8.15%)
-5. `sample_avg_entropy_per_agent` (7.83%)
-
-## Key Insights
-
-1. **Time-based features** (round total time, experiment total time) are most influential for experiment-level accuracy
-2. **Entropy-based features** (sample total entropy, entropy stability index) are most influential for sample-level correctness
-3. **Entropy dynamics** (change in entropy between rounds) plays a significant role
-4. **Token generation patterns** influence both experiment and sample performance
+```bash
+python data_mining_analyzer.py
+```
 
 ## Output Files
 
@@ -129,11 +141,15 @@ Classification models achieved excellent performance:
 - `merged_datasets.csv`: Combined dataset with 1,300 records from 2 datasets (aime2024, gsm8k)
 
 ### Report Files
-- `analysis_report.txt`: Comprehensive text report with all metrics and rankings
+- `unified_analysis_report.txt`: Comprehensive text report with all metrics and rankings
+- `regression/regression_report.txt`: Regression-specific analysis report
+- `classification/classification_report.txt`: Classification-specific analysis report
 
 ### Visualization Files
-- `Feature_Correlation_Heatmap_-_Experiment_Level.png`: Correlation matrix
-- `Feature_Importance_*.png`: Feature importance plots for each model and analysis type
+- `regression/Feature_Correlation_Heatmap_-_Experiment_Level_Regression.png`: Correlation matrix for regression
+- `classification/Feature_Correlation_Heatmap_-_Sample_Level_Classification.png`: Correlation matrix for classification
+- `regression/Feature_Importance_*.png`: Feature importance plots for regression models
+- `classification/Feature_Importance_*.png`: Feature importance plots for classification models
 
 ## Code Quality
 
@@ -151,7 +167,3 @@ Classification models achieved excellent performance:
 - Include SHAP values for model interpretability
 - Add time-series analysis for round-by-round dynamics
 - Implement ensemble methods combining multiple models
-
-## Contact
-
-For questions or issues, please refer to the project documentation or contact the development team.
