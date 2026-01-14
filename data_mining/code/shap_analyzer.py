@@ -297,19 +297,25 @@ class ShapAnalyzer:
                         temp_shap_values = np.asarray(temp_shap_values)
                     # Extract values for the specific feature
                     feature_shap_values = temp_shap_values[:, feature_idx] if temp_shap_values.ndim > 1 else temp_shap_values
-                    shap.plots.scatter(
-                        feature_shap_values,
-                        X_test[feature_name].values,
-                        show=False
+                    # Create Explanation object for shap.plots.scatter
+                    explanation = shap.Explanation(
+                        values=feature_shap_values,
+                        base_values=np.zeros(len(feature_shap_values)),
+                        data=X_test[feature_name].values,
+                        feature_names=[feature_name]
                     )
+                    shap.plots.scatter(explanation, show=False)
                 else:
                     # Extract values for the specific feature
                     feature_shap_values = shap_values[:, feature_idx] if shap_values.ndim > 1 else shap_values
-                    shap.plots.scatter(
-                        feature_shap_values,
-                        X_test[feature_name].values,
-                        show=False
+                    # Create Explanation object for shap.plots.scatter
+                    explanation = shap.Explanation(
+                        values=feature_shap_values,
+                        base_values=np.zeros(len(feature_shap_values)),
+                        data=X_test[feature_name].values,
+                        feature_names=[feature_name]
                     )
+                    shap.plots.scatter(explanation, show=False)
                 
                 # Create subdirectory for dependence plots
                 (self.output_dir / "shap_dependence_plots").mkdir(exist_ok=True)
