@@ -180,8 +180,36 @@ The entropy analysis provides comprehensive statistics at multiple levels:
    - `num_agents`: Number of agents in the sample
    - `average_entropy_per_token`: Average entropy per token
    - `sample_entropy_stability_index`: Stability index calculated as 1 - (std_entropy / mean_entropy), indicates consistency of entropy values
+   - `sample_entropy_range`, `sample_entropy_iqr`: Range and interquartile range of entropy values
+   - `sample_entropy_relative_iqr_mean`, `sample_entropy_relative_iqr_range`: Relative IQR w.r.t. mean entropy and overall range
+   - `sample_entropy_bowley_skewness`: Quantile-based skewness of the entropy distribution, indicating whether high-entropy or low-entropy tails dominate
+   - `sample_entropy_median_over_mean`: Ratio between median and mean entropy, measures how much the mean is affected by high-entropy outliers
+   - `sample_entropy_tail_weight`: Relative weight of the high-entropy tail compared to the main body (IQR)
+   - `sample_entropy_cv`: Coefficient of variation of entropy values (std / mean)
    - `agent_entropy_contribution`: Proportion of total entropy contributed by the current agent, calculated as agent_total_entropy / sample_total_entropy
    - `sample_avg_entropy_per_agent`: Average entropy per agent in the sample, calculated as sample_total_entropy / sample_num_agents
+   - `base_sample_total_entropy`, `base_sample_token_count`, `base_sample_avg_entropy_per_token`: Entropy statistics of the single-agent baseline (first-round agent in the single architecture) for the same model and sample
+   - `sample_entropy_ratio_vs_base_total`, `sample_entropy_reduction_vs_base_total`: Relative and absolute change of total entropy compared to the single-agent baseline
+   - `sample_avg_entropy_per_token_ratio_vs_base`, `sample_avg_entropy_per_token_diff_vs_base`: Relative and absolute change of per-token entropy compared to the baseline
+   - Round-wise sample features (aggregated over all agents in the sample):
+     - `sample_round_{r}_all_agents_total_entropy`: Total entropy of all agents in round r
+     - `sample_round_{r}_all_agents_total_token`: Total tokens of all agents in round r
+     - `sample_round_{r}_all_agents_entropy_per_token`: Entropy per token in round r
+   - Cross-round sample dynamics features:
+     - `sample_round_all_agents_total_entropy_first_last_diff`, `sample_round_all_agents_total_entropy_first_last_ratio`: Change and relative change of total entropy between first and last rounds
+     - `sample_round_all_agents_total_token_first_last_diff`, `sample_round_all_agents_total_token_first_last_ratio`: Change and relative change of total tokens between first and last rounds
+     - `sample_round_all_agents_entropy_per_token_first_last_diff`, `sample_round_all_agents_entropy_per_token_first_last_ratio`: Change and relative change of per-token entropy between first and last rounds
+     - `sample_round_all_agents_entropy_per_token_slope_per_round`, `sample_round_all_agents_entropy_per_token_volatility`: Time-series features describing per-round entropy-per-token trend and volatility
+     - `sample_round_1_2_change_tokens`, `sample_round_1_2_change_entropy`: Sample-level token and entropy change from round 1 to round 2 (when both rounds exist)
+   - Cross-round features based on aggregated agent entropy:
+     - `sample_round_mean_agent_mean_entropy_first_last_diff`, `sample_round_mean_agent_mean_entropy_first_last_ratio`: Change and relative change of per-round mean agent entropy between first and last rounds
+     - `sample_round_mean_agent_mean_entropy_slope_per_round`, `sample_round_mean_agent_mean_entropy_volatility`, `sample_round_mean_agent_mean_entropy_trend_sign`: Trend and volatility of mean agent entropy across rounds
+     - `sample_round_mean_agent_total_entropy_first_last_diff`, `sample_round_mean_agent_total_entropy_first_last_ratio`: Change and relative change of per-round mean agent total entropy
+     - `sample_round_mean_agent_total_entropy_slope_per_round`, `sample_round_mean_agent_total_entropy_volatility`: Trend and volatility of mean agent total entropy across rounds
+   - Intra-round agent distribution features:
+     - `sample_round_{r}_agent_mean_entropy_spread`, `sample_round_{r}_agent_mean_entropy_cv`, `sample_round_{r}_agent_mean_entropy_bowley_skewness`: Spread, coefficient of variation, and skewness of agents' mean entropy within round r
+     - `sample_round_{r}_agent_total_entropy_spread`: Spread of agents' total entropy within round r
+     - `sample_round_agent_mean_entropy_spread_first_last_diff`, `sample_round_agent_total_entropy_spread_first_last_diff`: Change of agent-level entropy spread between first and last rounds
    - `agents`: Dictionary of agent-level statistics per agent
 
 2. **Sequence Level** (`sequence_level`)
