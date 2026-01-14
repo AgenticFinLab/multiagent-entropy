@@ -229,9 +229,9 @@ class DataMiningAnalyzer:
         # Run data collection if not skipping
         if not self.skip_collection:
             merged_data_path = self.run_data_collection(target_datasets)
-            # Update analyzers with the new path
-            self.regression_analyzer.data_path = str(merged_data_path)
-            self.classification_analyzer.data_path = str(merged_data_path)
+            # Update analyzers with the new path - convert to Path object to match analyzer expectations
+            self.regression_analyzer.data_path = Path(str(merged_data_path))
+            self.classification_analyzer.data_path = Path(str(merged_data_path))
         else:
             logger.info("Skipping data collection step")
             merged_data_path = self.data_path

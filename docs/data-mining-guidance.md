@@ -112,6 +112,9 @@ python main.py --skip-collection --analysis-type regression
 # Specify multiple datasets
 python main.py --analysis-type all --datasets aime2025 gsm8k
 
+# Automatically discover and use all available datasets
+python main.py --analysis-type all --datasets '*'
+
 # Specify custom data path when skipping collection
 python main.py --skip-collection --data-path /custom/path/data.csv
 ```
