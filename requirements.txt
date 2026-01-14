@@ -22,3 +22,6 @@ seaborn
 scipy
 math-verify
 scikit-learn
+xgboost
+lightgbm
+shap
