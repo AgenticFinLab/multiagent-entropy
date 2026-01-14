@@ -5,19 +5,18 @@ This script runs multiple experiments with different parameter combinations
 and collects the results for analysis.
 """
 
-import argparse
-import json
-import logging
 import os
-import subprocess
 import sys
 import time
-from datetime import datetime
+import json
+import logging
+import argparse
+import subprocess
 from pathlib import Path
-from typing import Dict, List, Optional
 import concurrent.futures
 from threading import Lock
-
+from datetime import datetime
+from typing import Dict, List, Optional
 
 # Configure logging
 logging.basicConfig(
@@ -54,32 +53,61 @@ def run_single_experiment(config: Dict, experiment_id: int, total_experiments: i
         print(f"  Parameters: {config['params']}")
     
     try:
-        # Build command
-        cmd = [sys.executable, "main.py"]
-        
-        # Add parameters from config
+        # Build command to activate conda env, change directory and run the experiment
+        # First collect all the parameters
+        params_cmd_parts = []
         for param, value in config['params'].items():
             if isinstance(value, list):
                 # Handle list arguments like --model-name, --dataset, --architecture
-                cmd.extend([f"--{param.replace('_', '-')}"])
-                cmd.extend([str(v) for v in value])
+                params_cmd_parts.append(f"--{param.replace('_', '-')}".strip())
+                params_cmd_parts.extend([str(v) for v in value])
             elif isinstance(value, bool):
                 # Handle boolean flags
                 if value:
-                    cmd.append(f"--{param.replace('_', '-')}")
+                    params_cmd_parts.append(f"--{param.replace('_', '-')}".strip())
             else:
                 # Handle single-value arguments
-                cmd.extend([f"--{param.replace('_', '-')}", str(value)])
+                params_cmd_parts.extend([f"--{param.replace('_', '-')}", str(value)])
         
-        logger.info(f"Running command: {' '.join(cmd)}")
+        # Build the full command as a single bash script
+        params_str = ' '.join(params_cmd_parts)
+        bash_script = f"""#!/bin/bash
+set -e  # Exit on any error
+
+cd /home/yuxuanzhao/multiagent-entropy || exit 1
+
+# Activate conda environment
+source $(conda info --base)/etc/profile.d/conda.sh
+conda activate maep || exit 1
+
+# Run the experiment
+python data_mining/code/main.py {params_str}
+"""
         
-        # Execute the experiment
+        # Write bash script to temporary file
+        script_filename = f"/tmp/exp_{config.get('name', 'experiment')}_temp.sh"
+        with open(script_filename, 'w') as f:
+            f.write(bash_script)
+        
+        # Make the script executable
+        os.chmod(script_filename, 0o755)
+        
+        logger.info(f"Running bash script: {script_filename}")
+        logger.info(f"Script content: {bash_script.strip()}")
+        
+        # Execute the bash script
         result = subprocess.run(
-            cmd,
+            ['bash', script_filename],
             capture_output=True,
             text=True,
             timeout=config.get('timeout', 3600)  # Default 1 hour timeout
         )
+        
+        # Clean up the temporary script file
+        try:
+            os.remove(script_filename)
+        except OSError:
+            pass  # Ignore errors when removing temp file
         
         end_time = time.time()
         duration = end_time - start_time
@@ -271,13 +299,106 @@ def generate_report(results: List[Dict], output_dir: str = "experiment_reports")
     logger.info(f"- Summary TXT: {summary_filename.name}")
     logger.info(f"- Analysis CSV: {csv_filename.name}")
 
+def generate_experiment_configs(dataset_list: List[str], model_list: List[str], arch_list: List[str], exclude_feature_list: List[str]) -> List[Dict]:
+    """
+    Generate experiment configurations based on the provided parameter lists.
+    
+    Args:
+        dataset_list: List of dataset names
+        model_list: List of model names
+        arch_list: List of architecture types
+        exclude_feature_list: List of exclude feature options
+        
+    Returns:
+        List of experiment configuration dictionaries
+    """
+    configurations = []
+    
+    # Check if all lists contain only 'all' - if so, run a single experiment
+    all_wildcard = (
+        len(dataset_list) == 1 and dataset_list[0] == 'all' and
+        len(model_list) == 1 and model_list[0] == 'all' and
+        len(arch_list) == 1 and arch_list[0] == 'all' and
+        len(exclude_feature_list) == 1 and exclude_feature_list[0] == 'all'
+    )
+    
+    if all_wildcard:
+        # Run a single experiment with default parameters
+        config = {
+            "name": "single_experiment_default",
+            "params": {
+                "dataset": ["all"],  # Default dataset
+                "model_name": ["all"],  # Default model
+                "architecture": ["all"],  # Default architecture
+                "exclude_features": "default"  # Default exclude features
+            },
+            "timeout": 3600
+        }
+        configurations.append(config)
+    else:
+        # Generate configurations for all combinations
+        from itertools import product
+        
+        # Filter out 'all' from lists if the list has more than one element
+        filtered_dataset_list = [d for d in dataset_list if d != 'all'] if len(dataset_list) > 1 else dataset_list
+        filtered_model_list = [m for m in model_list if m != 'all'] if len(model_list) > 1 else model_list
+        filtered_arch_list = [a for a in arch_list if a != 'all'] if len(arch_list) > 1 else arch_list
+        filtered_exclude_feature_list = [e for e in exclude_feature_list if e != 'all'] if len(exclude_feature_list) > 1 else exclude_feature_list
+        
+        # Handle case where list had only 'all', use default values
+        if not filtered_dataset_list:
+            filtered_dataset_list = ["aime2025"]
+        if not filtered_model_list:
+            filtered_model_list = ["random_forest"]
+        if not filtered_arch_list:
+            filtered_arch_list = ["simple"]
+        if not filtered_exclude_feature_list:
+            filtered_exclude_feature_list = ["default"]
+        
+        for dataset, model, arch, exclude_feat in product(filtered_dataset_list, filtered_model_list, filtered_arch_list, filtered_exclude_feature_list):
+            # Create unique experiment name
+            exp_name = f"exp_{dataset}_{model}_{arch}_{exclude_feat}_{int(time.time()) % 10000}"
+            
+            config = {
+                "name": exp_name,
+                "params": {
+                    "dataset": [dataset],
+                    "model_name": [model],
+                    "architecture": [arch],
+                    "exclude_features": exclude_feat
+                },
+                "timeout": 3600  # Default timeout of 1 hour
+            }
+            configurations.append(config)
+    
+    return configurations
+
+
+def save_experiment_configs(configurations: List[Dict], output_path: str):
+    """
+    Save experiment configurations to a JSON file.
+    
+    Args:
+        configurations: List of experiment configurations
+        output_path: Path to save the configuration file
+    """
+    config_dict = {
+        "experiment_configs": configurations
+    }
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump(config_dict, f, indent=2, ensure_ascii=False)
+    
+    logger.info(f"Saved {len(configurations)} experiment configurations to {output_path}")
+
+
 def main():
     """Main entry point for the experiment runner."""
     parser = argparse.ArgumentParser(description="Automated Experiment Runner for Data Mining Analysis")
     parser.add_argument(
         '--config-file',
         type=str,
-        default="multiagent-entropy/data_mining/configs/sample_experiment_config.json",
+        default=None,
         help="Path to JSON file containing experiment configurations"
     )
     parser.add_argument(
@@ -294,7 +415,7 @@ def main():
     parser.add_argument(
         '--output-dir',
         type=str,
-        default='experiment_reports',
+        default='/home/yuxuanzhao/multiagent-entropy/data_mining/experiment_reports',
         help="Directory to save experiment reports"
     )
     parser.add_argument(
@@ -303,9 +424,83 @@ def main():
         help="Show what experiments would be run without executing them"
     )
     
+    # Add new arguments for dataset, model, architecture, and exclude features lists
+    parser.add_argument(
+        '--dataset-list',
+        nargs='+',
+        default=["gsm8k", "aime2024_8192", "aime2025_8192"],  # Changed to None to detect if the argument was provided
+        help="List of dataset names to use in experiments (use 'all' for all/default)"
+    )
+    parser.add_argument(
+        '--model-list',
+        nargs='+',
+        default=["qwen3_4b", "qwen3_8b"],  # Changed to None to detect if the argument was provided
+        help="List of model names to use in experiments (use 'all' for all/default)"
+    )
+    parser.add_argument(
+        '--arch-list',
+        nargs='+',
+        default=["all"],  # Changed to None to detect if the argument was provided
+        help="List of architecture types to use in experiments (use 'all' for all/default)"
+    )
+    parser.add_argument(
+        '--exclude-feature-list',
+        nargs='+',
+        default=["base_model_metrics,unseen_features", "base_model_metrics", "unseen_features", ],  # Changed to None to detect if the argument was provided
+        help="List of exclude feature options to use in experiments (use 'all' for all/default)"
+    )
+    parser.add_argument(
+        '--generate-config-only',
+        action='store_true',
+        help="Generate configuration file only without running experiments"
+    )
+    
     args = parser.parse_args()
     
-    # Get experiment configurations
+    # Check if we need to generate configurations from the four parameter lists
+    # We only generate if at least one of the new arguments was explicitly provided
+    # If the user provided new arguments, generate configs based on them
+    if (args.dataset_list is not None or args.model_list is not None or 
+        args.arch_list is not None or args.exclude_feature_list is not None):
+        
+        # Set defaults for any unspecified lists
+        if args.dataset_list is None:
+            args.dataset_list = ['all']
+        if args.model_list is None:
+            args.model_list = ['all']
+        if args.arch_list is None:
+            args.arch_list = ['all']
+        if args.exclude_feature_list is None:
+            args.exclude_feature_list = ['all']
+        
+        logger.info(f"Generating experiment configurations...")
+        logger.info(f"Dataset list: {args.dataset_list}")
+        logger.info(f"Model list: {args.model_list}")
+        logger.info(f"Architecture list: {args.arch_list}")
+        logger.info(f"Exclude feature list: {args.exclude_feature_list}")
+        
+        # Generate configurations based on the parameter lists
+        configurations = generate_experiment_configs(
+            args.dataset_list, args.model_list, args.arch_list, args.exclude_feature_list
+        )
+        
+        # Define config file path
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        config_output_path = f"/home/yuxuanzhao/multiagent-entropy/data_mining/configs/generated_experiment_config_{timestamp}.json"
+        
+        # Save the generated configurations
+        save_experiment_configs(configurations, config_output_path)
+        
+        # If only generating config, exit here
+        if args.generate_config_only:
+            print(f"Configuration file generated: {config_output_path}")
+            print(f"Number of experiments configured: {len(configurations)}")
+            return
+        
+        # Otherwise, use the generated config file for running experiments
+        args.config_file = config_output_path
+    
+    # Get experiment configurations from file (either original or generated)
     if args.config_file:
         config_path = Path(args.config_file)
         if not config_path.exists():
