@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Classification Analyzer for Multi-Agent Entropy Analysis
 
@@ -11,8 +10,8 @@ import warnings
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 

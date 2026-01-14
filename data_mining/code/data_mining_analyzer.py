@@ -12,7 +12,6 @@ Delegates to specialized analyzers while maintaining backward compatibility.
 import logging
 import warnings
 from pathlib import Path
-from typing import Dict
 
 from regression_analyzer import RegressionAnalyzer
 from classification_analyzer import ClassificationAnalyzer

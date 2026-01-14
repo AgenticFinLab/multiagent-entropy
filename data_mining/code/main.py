@@ -12,8 +12,8 @@ Supports running both analyses, or individual regression/classification analysis
 """
 
 import sys
-import argparse
 import logging
+import argparse
 from pathlib import Path
 
 # Add code directory to path
