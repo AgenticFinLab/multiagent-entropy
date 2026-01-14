@@ -15,7 +15,7 @@ data_mining/
 │   ├── regression_analyzer.py      # Experiment-level regression analysis module
 │   ├── classification_analyzer.py  # Sample-level classification analysis module
 │   ├── data_mining_analyzer.py     # Unified entry point (delegates to specialized analyzers)
-│   ├── main.py                     # Entry point with command-line interface
+│   ├── main.py                     # Command-line interface (uses data_mining_analyzer)
 │   └── data_mining_analysis.log    # Execution log
 └── results/                        # Analysis outputs
     └── {dataset}/
@@ -62,7 +62,11 @@ The analysis uses data from:
 
 ### Unified Analysis
 - **Module**: [data_mining_analyzer.py](../data_mining/code/data_mining_analyzer.py) - serves as a unified entry point that delegates to specialized analyzers
-- **Features**: Backward compatibility with existing code
+- **Features**: Backward compatibility with existing code, support for both programmatic and CLI usage
+
+### Command-Line Interface
+- **Module**: [main.py](../data_mining/code/main.py) - provides pure command-line interface for the unified analyzer
+- **Features**: Eliminates duplicate functionality, acts as wrapper for data_mining_analyzer
 
 ### Visualization
 - Feature importance rankings (top 20 features)
@@ -107,6 +111,9 @@ python main.py --skip-collection --analysis-type regression
 
 # Specify multiple datasets
 python main.py --analysis-type all --datasets aime2025 gsm8k
+
+# Specify custom data path when skipping collection
+python main.py --skip-collection --data-path /custom/path/data.csv
 ```
 
 ### Running Individual Modules
@@ -156,6 +163,7 @@ python data_mining_analyzer.py
 - Follows Google Python Style Guide
 - Comprehensive docstrings and comments
 - Modular design with clear separation of concerns
+- Eliminated duplicate functionality between main.py and data_mining_analyzer.py
 - Error handling and logging
 - Type hints for better code clarity
 
