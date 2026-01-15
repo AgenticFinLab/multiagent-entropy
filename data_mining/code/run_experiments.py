@@ -339,23 +339,7 @@ def generate_experiment_configs(dataset_list: List[str], model_list: List[str], 
         # Generate configurations for all combinations
         from itertools import product
         
-        # Filter out 'all' from lists if the list has more than one element
-        filtered_dataset_list = [d for d in dataset_list if d != 'all'] if len(dataset_list) > 1 else dataset_list
-        filtered_model_list = [m for m in model_list if m != 'all'] if len(model_list) > 1 else model_list
-        filtered_arch_list = [a for a in arch_list if a != 'all'] if len(arch_list) > 1 else arch_list
-        filtered_exclude_feature_list = [e for e in exclude_feature_list if e != 'all'] if len(exclude_feature_list) > 1 else exclude_feature_list
-        
-        # Handle case where list had only 'all', use default values
-        if not filtered_dataset_list:
-            filtered_dataset_list = ["aime2025"]
-        if not filtered_model_list:
-            filtered_model_list = ["random_forest"]
-        if not filtered_arch_list:
-            filtered_arch_list = ["simple"]
-        if not filtered_exclude_feature_list:
-            filtered_exclude_feature_list = ["default"]
-        
-        for dataset, model, arch, exclude_feat in product(filtered_dataset_list, filtered_model_list, filtered_arch_list, filtered_exclude_feature_list):
+        for dataset, model, arch, exclude_feat in product(dataset_list, model_list, arch_list, exclude_feature_list):
             # Create unique experiment name
             exp_name = f"exp_{dataset}_{model}_{arch}_{exclude_feat}_{int(time.time()) % 10000}"
             
@@ -398,7 +382,7 @@ def main():
     parser.add_argument(
         '--config-file',
         type=str,
-        default="data_mining/configs/experiment_config.json",
+        default=None,
         help="Path to JSON file containing experiment configurations"
     )
     parser.add_argument(
@@ -428,13 +412,13 @@ def main():
     parser.add_argument(
         '--dataset-list',
         nargs='+',
-        default=["gsm8k", "aime2024_8192", "aime2025_8192"],  # Changed to None to detect if the argument was provided
+        default=["gsm8k", "aime2024_8192", "aime2025_8192", "all"],  # Changed to None to detect if the argument was provided
         help="List of dataset names to use in experiments (use 'all' for all/default)"
     )
     parser.add_argument(
         '--model-list',
         nargs='+',
-        default=["qwen3_4b", "qwen3_8b"],  # Changed to None to detect if the argument was provided
+        default=["qwen3_4b", "qwen3_8b", "all"],  # Changed to None to detect if the argument was provided
         help="List of model names to use in experiments (use 'all' for all/default)"
     )
     parser.add_argument(
@@ -446,8 +430,8 @@ def main():
     parser.add_argument(
         '--exclude-feature-list',
         nargs='+',
-        default=["base_model_metrics,unseen_features", "base_model_metrics", "unseen_features", ],  # Changed to None to detect if the argument was provided
-        help="List of exclude feature options to use in experiments (use 'all' for all/default)"
+        default=["base_model_metrics", "default"],  # Changed to None to detect if the argument was provided
+        help="List of exclude feature options to use in experiments (use 'default' for default and 'all' for all)"
     )
     parser.add_argument(
         '--generate-config-only',
