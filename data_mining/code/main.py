@@ -98,7 +98,7 @@ def main():
             'default' - Use default exclusions (recommended)
             Feature group name(s) - Specify groups from features.py (comma-separated)
             Available groups: 
-            base_model_metrics, experiment_identifier, sample_identifier, experiment_statistics, unseen_features, round_statistics, sample_statistics, sample_distribution_shape, sample_baseline_entropy, aggregation_over_agents, sample_round_wise_aggregated, cross_round_aggregated, intra_round_agent_distribution, cross_round_agent_spread_change, sample_round1_agent_statistics, sample_round2_agent_statistics
+            base_model_metrics, unseen_features, experiment_identifier, sample_identifier, experiment_statistics, unseen_features, round_statistics, sample_statistics, sample_distribution_shape, sample_baseline_entropy, aggregation_over_agents, sample_round_wise_aggregated, cross_round_aggregated, intra_round_agent_distribution, cross_round_agent_spread_change, sample_round1_agent_statistics, sample_round2_agent_statistics
             Examples:
                 --exclude-features 'all' (use all features)
                 --exclude-features 'default' (default exclusions)
