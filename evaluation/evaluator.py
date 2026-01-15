@@ -35,25 +35,15 @@ def main():
     parser = argparse.ArgumentParser(
         description="Analyze multi-agent experiment results"
     )
-    # Add dataset argument for single dataset (kept for backward compatibility)
-    parser.add_argument(
-        "--dataset",
-        type=str,
-        choices=DATASETS,
-        default=None,
-        help="Single dataset to analyze (deprecated: use --datasets instead)",
-    )
-    
     # Add datasets argument with multiple choices
     parser.add_argument(
         "--datasets",
         type=str,
         nargs="*",
         choices=DATASETS,
-        default=["aime2024_16384", "aime2025_16384"],
+        default=["aime2024_8192"],
         help="Datasets to analyze (space-separated list)",
     )
-    
     # Add flag to analyze all datasets
     parser.add_argument(
         "--all-datasets",
@@ -89,36 +79,6 @@ def main():
         default=None,
         help="Output file path (if not provided, save to evaluation/results/)",
     )
-    # Add flag for entropy statistical analysis
-    parser.add_argument(
-        "--analyze-entropy",
-        default=True,
-        help="Perform entropy statistical analysis",
-    )
-    # Add flag for saving entropy results to JSON
-    parser.add_argument(
-        "--save-entropy-json",
-        default=True,
-        help="Save detailed entropy results to JSON file",
-    )
-    # Add flag for aggregating results from metrics files
-    parser.add_argument(
-        "--aggregate",
-        default=True,
-        help="Aggregate results from metrics files",
-    )
-    # Add flag for analyzing entropy change trends
-    parser.add_argument(
-        "--analyze-trends",
-        default=True,
-        help="Analyze entropy change trends between agents across rounds",
-    )
-    # Add flag for saving trend results to JSON
-    parser.add_argument(
-        "--save-trends-json",
-        default=True,
-        help="Save detailed trend results to JSON file",
-    )
     # Add flag for running aggregator to combine metrics and entropy
     parser.add_argument(
         "--run-aggregator",
@@ -144,9 +104,6 @@ def main():
     # Determine which datasets to analyze
     if args.all_datasets:
         datasets_to_analyze = DATASETS
-    elif args.dataset:
-        # For backward compatibility
-        datasets_to_analyze = [args.dataset]
     elif args.datasets:
         datasets_to_analyze = args.datasets
     else:
@@ -155,19 +112,18 @@ def main():
 
     # Get base path to project directory
     base_path = str(Path(__file__).parent.parent)
-    
+
     # Process each dataset
     for dataset in datasets_to_analyze:
         print(f"\nProcessing dataset: {dataset}")
-        
+
         # Initialize experiment analyzer with base path
         analyzer = ExperimentAnalyzer(base_path)
         # Initialize entropy statistic if needed
         entropy_statistic = None
 
-        # Create entropy statistic instance if entropy or trend analysis is requested
-        if args.analyze_entropy or args.analyze_trends:
-            entropy_statistic = EntropyStatistic(base_path)
+        # Create entropy statistic instance
+        entropy_statistic = EntropyStatistic(base_path)
 
         # Analyze a specific experiment if experiment name is provided
         if args.experiment:
@@ -206,7 +162,9 @@ def main():
 
             # Perform entropy analysis if entropy statistic is available
             if entropy_statistic:
-                print(f"\nAnalyzing entropy for experiment: {args.model}/{args.experiment}")
+                print(
+                    f"\nAnalyzing entropy for experiment: {args.model}/{args.experiment}"
+                )
                 entropy_results = entropy_statistic.analyze_experiment_entropy(
                     dataset, args.model, args.experiment
                 )
@@ -222,23 +180,21 @@ def main():
                 )
                 entropy_output_dir.mkdir(parents=True, exist_ok=True)
 
-                # Save entropy results to JSON if requested
-                if args.save_entropy_json:
-                    json_output_path = (
-                        entropy_output_dir / f"{args.experiment}_entropy.json"
-                    )
-                    with open(json_output_path, "w", encoding="utf-8") as f:
-                        json.dump(entropy_results, f, indent=2, ensure_ascii=False)
-                    print(f"Entropy JSON saved to: {json_output_path}")
+                # Save entropy results to JSON
+                json_output_path = (
+                    entropy_output_dir / f"{args.experiment}_entropy.json"
+                )
+                with open(json_output_path, "w", encoding="utf-8") as f:
+                    json.dump(entropy_results, f, indent=2, ensure_ascii=False)
+                print(f"Entropy JSON saved to: {json_output_path}")
 
-                # Analyze entropy change trends if requested
-                if args.analyze_trends:
-                    print(
-                        f"\nAnalyzing entropy change trends for experiment: {args.model}/{args.experiment}"
-                    )
-                    trend_results = entropy_statistic.analyze_entropy_change_trends(
-                        dataset, args.model, args.experiment
-                    )
+                # Analyze entropy change trends
+                print(
+                    f"\nAnalyzing entropy change trends for experiment: {args.model}/{args.experiment}"
+                )
+                trend_results = entropy_statistic.analyze_entropy_change_trends(
+                    dataset, args.model, args.experiment
+                )
 
         # Analyze all experiments if no specific experiment is provided
         else:
@@ -271,44 +227,41 @@ def main():
                 )
                 entropy_output_dir.mkdir(parents=True, exist_ok=True)
 
-                # Save entropy results to JSON if requested
-                if args.save_entropy_json:
-                    json_output_path = entropy_output_dir / "all_entropy_results.json"
-                    with open(json_output_path, "w", encoding="utf-8") as f:
-                        json.dump(entropy_results, f, indent=2, ensure_ascii=False)
+                # Save entropy results to JSON
+                json_output_path = entropy_output_dir / "all_entropy_results.json"
+                with open(json_output_path, "w", encoding="utf-8") as f:
+                    json.dump(entropy_results, f, indent=2, ensure_ascii=False)
                     print(f"Entropy JSON saved to: {json_output_path}")
 
-                # Analyze entropy change trends for each experiment if requested
-                if args.analyze_trends:
-                    for model_name, model_data in entropy_results["models"].items():
-                        for exp_name in model_data["experiments"].keys():
-                            # Skip experiments with errors
-                            if "error" not in model_data["experiments"][exp_name]:
-                                try:
-                                    trend_results = (
-                                        entropy_statistic.analyze_entropy_change_trends(
-                                            dataset, model_name, exp_name
-                                        )
+                # Analyze entropy change trends for each experiment
+                for model_name, model_data in entropy_results["models"].items():
+                    for exp_name in model_data["experiments"].keys():
+                        # Skip experiments with errors
+                        if "error" not in model_data["experiments"][exp_name]:
+                            try:
+                                trend_results = (
+                                    entropy_statistic.analyze_entropy_change_trends(
+                                        dataset, model_name, exp_name
                                     )
-                                    model_data["experiments"][exp_name][
-                                        "trend_analysis"
-                                    ] = trend_results
-                                except Exception as e:
-                                    print(
-                                        f"Error analyzing trends for {model_name}/{exp_name}: {e}"
-                                    )
-                                    model_data["experiments"][exp_name][
-                                        "trend_analysis"
-                                    ] = {"error": str(e)}
+                                )
+                                model_data["experiments"][exp_name][
+                                    "trend_analysis"
+                                ] = trend_results
+                            except Exception as e:
+                                print(
+                                    f"Error analyzing trends for {model_name}/{exp_name}: {e}"
+                                )
+                                model_data["experiments"][exp_name][
+                                    "trend_analysis"
+                                ] = {"error": str(e)}
 
-                    # Save updated entropy results with trend analysis
-                    if args.save_entropy_json:
-                        json_output_path = entropy_output_dir / "all_entropy_results.json"
-                        with open(json_output_path, "w", encoding="utf-8") as f:
-                            json.dump(entropy_results, f, indent=2, ensure_ascii=False)
+                # Save updated entropy results with trend analysis
+                json_output_path = entropy_output_dir / "all_entropy_results.json"
+                with open(json_output_path, "w", encoding="utf-8") as f:
+                    json.dump(entropy_results, f, indent=2, ensure_ascii=False)
 
     # Run aggregator to combine metrics and entropy data if requested
-    if args.run_aggregator or args.aggregate_all:
+    if args.run_aggregator:
         base_results_path = Path(base_path) / "evaluation" / "results"
 
         # Aggregate all datasets if aggregate_all flag is set
