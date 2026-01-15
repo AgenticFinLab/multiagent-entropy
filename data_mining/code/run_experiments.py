@@ -398,7 +398,7 @@ def main():
     parser.add_argument(
         '--config-file',
         type=str,
-        default=None,
+        default="data_mining/configs/experiment_config.json",
         help="Path to JSON file containing experiment configurations"
     )
     parser.add_argument(
@@ -456,49 +456,36 @@ def main():
     )
     
     args = parser.parse_args()
-    
-    # Check if we need to generate configurations from the four parameter lists
-    # We only generate if at least one of the new arguments was explicitly provided
-    # If the user provided new arguments, generate configs based on them
-    if (args.dataset_list is not None or args.model_list is not None or 
-        args.arch_list is not None or args.exclude_feature_list is not None):
-        
-        # Set defaults for any unspecified lists
-        if args.dataset_list is None:
-            args.dataset_list = ['all']
-        if args.model_list is None:
-            args.model_list = ['all']
-        if args.arch_list is None:
-            args.arch_list = ['all']
-        if args.exclude_feature_list is None:
-            args.exclude_feature_list = ['all']
-        
-        logger.info(f"Generating experiment configurations...")
+       
+    if args.config_file == None or args.config_file == "":
+        logger.info(f"Generating experiment configurations from parameter lists...")
         logger.info(f"Dataset list: {args.dataset_list}")
         logger.info(f"Model list: {args.model_list}")
         logger.info(f"Architecture list: {args.arch_list}")
         logger.info(f"Exclude feature list: {args.exclude_feature_list}")
-        
+
         # Generate configurations based on the parameter lists
         configurations = generate_experiment_configs(
             args.dataset_list, args.model_list, args.arch_list, args.exclude_feature_list
         )
-        
+
         # Define config file path
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         config_output_path = f"/home/yuxuanzhao/multiagent-entropy/data_mining/configs/generated_experiment_config_{timestamp}.json"
-        
+
         # Save the generated configurations
         save_experiment_configs(configurations, config_output_path)
-        
+
         # If only generating config, exit here
         if args.generate_config_only:
             print(f"Configuration file generated: {config_output_path}")
             print(f"Number of experiments configured: {len(configurations)}")
             return
-        
+
         # Otherwise, use the generated config file for running experiments
         args.config_file = config_output_path
+    else:
+        logger.info(f"Using specified configuration file: {args.config_file}")
     
     # Get experiment configurations from file (either original or generated)
     if args.config_file:
