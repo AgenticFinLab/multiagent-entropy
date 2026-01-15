@@ -173,6 +173,16 @@ class ExperimentAggregator:
         summary["mean_importance"] = (
             summary["lightgbm_importance"] + summary["xgboost_importance"]
         ) / 2
+
+        # Normalize importance values (Min-Max normalization to 0-1 range)
+        lgb_min, lgb_max = summary["lightgbm_importance"].min(), summary["lightgbm_importance"].max()
+        xgb_min, xgb_max = summary["xgboost_importance"].min(), summary["xgboost_importance"].max()
+
+        lgb_norm = (summary["lightgbm_importance"] - lgb_min) / (lgb_max - lgb_min) if lgb_max > lgb_min else summary["lightgbm_importance"] * 0
+        xgb_norm = (summary["xgboost_importance"] - xgb_min) / (xgb_max - xgb_min) if xgb_max > xgb_min else summary["xgboost_importance"] * 0
+
+        summary["mean_importance_normalized"] = (lgb_norm + xgb_norm) / 2
+
         summary["mean_mean_abs_shap"] = (
             summary["lightgbm_mean_abs_shap"] + summary["xgboost_mean_abs_shap"]
         ) / 2
@@ -339,6 +349,7 @@ class ExperimentAggregator:
             "lightgbm_importance",
             "xgboost_importance",
             "mean_importance",
+            "mean_importance_normalized",
             "lightgbm_mean_abs_shap",
             "xgboost_mean_abs_shap",
             "mean_mean_abs_shap",
