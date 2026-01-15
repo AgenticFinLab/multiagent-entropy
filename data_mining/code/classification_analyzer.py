@@ -304,6 +304,11 @@ class ClassificationAnalyzer:
             {"Feature": feature_names, "Importance": importances}
         ).sort_values("Importance", ascending=False)
 
+        # Save feature importance data to CSV
+        csv_path = Path(str(save_path).replace('.png', '.csv'))
+        importance_df.to_csv(csv_path, index=False)
+        logger.info(f"Feature importance data saved to CSV: {csv_path}")
+
         # Plot
         plt.figure(figsize=(12, 8))
         sns.barplot(data=importance_df.head(20), x="Importance", y="Feature")
@@ -345,6 +350,11 @@ class ClassificationAnalyzer:
             logger.info(f"Included '{target_column}' in correlation analysis")
         else:
             corr_matrix = X.corr()
+
+        # Save correlation matrix to CSV
+        csv_path = Path(str(save_path).replace('.png', '.csv'))
+        corr_matrix.to_csv(csv_path)
+        logger.info(f"Correlation matrix saved to CSV: {csv_path}")
 
         # Create mask for upper triangle
         mask = np.triu(np.ones_like(corr_matrix, dtype=bool))

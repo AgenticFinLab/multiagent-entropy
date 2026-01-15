@@ -274,6 +274,30 @@ class ShapAnalyzer:
             plt.close()
             plots_info["importance_plot"] = str(importance_plot_path)
             logger.info(f"SHAP importance plot saved: {importance_plot_path}")
+
+            # Save SHAP values to CSV for each sample
+            shap_df = pd.DataFrame(
+                shap_values_for_plots,
+                columns=X_test.columns
+            )
+            shap_df.index.name = 'sample_index'
+            shap_csv_path = (
+                self.output_dir / f"shap_values_{model_name}_{task_type}.csv"
+            )
+            shap_df.to_csv(shap_csv_path)
+            logger.info(f"SHAP values saved to CSV: {shap_csv_path}")
+
+            # Save mean absolute SHAP values (feature importance) to CSV
+            mean_abs_shap = np.abs(shap_values_for_plots).mean(0)
+            importance_df = pd.DataFrame({
+                'Feature': X_test.columns,
+                'Mean_Abs_SHAP': mean_abs_shap
+            }).sort_values('Mean_Abs_SHAP', ascending=False)
+            importance_csv_path = (
+                self.output_dir / f"shap_feature_importance_{model_name}_{task_type}.csv"
+            )
+            importance_df.to_csv(importance_csv_path, index=False)
+            logger.info(f"SHAP feature importance saved to CSV: {importance_csv_path}")
         except Exception as e:
             logger.warning(f"Could not create importance plot: {str(e)}")
             plt.close()
@@ -339,6 +363,19 @@ class ShapAnalyzer:
                     plt.close()
                     dependence_plots.append(str(dep_plot_path))
                     logger.info(f"SHAP dependence plot saved: {dep_plot_path}")
+
+                    # Save dependence data to CSV (feature value vs SHAP value)
+                    dependence_df = pd.DataFrame({
+                        'Feature_Value': X_test.iloc[:, feature_idx].values,
+                        'SHAP_Value': shap_values_for_plots[:, feature_idx]
+                    })
+                    dep_csv_path = (
+                        self.output_dir
+                        / "shap_dependence_plots"
+                        / f"shap_dependence_{feature_name}_{model_name}_{task_type}.csv"
+                    )
+                    dependence_df.to_csv(dep_csv_path, index=False)
+                    logger.info(f"SHAP dependence data saved to CSV: {dep_csv_path}")
                 except Exception as e:
                     logger.warning(
                         f"Could not create dependence plot for {feature_name}: {str(e)}"
