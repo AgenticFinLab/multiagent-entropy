@@ -327,6 +327,8 @@ class ExperimentAggregator:
         df["overall_impact_direction"] = df.apply(determine_overall_direction, axis=1)
 
         # Impact strength (considering both importance and direction consistency)
+        # impact_strength = feature_importance * (1 - direction_mismatch)
+        # This metric helps to find features with strong impact and consistent direction
         df["impact_strength"] = df["mean_mean_abs_shap"] * (
             1 - abs(df["mean_positive_ratio"] - df["mean_negative_ratio"])
         )
