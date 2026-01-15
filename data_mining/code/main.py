@@ -14,8 +14,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from data_mining_analyzer import DataMiningAnalyzer
-from aggregator import ExperimentAggregator
-from visualizer import AggregatedResultsVisualizer
 
 # Configure logging
 logging.basicConfig(
@@ -108,16 +106,6 @@ def main():
                 --exclude-features 'base_model_metrics,experiment_identifier' (exclude multiple groups)
                 --exclude-features 'default+base_model_metrics' (combine default with additional exclusions)
         """,
-    )
-    parser.add_argument(
-        "--run-aggregation",
-        default=True,
-        help="Run experiment results aggregation after analysis (default: True)",
-    )
-    parser.add_argument(
-        "--run-visualization",
-        default=True,
-        help="Run visualization of aggregated results after aggregation (default: True)",
     )
     args = parser.parse_args()
 
@@ -214,44 +202,6 @@ def main():
         logger.info("\n" + "=" * 80)
         logger.info("DATA MINING ANALYSIS COMPLETED SUCCESSFULLY!")
         logger.info("=" * 80)
-
-        # Run aggregation if requested
-        if args.run_aggregation:
-            logger.info("\nStarting experiment results aggregation...")
-            try:
-                script_dir = Path(__file__).parent
-                project_root = script_dir.parent
-                results_dir = project_root / "results"
-                output_dir = project_root / "results_aggregated"
-                output_dir.mkdir(parents=True, exist_ok=True)
-                
-                aggregator = ExperimentAggregator(str(results_dir), str(output_dir))
-                aggregator.aggregate_all_experiments()
-                logger.info("Experiment results aggregation completed!")
-            except Exception as e:
-                logger.error(f"Error during aggregation: {str(e)}", exc_info=True)
-                raise
-        
-        # Run visualization if requested
-        if args.run_visualization:
-            logger.info("\nStarting visualization of aggregated results...")
-            try:
-                script_dir = Path(__file__).parent
-                project_root = script_dir.parent
-                input_dir = project_root / "results_aggregated"
-                output_dir = project_root / "results_visualizations"
-                
-                visualizer = AggregatedResultsVisualizer(
-                    str(input_dir),
-                    str(output_dir),
-                    n_features=20,
-                    feature_importance_from="mean_importance_normalized",
-                )
-                visualizer.visualize_all_experiments()
-                logger.info("Visualization of aggregated results completed!")
-            except Exception as e:
-                logger.error(f"Error during visualization: {str(e)}", exc_info=True)
-                raise
 
         return results, report_paths
 
