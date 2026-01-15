@@ -6,8 +6,25 @@ EXPERIMENT_IDENTIFIER = [
     "num_rounds",
 ]
 
-# Default exclusions for analysis
-DEFAULT_EXCLUDE_COLUMNS = EXPERIMENT_IDENTIFIER
+# Sample identifier
+SAMPLE_IDENTIFIER = [
+    "is_finally_correct",
+    "final_format_compliance",
+]
+
+# Experiment statistics
+EXPERIMENT_STATISTICS = [
+    "exp_total_entropy",
+    "exp_infer_average_entropy",
+    "exp_num_inferences",
+    "exp_accuracy",
+    "exp_format_compliance_rate",
+    "exp_total_time",
+    "exp_total_token",
+]
+
+# Exclude identifiers and statistics that would leak target information
+DEFAULT_EXCLUDE_COLUMNS = EXPERIMENT_IDENTIFIER + SAMPLE_IDENTIFIER + EXPERIMENT_STATISTICS
 
 # Base model metrics
 BASE_MODEL_METRICS_EXPERIMENT_LEVEL = [
@@ -32,28 +49,6 @@ SAMPLE_BASELINE_ENTROPY = [
 ]
 
 BASE_MODEL_METRICS = DEFAULT_EXCLUDE_COLUMNS + BASE_MODEL_METRICS_EXPERIMENT_LEVEL + BASE_MODEL_METRICS_SAMPLE_LEVEL + SAMPLE_BASELINE_ENTROPY
-
-
-# Sample identifier
-SAMPLE_IDENTIFIER = [
-    "is_finally_correct",
-    "final_format_compliance",
-]
-
-# Experiment statistics
-EXPERIMENT_STATISTICS = [
-    "exp_total_entropy",
-    "exp_infer_average_entropy",
-    "exp_num_inferences",
-    "exp_accuracy",
-    "exp_format_compliance_rate",
-    "exp_total_time",
-    "exp_total_token",
-]
-
-# Exclude identifiers and statistics that would leak target information
-UNSEEN_FEATURES = DEFAULT_EXCLUDE_COLUMNS + SAMPLE_IDENTIFIER + EXPERIMENT_STATISTICS
-
 
 # Round statistics
 ROUND_STATISTICS = [
@@ -318,8 +313,7 @@ SAMPLE_ROUND2_AGENT_STATISTICS = [
 
 # All features combined
 ALL_FEATURES = (
-    BASE_MODEL_METRICS +
-    UNSEEN_FEATURES +
+    BASE_MODEL_METRICS + 
     ROUND_STATISTICS +
     SAMPLE_STATISTICS +
     SAMPLE_DISTRIBUTION_SHAPE +
@@ -336,6 +330,8 @@ ALL_FEATURES = (
 
 # Define feature groups for easy access
 FEATURE_GROUPS = {
+    "default": DEFAULT_EXCLUDE_COLUMNS,
+    "base_model_metrics": BASE_MODEL_METRICS,
     "experiment_identifier": EXPERIMENT_IDENTIFIER,
     "sample_identifier": SAMPLE_IDENTIFIER,
     "experiment_statistics": EXPERIMENT_STATISTICS,
@@ -343,8 +339,6 @@ FEATURE_GROUPS = {
     "sample_statistics": SAMPLE_STATISTICS,
     "sample_distribution_shape": SAMPLE_DISTRIBUTION_SHAPE,
     "sample_baseline_entropy": SAMPLE_BASELINE_ENTROPY,
-    "base_model_metrics": BASE_MODEL_METRICS,
-    "unseen_features": UNSEEN_FEATURES,
     "aggregation_over_agents": AGGREGATION_OVER_AGENTS,
     "sample_round_wise_aggregated": SAMPLE_ROUND_WISE_AGGREGATED,
     "cross_round_aggregated": CROSS_ROUND_AGGREGATED,
