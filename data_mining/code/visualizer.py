@@ -17,10 +17,16 @@ import matplotlib.pyplot as plt
 
 warnings.filterwarnings("ignore")
 
-# Set plotting style
-sns.set_style("whitegrid")
-plt.rcParams["figure.figsize"] = (20, 12)
-plt.rcParams["font.size"] = 10
+# Set enhanced plotting style
+sns.set_style("whitegrid", {"axes.spines.top": False, "axes.spines.right": False})
+plt.rcParams["figure.figsize"] = (16, 12)
+plt.rcParams["font.size"] = 11
+plt.rcParams["axes.labelsize"] = 12
+plt.rcParams["axes.titlesize"] = 14
+plt.rcParams["xtick.labelsize"] = 10
+plt.rcParams["ytick.labelsize"] = 10
+plt.rcParams["legend.fontsize"] = 11
+plt.rcParams["figure.titlesize"] = 16
 
 
 class AggregatedResultsVisualizer:
@@ -117,10 +123,10 @@ class AggregatedResultsVisualizer:
         ).head(self.n_features)
 
         # Create figure with subplots
-        fig = plt.figure(figsize=(8, 16))
-        gs = fig.add_gridspec(3, 1, hspace=0.35, wspace=0.1)
+        fig = plt.figure(figsize=(12, 28))
+        gs = fig.add_gridspec(4, 1, height_ratios=[2.5, 2.5, 2.5, 1], hspace=0.5, wspace=0.3)
 
-        # 1. Feature Importance Comparison (Top subplot, spanning 2 columns)
+        # 1. Feature Importance Comparison
         ax1 = fig.add_subplot(gs[0, 0])
         self._plot_feature_importance(ax1, df_sorted)
 
@@ -128,29 +134,31 @@ class AggregatedResultsVisualizer:
         ax2 = fig.add_subplot(gs[1, 0])
         self._plot_shap_values(ax2, df_sorted)
 
-        # # 3. Impact Direction Distribution
-        # ax4 = fig.add_subplot(gs[0, 1])
-        # self._plot_impact_direction(ax4, df_sorted)
+        # 3. SHAP Statistics - Positive vs Negative Ratios
+        ax3 = fig.add_subplot(gs[2, 0])
+        self._plot_shap_ratios(ax3, df_sorted)
 
-        # 4. SHAP Statistics - Positive vs Negative Ratios
-        ax5 = fig.add_subplot(gs[2, 0])
-        self._plot_shap_ratios(ax5, df_sorted)
-
-        # # 5. Feature Importance Distribution
-        # ax6 = fig.add_subplot(gs[2, 0])
-        # self._plot_importance_distribution(ax6, df)
+        # 4. Feature Importance Distribution
+        ax4 = fig.add_subplot(gs[3, 0])
+        self._plot_importance_distribution(ax4, df)
 
         # Add main title
         fig.suptitle(
             f"Experiment Analysis: {exp_name}\n(Top {self.n_features} features by {self.feature_importance_from})",
-            fontsize=16,
+            fontsize=18,
             fontweight="bold",
             y=0.95,
         )
+        
+        # Add subtle footer with timestamp
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        fig.text(0.02, 0.02, f'Generated on: {timestamp}',
+                 fontsize=9, style='italic', color='#666666')
 
         # Save figure
         output_file = self.output_dir / f"{exp_name}.png"
-        plt.savefig(output_file, dpi=300, bbox_inches="tight")
+        plt.savefig(output_file, dpi=300, bbox_inches="tight", facecolor='white', edgecolor='none')
         plt.close(fig)
         print(f"   Saved visualization to: {output_file}")
 
@@ -161,6 +169,7 @@ class AggregatedResultsVisualizer:
         xgb_imp = df["xgboost_importance"].values
         mean_imp_norm = df[self.feature_importance_from].values
 
+        # Increase spacing between bars by modifying the x positions
         x = np.arange(len(features))
         width = 0.25
 
@@ -168,41 +177,57 @@ class AggregatedResultsVisualizer:
         lgb_norm = (lgb_imp - lgb_imp.min()) / (lgb_imp.max() - lgb_imp.min()) if lgb_imp.max() > lgb_imp.min() else lgb_imp * 0
         xgb_norm = (xgb_imp - xgb_imp.min()) / (xgb_imp.max() - xgb_imp.min()) if xgb_imp.max() > xgb_imp.min() else xgb_imp * 0
 
-        ax.barh(x - width, lgb_norm, width, label="LightGBM (normalized)", alpha=0.8, color="#2E86AB")
-        ax.barh(x, xgb_norm, width, label="XGBoost (normalized)", alpha=0.8, color="#A23B72")
-        ax.barh(x + width, mean_imp_norm, width, label="Mean Normalized", alpha=0.8, color="#F18F01")
+        # Improved color palette
+        ax.barh(x - width, lgb_norm, width, label="LightGBM (normalized)", alpha=0.8, 
+                color="#1f77b4", edgecolor='white', linewidth=0.8)
+        ax.barh(x, xgb_norm, width, label="XGBoost (normalized)", alpha=0.8, 
+                color="#ff7f0e", edgecolor='white', linewidth=0.8)
+        ax.barh(x + width, mean_imp_norm, width, label="Mean Normalized", alpha=0.8, 
+                color="#2ca02c", edgecolor='white', linewidth=0.8)
 
         ax.set_yticks(x)
-        ax.set_yticklabels(features, fontsize=9)
-        ax.set_xlabel("Normalized Importance", fontweight="bold")
-        ax.set_title("Feature Importance Comparison", fontweight="bold", fontsize=12)
-        ax.legend(loc="lower right")
+        ax.set_yticklabels(features, fontsize=10, ha='right')
+        ax.set_xlabel("Normalized Importance", fontweight="bold", fontsize=12)
+        ax.set_title("Feature Importance Comparison", fontweight="bold", fontsize=14, pad=15)
+        ax.legend(loc="lower right", frameon=True, fancybox=True, shadow=True)
         ax.invert_yaxis()
         ax.grid(axis="x", alpha=0.3)
+        
+        # Add subtle background color
+        ax.set_facecolor('#f8f9fa')
 
     def _plot_shap_values(self, ax, df: pd.DataFrame):
         """Plots SHAP values for top features."""
         features = df["feature"].values[:20]  # Top 20 for clarity
         mean_shap = df["mean_shap"].values[:20]
 
+        # Increase spacing between bars
+        y_positions = np.arange(len(features)) 
+        
         colors = ["#2E8B57" if val > 0 else "#DC143C" for val in mean_shap]
 
-        ax.barh(features, mean_shap, color=colors, alpha=0.7)
-        ax.axvline(x=0, color="black", linestyle="--", linewidth=1)
-        ax.set_xlabel("Mean SHAP Value", fontweight="bold")
-        ax.set_title("SHAP Value Impact\n(Top 20 Features)", fontweight="bold", fontsize=12)
+        bars = ax.barh(y_positions, mean_shap, color=colors, alpha=0.8, edgecolor='white', linewidth=0.8)
+        ax.axvline(x=0, color="black", linestyle="--", linewidth=1.5, alpha=0.7)
+        ax.set_xlabel("Mean SHAP Value", fontweight="bold", fontsize=12)
+        ax.set_title("SHAP Value Impact\n(Top 20 Features)", fontweight="bold", fontsize=14, pad=15)
+        ax.set_yticks(y_positions)
+        ax.set_yticklabels(features, fontsize=10, ha='right')
         ax.invert_yaxis()
         ax.grid(axis="x", alpha=0.3)
+        
+        # Add subtle background color
+        ax.set_facecolor('#f8f9fa')
 
         # Add value labels
         for i, (feature, value) in enumerate(zip(features, mean_shap)):
             ax.text(
                 value,
-                i,
+                y_positions[i],
                 f" {value:.3f}",
                 va="center",
                 ha="left" if value > 0 else "right",
-                fontsize=8,
+                fontsize=9,
+                weight='normal'
             )
 
     def _plot_impact_direction(self, ax, df: pd.DataFrame):
@@ -218,13 +243,18 @@ class AggregatedResultsVisualizer:
             autopct="%1.1f%%",
             colors=plot_colors,
             startangle=90,
-            textprops={"fontsize": 10, "weight": "bold"},
+            textprops={"fontsize": 12, "weight": "bold"},
+            wedgeprops=dict(width=0.5, edgecolor='white', linewidth=1.2)  # Add doughnut style and edges
         )
 
         for autotext in autotexts:
             autotext.set_color("white")
+            autotext.set_fontweight("bold")
 
-        ax.set_title("Impact Direction Distribution", fontweight="bold", fontsize=12)
+        ax.set_title("Impact Direction Distribution", fontweight="bold", fontsize=14, pad=20)
+        
+        # Add subtle background color
+        ax.set_facecolor('#f8f9fa')
 
     def _plot_shap_ratios(self, ax, df: pd.DataFrame):
         """Plots positive vs negative SHAP ratios."""
@@ -232,19 +262,25 @@ class AggregatedResultsVisualizer:
         pos_ratio = df["mean_positive_ratio"].values[:20]
         neg_ratio = df["mean_negative_ratio"].values[:20]
 
+        # Increase spacing between bars
         x = np.arange(len(features))
         width = 0.35
 
-        ax.barh(x - width / 2, pos_ratio, width, label="Positive Ratio", color="#2E8B57", alpha=0.8)
-        ax.barh(x + width / 2, neg_ratio, width, label="Negative Ratio", color="#DC143C", alpha=0.8)
+        ax.barh(x - width / 2, pos_ratio, width, label="Positive Ratio", color="#2E8B57", alpha=0.8, 
+                edgecolor='white', linewidth=0.8)
+        ax.barh(x + width / 2, neg_ratio, width, label="Negative Ratio", color="#DC143C", alpha=0.8, 
+                edgecolor='white', linewidth=0.8)
 
         ax.set_yticks(x)
-        ax.set_yticklabels(features, fontsize=9)
-        ax.set_xlabel("Ratio", fontweight="bold")
-        ax.set_title("SHAP Positive/Negative Ratios\n(Top 20 Features)", fontweight="bold", fontsize=12)
-        ax.legend()
+        ax.set_yticklabels(features, fontsize=10, ha='right')
+        ax.set_xlabel("Ratio", fontweight="bold", fontsize=12)
+        ax.set_title("SHAP Positive/Negative Ratios\n(Top 20 Features)", fontweight="bold", fontsize=14, pad=15)
+        ax.legend(frameon=True, fancybox=True, shadow=True)
         ax.invert_yaxis()
         ax.grid(axis="x", alpha=0.3)
+        
+        # Add subtle background color
+        ax.set_facecolor('#f8f9fa')
 
     def _plot_importance_distribution(self, ax, df: pd.DataFrame):
         """Plots distribution of feature importance."""
@@ -266,11 +302,14 @@ class AggregatedResultsVisualizer:
             label=f"Median: {np.median(mean_imp_norm):.3f}",
         )
 
-        ax.set_xlabel(f"{self.feature_importance_from}", fontweight="bold")
+        ax.set_xlabel(f"{self.feature_importance_from}", fontweight="bold", fontsize=12)
         ax.set_ylabel("Frequency", fontweight="bold")
-        ax.set_title("Feature Importance Distribution\n(All Features)", fontweight="bold", fontsize=12)
-        ax.legend()
+        ax.set_title("Feature Importance Distribution\n(All Features)", fontweight="bold", fontsize=14, pad=15)
+        ax.legend(frameon=True, fancybox=True, shadow=True)
         ax.grid(axis="y", alpha=0.3)
+        
+        # Add subtle background color
+        ax.set_facecolor('#f8f9fa')
 
 
 def main():
