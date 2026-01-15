@@ -412,25 +412,29 @@ def main():
     parser.add_argument(
         '--dataset-list',
         nargs='+',
-        default=["gsm8k", "aime2024_8192", "aime2025_8192", "all"],  # Changed to None to detect if the argument was provided
+        # Changed to None to detect if the argument was provided
+        default=["math500", "aime2024_8192", "aime2025_8192", "gsm8k", "all"],  
         help="List of dataset names to use in experiments (use 'all' for all/default)"
     )
     parser.add_argument(
         '--model-list',
         nargs='+',
-        default=["qwen3_4b", "qwen3_8b", "all"],  # Changed to None to detect if the argument was provided
+        # Changed to None to detect if the argument was provided
+        default=["qwen3_4b", "qwen3_8b", "all"],  
         help="List of model names to use in experiments (use 'all' for all/default)"
     )
     parser.add_argument(
         '--arch-list',
         nargs='+',
-        default=["all"],  # Changed to None to detect if the argument was provided
+        # Changed to None to detect if the argument was provided
+        default=["all"],  
         help="List of architecture types to use in experiments (use 'all' for all/default)"
     )
     parser.add_argument(
         '--exclude-feature-list',
         nargs='+',
-        default=["base_model_metrics", "default"],  # Changed to None to detect if the argument was provided
+        # Changed to None to detect if the argument was provided
+        default=["base_model_metrics", "default"],  
         help="List of exclude feature options to use in experiments (use 'default' for default and 'all' for all)"
     )
     parser.add_argument(
