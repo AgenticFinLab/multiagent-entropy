@@ -225,3 +225,4 @@ entropy_analysis/results
 data_mining/data
 data_mining/results*
 data_mining/configs
+data_mining/experiment_reports
