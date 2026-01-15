@@ -415,7 +415,7 @@ def main():
     parser.add_argument(
         '--output-dir',
         type=str,
-        default='/home/yuxuanzhao/multiagent-entropy/data_mining/experiment_reports',
+        default='data_mining/experiment_reports',
         help="Directory to save experiment reports"
     )
     parser.add_argument(
@@ -471,7 +471,7 @@ def main():
 
         # Define config file path
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        config_output_path = f"/home/yuxuanzhao/multiagent-entropy/data_mining/configs/generated_experiment_config_{timestamp}.json"
+        config_output_path = f"data_mining/configs/generated_experiment_config_{timestamp}.json"
 
         # Save the generated configurations
         save_experiment_configs(configurations, config_output_path)
