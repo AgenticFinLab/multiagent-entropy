@@ -124,7 +124,7 @@ class AggregatedResultsVisualizer:
 
         # Create figure with subplots
         fig = plt.figure(figsize=(12, 28))
-        gs = fig.add_gridspec(4, 1, height_ratios=[2.5, 2.5, 2.5, 1], hspace=0.5, wspace=0.3)
+        gs = fig.add_gridspec(4, 1, height_ratios=[2.5, 2.5, 2.5, 1], hspace=0.4, wspace=0.3)
 
         # 1. Feature Importance Comparison
         ax1 = fig.add_subplot(gs[0, 0])
