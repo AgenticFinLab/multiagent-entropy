@@ -7,7 +7,6 @@ results_aggregated directory, including:
 3. Impact direction statistics
 """
 
-import os
 import warnings
 from pathlib import Path
 
@@ -139,28 +138,34 @@ class AggregatedResultsVisualizer:
             # Use the same ordering as in the main sorting (based on df_sorted) to ensure consistency
             if df_sorted is not None:
                 # Use the features from df_sorted in the same order
-                feature_names = df_sorted['feature'].values
-                # Only include features that are present in the SHAP data
-                feature_names = [f for f in feature_names if f in shap_values_df.columns]
-                # Limit to top 20 or however many features we have
+                all_sorted_features = df_sorted['feature'].values
+                # Only include features that are present in the SHAP data and in correlation data
+                feature_names = [f for f in all_sorted_features if f in shap_values_df.columns and f in correlation_data]
+                # Limit to top n_features or however many features we have
                 feature_names = feature_names[:min(self.n_features, len(feature_names))]
             else:
-                # Fallback to SHAP-based sorting
-                mean_abs_shap = np.abs(shap_values).mean(0)
-                feature_indices = np.argsort(mean_abs_shap)[::-1][:self.n_features]  # Top n_features features
-                feature_names = np.array(shap_values_df.columns)[feature_indices]
+                raise ValueError("Feature names not found")
             
             plt.sca(ax)
             # Create a custom plot since we want to control feature order
-            # Instead of using shap.summary_plot directly, we'll use shap.plots.beeswarm or reorder
+            # To ensure the order matches our feature_names, we need to slice the data appropriately
+            # Get indices for the features we want to display in our desired order
+            feature_indices_map = {name: idx for idx, name in enumerate(shap_values_df.columns)}
+            display_indices = [feature_indices_map[f] for f in feature_names if f in feature_indices_map]
+            
+            # Slice the SHAP values to include only the features we want to display, in our order
+            ordered_shap_values = shap_values[:, display_indices]
+            ordered_X_test_values = X_test_values[:, display_indices]
+
             shap.summary_plot(
-                shap_values,
-                X_test_values,
-                feature_names=None,  # Hide feature names
+                ordered_shap_values,
+                ordered_X_test_values,
+                # feature_names=None,  # Hide feature names
                 plot_type="dot",
                 show=False,
                 max_display=len(feature_names),  # Use our determined feature count
                 color=plt.get_cmap("coolwarm"),
+                sort=False
             )
 
             ax.set_title(
@@ -171,7 +176,12 @@ class AggregatedResultsVisualizer:
             )
             ax.set_facecolor("#f8f9fa")
 
-            # Adjust y-axis tick labels
+            # Set y ticks to 0,1,2,...,N-1
+            ax.set_yticks(range(len(feature_names)))  
+            # Set the feature names as tick labels
+            # ax.set_yticklabels(feature_names, fontsize=8)  
+            # ax.invert_yaxis()
+
             ax.tick_params(axis="y", labelsize=8)
             ax.set_ylabel("Features", fontsize=9, fontweight="bold")
             ax.set_xlabel(
@@ -195,8 +205,8 @@ class AggregatedResultsVisualizer:
                         # Position annotation to the right of the plot
                         ax.annotate(
                             f'r={corr_val:.3f}',
-                            xy=(0, y_ticks[i]),
-                            xytext=(ax.get_xlim()[1] * 1.2, y_ticks[i]),  # Slightly to the right of the plot
+                            xy=(0, self.n_features-i-1),
+                            xytext=(ax.get_xlim()[1] * 1.2, self.n_features-i-1),  # Slightly to the right of the plot
                             fontsize=5.5,
                             verticalalignment='center',
                             horizontalalignment='left',
