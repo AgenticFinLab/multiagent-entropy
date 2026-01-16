@@ -111,8 +111,8 @@ Return ONLY a JSON array with these fields for each feature:
 Example JSON output:
 ```json
 [
-  {{"rank": 1, "feature_name": "feature1", "shap_correlation": 0.5, "overall_direction": "positive", "reason": ""}},
-  {{"rank": 2, "feature_name": "feature2", "shap_correlation": -0.3, "overall_direction": "negative", "reason": ""}}
+  {{"rank": 1, "feature_name": "feature1", "shap_correlation": 0.5, "overall_direction": 0.8, "reason": ""}},
+  {{"rank": 2, "feature_name": "feature2", "shap_correlation": -0.3, "overall_direction": -0.6, "reason": ""}}
 ]
 ```
 """
@@ -267,19 +267,19 @@ Example JSON output:
     def _analyze_top_level(self, summary_data, output_file):
         """Perform top-level analysis across all datasets, models, and exclude conditions."""
         output_file.write("### Overall Feature Importance Ranking Consistency\n")
-        self._analyze_ranking_consistency_md(summary_data, output_file)
+        self._analyze_ranking_consistency(summary_data, output_file)
 
         output_file.write("\n### Overall Feature Impact Direction Distribution\n")
-        self._analyze_direction_distribution_md(summary_data, output_file)
+        self._analyze_direction_distribution(summary_data, output_file)
 
         output_file.write("\n### Overall Top 5 Features Overlap\n")
-        self._analyze_overlap_md(summary_data, output_file)
+        self._analyze_overlap(summary_data, output_file)
 
         output_file.write("\n### Overall SHAP Value Distribution\n")
-        self._analyze_shap_distribution_md(summary_data, output_file)
+        self._analyze_shap_distribution(summary_data, output_file)
 
         output_file.write("\n### Overall Exclude Condition Differences\n")
-        self._analyze_exclude_condition_differences_md(summary_data, output_file)
+        self._analyze_exclude_condition_differences(summary_data, output_file)
 
     def _analyze_by_exclude_conditions(self, summary_data, output_file):
         """Analyze data by exclude conditions (exclude_default vs exclude_base_model_metrics)."""
@@ -316,19 +316,19 @@ Example JSON output:
 
         if exclude_default_data:
             output_file.write("### Analysis for exclude_default condition\n")
-            self._analyze_ranking_consistency_md(exclude_default_data, output_file)
-            self._analyze_direction_distribution_md(exclude_default_data, output_file)
-            self._analyze_overlap_md(exclude_default_data, output_file)
-            self._analyze_shap_distribution_md(exclude_default_data, output_file)
+            self._analyze_ranking_consistency(exclude_default_data, output_file)
+            self._analyze_direction_distribution(exclude_default_data, output_file)
+            self._analyze_overlap(exclude_default_data, output_file)
+            self._analyze_shap_distribution(exclude_default_data, output_file)
 
         if exclude_base_data:
             output_file.write(
                 "\n### Analysis for exclude_base_model_metrics condition\n"
             )
-            self._analyze_ranking_consistency_md(exclude_base_data, output_file)
-            self._analyze_direction_distribution_md(exclude_base_data, output_file)
-            self._analyze_overlap_md(exclude_base_data, output_file)
-            self._analyze_shap_distribution_md(exclude_base_data, output_file)
+            self._analyze_ranking_consistency(exclude_base_data, output_file)
+            self._analyze_direction_distribution(exclude_base_data, output_file)
+            self._analyze_overlap(exclude_base_data, output_file)
+            self._analyze_shap_distribution(exclude_base_data, output_file)
 
         # Compare the two exclude conditions
         if exclude_default_data and exclude_base_data:
@@ -372,10 +372,10 @@ Example JSON output:
 
         for dataset_type, data in dataset_groups.items():
             output_file.write(f"\n### Analysis for {dataset_type} dataset\n")
-            self._analyze_ranking_consistency_md(data, output_file)
-            self._analyze_direction_distribution_md(data, output_file)
-            self._analyze_overlap_md(data, output_file)
-            self._analyze_shap_distribution_md(data, output_file)
+            self._analyze_ranking_consistency(data, output_file)
+            self._analyze_direction_distribution(data, output_file)
+            self._analyze_overlap(data, output_file)
+            self._analyze_shap_distribution(data, output_file)
 
     def _analyze_by_dataset_and_model(self, summary_data, output_file):
         """Provide detailed analysis for each dataset and model combination."""
@@ -393,8 +393,6 @@ Example JSON output:
             # Or model_{model_name}_exclude_{exclude feature group}
             # Or exclude_{exclude feature group}
             # Or just exclude_{exclude feature group} (all datasets, all models)
-            parts = experiment_name.split("_")
-
             if experiment_name.startswith("model_") and "_dataset_" in experiment_name:
                 # Format: model_{model_name}_dataset_{dataset_name}_exclude_{condition}
                 model_start_idx = 1  # after 'model'
@@ -443,10 +441,10 @@ Example JSON output:
 
             # Single dataset analysis
             single_dataset_data = {experiment_name: features}
-            self._analyze_ranking_consistency_md(single_dataset_data, output_file)
-            self._analyze_direction_distribution_md(single_dataset_data, output_file)
-            self._analyze_overlap_md(single_dataset_data, output_file)
-            self._analyze_shap_distribution_md(single_dataset_data, output_file)
+            self._analyze_ranking_consistency(single_dataset_data, output_file)
+            self._analyze_direction_distribution(single_dataset_data, output_file)
+            self._analyze_overlap(single_dataset_data, output_file)
+            self._analyze_shap_distribution(single_dataset_data, output_file)
 
     def _compare_exclude_conditions(
         self, exclude_default_data, exclude_base_data, output_file
@@ -485,11 +483,14 @@ Example JSON output:
                 f"- {feature} (exclude_default: {top_exclude_default[feature]}, exclude_base: {top_exclude_base[feature]})\n"
             )
 
-    def _analyze_ranking_consistency_md(self, summary_data, output_file):
+    def _analyze_ranking_consistency(self, summary_data, output_file):
         """Analyze consistency of feature rankings across datasets in markdown format."""
         # Count how many times each feature appears in top positions
         feature_rank_counts = defaultdict(lambda: [0, 0, 0, 0, 0])  # For ranks 1-5
         feature_appearances = Counter()
+        # Track shap_correlation and overall_direction for each feature
+        feature_shap_values = defaultdict(list)
+        feature_direction_values = defaultdict(list)
         total_experiments = len(summary_data)
 
         for experiment_name, features in summary_data.items():
@@ -499,6 +500,9 @@ Example JSON output:
                 if 1 <= rank <= 5:
                     feature_rank_counts[feature_name][rank - 1] += 1
                     feature_appearances[feature_name] += 1
+                    # Store shap_correlation and overall_direction for each occurrence
+                    feature_shap_values[feature_name].append(feature_data["shap_correlation"])
+                    feature_direction_values[feature_name].append(feature_data["overall_direction"])
 
         # Sort features by total appearances in top 5
         sorted_features = sorted(
@@ -508,9 +512,34 @@ Example JSON output:
         output_file.write(f"- Total experiments analyzed: {total_experiments}\n")
         output_file.write("- Features appearing in top 5 across experiments:\n")
         for feature, count in sorted_features[:10]:  # Top 10 features
+            # Calculate average shap_correlation and representative direction
+            avg_shap = sum(feature_shap_values[feature]) / len(feature_shap_values[feature])
+            # Calculate average overall_direction value, converting strings to numbers if necessary
+            converted_values = []
+            for val in feature_direction_values[feature]:
+                if isinstance(val, str):
+                    # Convert string direction to numeric equivalent
+                    if "positive" in val.lower():
+                        converted_values.append(abs(float(val.replace("positive", "") or "1")))  # Default to 1 if no number specified
+                    elif "negative" in val.lower():
+                        converted_values.append(-abs(float(val.replace("negative", "") or "1")))  # Default to -1 if no number specified
+                    else:
+                        # Try to convert directly to float, default to 0 if fail
+                        try:
+                            converted_values.append(float(val))
+                        except ValueError:
+                            converted_values.append(0.0)
+                else:
+                    converted_values.append(float(val))
+            
+            avg_direction = sum(converted_values) / len(converted_values) if converted_values else 0.0
+            # Determine direction sign for display
+            direction_display = "positive" if avg_direction > 0 else "negative"
+            # Use average direction value with sign indicator
+            most_common_direction = f"{direction_display} ({avg_direction:.3f})"
+            
             output_file.write(
-                f"  - {feature}: {count}/{total_experiments} experiments ({count/total_experiments*100:.1f}%)"
-            )
+                f"  - {feature}: {count}/{total_experiments} experiments ({count/total_experiments*100:.1f}%), avg shap_correlation: {avg_shap:.3f}, overall_direction: {most_common_direction}")
 
             # Show distribution across ranks
             rank_dist = feature_rank_counts[feature]
@@ -533,11 +562,37 @@ Example JSON output:
             and sum(feature_rank_counts[feat][:2]) > 0
         ]  # At least one appearance in top 2
         for feature in consistent_top_features:
+            # Calculate average shap_correlation and representative direction
+            avg_shap = sum(feature_shap_values[feature]) / len(feature_shap_values[feature])
+            # Calculate average overall_direction value, converting strings to numbers if necessary
+            converted_values = []
+            for val in feature_direction_values[feature]:
+                if isinstance(val, str):
+                    # Convert string direction to numeric equivalent
+                    if "positive" in val.lower():
+                        converted_values.append(abs(float(val.replace("positive", "") or "1")))  # Default to 1 if no number specified
+                    elif "negative" in val.lower():
+                        converted_values.append(-abs(float(val.replace("negative", "") or "1")))  # Default to -1 if no number specified
+                    else:
+                        # Try to convert directly to float, default to 0 if fail
+                        try:
+                            converted_values.append(float(val))
+                        except ValueError:
+                            converted_values.append(0.0)
+                else:
+                    converted_values.append(float(val))
+            
+            avg_direction = sum(converted_values) / len(converted_values) if converted_values else 0.0
+            # Determine direction sign for display
+            direction_display = "positive" if avg_direction > 0 else "negative"
+            # Use average direction value with sign indicator
+            most_common_direction = f"{direction_display} ({avg_direction:.3f})"
+            
             output_file.write(
-                f"  - {feature}: {feature_appearances[feature]}/{total_experiments} experiments\n"
+                f"  - {feature}: {feature_appearances[feature]}/{total_experiments} experiments, avg shap_correlation: {avg_shap:.3f}, overall_direction: {most_common_direction}\n"
             )
 
-    def _analyze_direction_distribution_md(self, summary_data, output_file):
+    def _analyze_direction_distribution(self, summary_data, output_file):
         """Analyze the distribution of feature impact directions (positive/negative) in markdown format."""
         total_features = 0
         positive_count = 0
@@ -546,9 +601,25 @@ Example JSON output:
         for _, features in summary_data.items():
             for feature_data in features:
                 total_features += 1
-                if feature_data["direction"] == "positive":
+                # Use numeric direction value for comparison, handling possible string values
+                direction_value = feature_data["overall_direction"]
+                if isinstance(direction_value, str):
+                    # Convert string direction to numeric equivalent
+                    if "positive" in direction_value.lower():
+                        direction_value = 1
+                    elif "negative" in direction_value.lower():
+                        direction_value = -1
+                    else:
+                        try:
+                            direction_value = float(direction_value)
+                        except ValueError:
+                            direction_value = 0
+                else:
+                    direction_value = float(direction_value)
+                
+                if direction_value > 0:
                     positive_count += 1
-                elif feature_data["direction"] == "negative":
+                elif direction_value < 0:
                     negative_count += 1
 
         output_file.write(f"- Total features analyzed: {total_features}\n")
@@ -564,12 +635,30 @@ Example JSON output:
         for _, features in summary_data.items():
             for feature_data in features:
                 feature_name = feature_data["feature_name"]
-                feature_directions[feature_name].append(feature_data["direction"])
+                # Use numeric direction value for consistency analysis, handling possible string values
+                direction_value = feature_data["overall_direction"]
+                if isinstance(direction_value, str):
+                    # Convert string direction to numeric equivalent
+                    if "positive" in direction_value.lower():
+                        direction_value = 1
+                    elif "negative" in direction_value.lower():
+                        direction_value = -1
+                    else:
+                        try:
+                            direction_value = float(direction_value)
+                        except ValueError:
+                            direction_value = 0
+                else:
+                    direction_value = float(direction_value)
+                # Directly append the numeric value for consistency analysis
+                feature_directions[feature_name].append(direction_value)
 
         inconsistent_features = []
         for feature, directions in feature_directions.items():
-            unique_directions = set(directions)
-            if len(unique_directions) > 1:
+            # Convert directions to signs to check for inconsistencies
+            direction_signs = [1 if d > 0 else (-1 if d < 0 else 0) for d in directions]
+            unique_signs = set(direction_signs)
+            if len(unique_signs) > 1 or (len(unique_signs) == 1 and 0 not in unique_signs and len(set(directions)) > 1):
                 inconsistent_features.append((feature, len(directions), directions))
 
         if inconsistent_features:
@@ -577,16 +666,20 @@ Example JSON output:
                 f"\n- Features with inconsistent directions across datasets:\n"
             )
             for feature, count, directions in inconsistent_features[:10]:  # Top 10
-                direction_counts = Counter(directions)
+                # Count positive, negative, and neutral directions
+                pos_count = sum(1 for d in directions if d > 0)
+                neg_count = sum(1 for d in directions if d < 0)
+                neu_count = sum(1 for d in directions if d == 0)
+                direction_summary = f"pos:{pos_count}, neg:{neg_count}, zero:{neu_count}"
                 output_file.write(
-                    f"  - {feature}: {dict(direction_counts)} (across {count} instances)\n"
+                    f"  - {feature}: {direction_summary} (across {count} instances)\n"
                 )
         else:
             output_file.write(
                 f"\n- No features showed inconsistent directions across datasets.\n"
             )
 
-    def _analyze_overlap_md(self, summary_data, output_file):
+    def _analyze_overlap(self, summary_data, output_file):
         """Analyze overlap of top 5 features across different datasets in markdown format."""
         experiment_features = {}
         all_features = set()
@@ -641,74 +734,108 @@ Example JSON output:
                 f"  - {feature}: {count}/{len(experiment_features)} experiments ({pct:.1f}%)\n"
             )
 
-    def _analyze_shap_distribution_md(self, summary_data, output_file):
+    def _analyze_shap_distribution(self, summary_data, output_file):
         """Analyze the distribution of SHAP values in markdown format."""
-        all_magnitudes = []
-        positive_magnitudes = []
-        negative_magnitudes = []
+        all_shap_correlations = []
+        positive_shap_correlations = []
+        negative_shap_correlations = []
 
         for dataset, features in summary_data.items():
             for feature_data in features:
-                magnitude = feature_data["magnitude"]
-                all_magnitudes.append(magnitude)
-                if feature_data["direction"] == "positive":
-                    positive_magnitudes.append(magnitude)
+                shap_corr = feature_data["shap_correlation"]
+                all_shap_correlations.append(shap_corr)
+                # Use numeric direction for grouping, handling possible string values
+                direction_value = feature_data["overall_direction"]
+                if isinstance(direction_value, str):
+                    # Convert string direction to numeric equivalent
+                    if "positive" in direction_value.lower():
+                        direction_value = 1
+                    elif "negative" in direction_value.lower():
+                        direction_value = -1
+                    else:
+                        try:
+                            direction_value = float(direction_value)
+                        except ValueError:
+                            direction_value = 0
                 else:
-                    negative_magnitudes.append(magnitude)
+                    direction_value = float(direction_value)
+                
+                if direction_value > 0:
+                    positive_shap_correlations.append(shap_corr)
+                else:
+                    negative_shap_correlations.append(shap_corr)
 
-        output_file.write(f"- SHAP Magnitude Statistics:\n")
-        if all_magnitudes:
-            output_file.write(f"  - Total values: {len(all_magnitudes)}\n")
-            output_file.write(f"  - Mean: {statistics.mean(all_magnitudes):.3f}\n")
-            output_file.write(f"  - Median: {statistics.median(all_magnitudes):.3f}\n")
-            output_file.write(f"  - Std Dev: {statistics.pstdev(all_magnitudes):.3f}\n")
-            output_file.write(f"  - Min: {min(all_magnitudes):.3f}\n")
-            output_file.write(f"  - Max: {max(all_magnitudes):.3f}\n")
-
-        output_file.write(
-            f"\n- Positive SHAP Magnitudes (N={len(positive_magnitudes)}):\n"
-        )
-        if positive_magnitudes:
-            output_file.write(f"  - Mean: {statistics.mean(positive_magnitudes):.3f}\n")
-            output_file.write(
-                f"  - Median: {statistics.median(positive_magnitudes):.3f}\n"
-            )
-            output_file.write(
-                f"  - Std Dev: {statistics.pstdev(positive_magnitudes):.3f}\n"
-            )
-            output_file.write(f"  - Min: {min(positive_magnitudes):.3f}\n")
-            output_file.write(f"  - Max: {max(positive_magnitudes):.3f}\n")
+        output_file.write(f"- SHAP Correlation Statistics:\n")
+        if all_shap_correlations:
+            output_file.write(f"  - Total values: {len(all_shap_correlations)}\n")
+            output_file.write(f"  - Mean: {statistics.mean(all_shap_correlations):.3f}\n")
+            output_file.write(f"  - Median: {statistics.median(all_shap_correlations):.3f}\n")
+            output_file.write(f"  - Std Dev: {statistics.pstdev(all_shap_correlations):.3f}\n")
+            output_file.write(f"  - Min: {min(all_shap_correlations):.3f}\n")
+            output_file.write(f"  - Max: {max(all_shap_correlations):.3f}\n")
 
         output_file.write(
-            f"\n- Negative SHAP Magnitudes (N={len(negative_magnitudes)}):\n"
+            f"\n- Positive SHAP Correlations (N={len(positive_shap_correlations)}):\n"
         )
-        if negative_magnitudes:
-            output_file.write(f"  - Mean: {statistics.mean(negative_magnitudes):.3f}\n")
+        if positive_shap_correlations:
+            output_file.write(f"  - Mean: {statistics.mean(positive_shap_correlations):.3f}\n")
             output_file.write(
-                f"  - Median: {statistics.median(negative_magnitudes):.3f}\n"
+                f"  - Median: {statistics.median(positive_shap_correlations):.3f}\n"
             )
             output_file.write(
-                f"  - Std Dev: {statistics.pstdev(negative_magnitudes):.3f}\n"
+                f"  - Std Dev: {statistics.pstdev(positive_shap_correlations):.3f}\n"
             )
-            output_file.write(f"  - Min: {min(negative_magnitudes):.3f}\n")
-            output_file.write(f"  - Max: {max(negative_magnitudes):.3f}\n")
+            output_file.write(f"  - Min: {min(positive_shap_correlations):.3f}\n")
+            output_file.write(f"  - Max: {max(positive_shap_correlations):.3f}\n")
 
-        # Identify most impactful features
+        output_file.write(
+            f"\n- Negative SHAP Correlations (N={len(negative_shap_correlations)}):\n"
+        )
+        if negative_shap_correlations:
+            output_file.write(f"  - Mean: {statistics.mean(negative_shap_correlations):.3f}\n")
+            output_file.write(
+                f"  - Median: {statistics.median(negative_shap_correlations):.3f}\n"
+            )
+            output_file.write(
+                f"  - Std Dev: {statistics.pstdev(negative_shap_correlations):.3f}\n"
+            )
+            output_file.write(f"  - Min: {min(negative_shap_correlations):.3f}\n")
+            output_file.write(f"  - Max: {max(negative_shap_correlations):.3f}\n")
+
+        # Identify most impactful features by absolute shap correlation
         sorted_by_impact = sorted(
             [(e, f) for e, fs in summary_data.items() for f in fs],
-            key=lambda x: abs(x[1]["magnitude"]),
+            key=lambda x: abs(x[1]["shap_correlation"]),
             reverse=True,
         )[:10]
 
         output_file.write(
-            f"\n- Top 10 most impactful features (by absolute magnitude):\n"
+            f"\n- Top 10 most impactful features (by absolute SHAP correlation):\n"
         )
         for experiment_name, feature in sorted_by_impact:
+            # Use numerical overall_direction value, handling possible string values
+            direction_value = feature['overall_direction']
+            if isinstance(direction_value, str):
+                # Convert string direction to numeric equivalent
+                if "positive" in direction_value.lower():
+                    direction_value = 1
+                elif "negative" in direction_value.lower():
+                    direction_value = -1
+                else:
+                    try:
+                        direction_value = float(direction_value)
+                    except ValueError:
+                        direction_value = 0
+            else:
+                direction_value = float(direction_value)
+            
+            direction_text = 'positive' if direction_value > 0 else 'negative'
+            
             output_file.write(
-                f"  - {experiment_name}: {feature['feature_name']} ({feature['magnitude']}, {feature['direction']})\n"
+                f"  - {experiment_name}: {feature['feature_name']} ({feature['shap_correlation']}, {direction_text} {direction_value:.3f})\n"
             )
 
-    def _analyze_exclude_condition_differences_md(self, summary_data, output_file):
+    def _analyze_exclude_condition_differences(self, summary_data, output_file):
         """Analyze differences in feature importance based on exclude conditions (e.g., exclude_default vs exclude_base_model_metrics) in markdown format."""
         # Group experiments by exclude condition based on naming patterns
         exclude_groups = defaultdict(list)
@@ -821,328 +948,6 @@ Example JSON output:
                     f"  - {exclude_condition}: Only one experiment, no consistency analysis\n"
                 )
 
-    def _analyze_ranking_consistency(self, summary_data, output_file):
-        """Analyze consistency of feature rankings across datasets."""
-        # Count how many times each feature appears in top positions
-        feature_rank_counts = defaultdict(lambda: [0, 0, 0, 0, 0])  # For ranks 1-5
-        feature_appearances = Counter()
-        total_experiments = len(summary_data)
-
-        for experiment_name, features in summary_data.items():
-            for feature_data in features:
-                rank = feature_data["rank"]
-                feature_name = feature_data["feature_name"]
-                if 1 <= rank <= 5:
-                    feature_rank_counts[feature_name][rank - 1] += 1
-                    feature_appearances[feature_name] += 1
-
-        # Sort features by total appearances in top 5
-        sorted_features = sorted(
-            feature_appearances.items(), key=lambda x: x[1], reverse=True
-        )
-
-        output_file.write(f"Total experiments analyzed: {total_experiments}\n")
-        output_file.write(f"Features appearing in top 5 across experiments:\n")
-        for feature, count in sorted_features[:10]:  # Top 10 features
-            output_file.write(
-                f"  {feature}: {count}/{total_experiments} experiments ({count/total_experiments*100:.1f}%)"
-            )
-
-            # Show distribution across ranks
-            rank_dist = feature_rank_counts[feature]
-            rank_summary = []
-            for i, rank_count in enumerate(rank_dist):
-                if rank_count > 0:
-                    rank_summary.append(f"R{i+1}:{rank_count}")
-            if rank_summary:
-                output_file.write(f" [Rank distribution: {', '.join(rank_summary)}]")
-            output_file.write("\n")
-
-        # Identify features that consistently appear in top positions
-        output_file.write(
-            f"\nFeatures appearing in top 3 in at least 50% of experiments:\n"
-        )
-        consistent_top_features = [
-            feat
-            for feat, count in sorted_features
-            if count >= total_experiments * 0.5
-            and sum(feature_rank_counts[feat][:2]) > 0
-        ]  # At least one appearance in top 2
-        for feature in consistent_top_features:
-            output_file.write(
-                f"  {feature}: {feature_appearances[feature]}/{total_experiments} experiments\n"
-            )
-
-    def _analyze_direction_distribution(self, summary_data, output_file):
-        """Analyze the distribution of feature impact directions (positive/negative)."""
-        total_features = 0
-        positive_count = 0
-        negative_count = 0
-
-        for experiment_name, features in summary_data.items():
-            for feature_data in features:
-                total_features += 1
-                if feature_data["direction"] == "positive":
-                    positive_count += 1
-                elif feature_data["direction"] == "negative":
-                    negative_count += 1
-
-        output_file.write(f"Total features analyzed: {total_features}\n")
-        output_file.write(
-            f"Positive impacts: {positive_count} ({positive_count/total_features*100:.1f}%)\n"
-        )
-        output_file.write(
-            f"Negative impacts: {negative_count} ({negative_count/total_features*100:.1f}%)\n"
-        )
-
-        # Analyze direction consistency for features appearing multiple times
-        feature_directions = defaultdict(list)
-        for experiment_name, features in summary_data.items():
-            for feature_data in features:
-                feature_name = feature_data["feature_name"]
-                feature_directions[feature_name].append(feature_data["direction"])
-
-        inconsistent_features = []
-        for feature, directions in feature_directions.items():
-            unique_directions = set(directions)
-            if len(unique_directions) > 1:
-                inconsistent_features.append((feature, len(directions), directions))
-
-        if inconsistent_features:
-            output_file.write(
-                f"\nFeatures with inconsistent directions across experiments:\n"
-            )
-            for feature, count, directions in inconsistent_features[:10]:  # Top 10
-                direction_counts = Counter(directions)
-                output_file.write(
-                    f"  {feature}: {dict(direction_counts)} (across {count} instances)\n"
-                )
-        else:
-            output_file.write(
-                f"\nNo features showed inconsistent directions across experiments.\n"
-            )
-
-    def _analyze_overlap(self, summary_data, output_file):
-        """Analyze overlap of top 5 features across different experiments."""
-        experiment_features = {}
-        all_features = set()
-
-        for experiment_name, features in summary_data.items():
-            top_features = [f["feature_name"] for f in features[:5]]  # Top 5 features
-            experiment_features[experiment_name] = set(top_features)
-            all_features.update(top_features)
-
-        output_file.write(f"Number of experiments: {len(experiment_features)}\n")
-
-        # Calculate pairwise overlaps
-        overlaps = []
-        experiments_list = list(experiment_features.keys())
-        for i in range(len(experiments_list)):
-            for j in range(i + 1, len(experiments_list)):
-                exp1, exp2 = experiments_list[i], experiments_list[j]
-                common_features = experiment_features[exp1] & experiment_features[exp2]
-                overlap_pct = (
-                    len(common_features) / 5 * 100 if len(common_features) > 0 else 0
-                )
-                overlaps.append((exp1, exp2, len(common_features), overlap_pct))
-
-        if overlaps:
-            avg_overlap = statistics.mean([o[3] for o in overlaps])
-            output_file.write(
-                f"Average overlap of top 5 features between experiments: {avg_overlap:.1f}%\n"
-            )
-
-            # Show highest and lowest overlaps
-            max_overlap = max(overlaps, key=lambda x: x[3])
-            min_overlap = min(overlaps, key=lambda x: x[3])
-            output_file.write(
-                f"Highest overlap: {max_overlap[0]} vs {max_overlap[1]} - {max_overlap[2]}/5 features ({max_overlap[3]:.1f}%)\n"
-            )
-            output_file.write(
-                f"Lowest overlap: {min_overlap[0]} vs {min_overlap[1]} - {min_overlap[2]}/5 features ({min_overlap[3]:.1f}%)\n"
-            )
-
-        # Identify most common top features across all experiments
-        feature_counts = Counter()
-        for experiment_name, features in summary_data.items():
-            for feature_data in features[:5]:  # Only top 5
-                feature_counts[feature_data["feature_name"]] += 1
-
-        output_file.write(f"\nMost common features in top 5 across all experiments:\n")
-        for feature, count in feature_counts.most_common(10):
-            pct = count / len(experiment_features) * 100
-            output_file.write(
-                f"  {feature}: {count}/{len(experiment_features)} experiments ({pct:.1f}%)\n"
-            )
-
-    def _analyze_shap_distribution(self, summary_data, output_file):
-        """Analyze the distribution of SHAP values."""
-        all_magnitudes = []
-        positive_magnitudes = []
-        negative_magnitudes = []
-
-        for experiment_name, features in summary_data.items():
-            for feature_data in features:
-                magnitude = feature_data["magnitude"]
-                all_magnitudes.append(magnitude)
-                if feature_data["direction"] == "positive":
-                    positive_magnitudes.append(magnitude)
-                else:
-                    negative_magnitudes.append(magnitude)
-
-        output_file.write(f"SHAP Magnitude Statistics:\n")
-        if all_magnitudes:
-            output_file.write(f"  Total values: {len(all_magnitudes)}\n")
-            output_file.write(f"  Mean: {statistics.mean(all_magnitudes):.3f}\n")
-            output_file.write(f"  Median: {statistics.median(all_magnitudes):.3f}\n")
-            output_file.write(f"  Std Dev: {statistics.pstdev(all_magnitudes):.3f}\n")
-            output_file.write(f"  Min: {min(all_magnitudes):.3f}\n")
-            output_file.write(f"  Max: {max(all_magnitudes):.3f}\n")
-
-        output_file.write(
-            f"\nPositive SHAP Magnitudes (N={len(positive_magnitudes)}):\n"
-        )
-        if positive_magnitudes:
-            output_file.write(f"  Mean: {statistics.mean(positive_magnitudes):.3f}\n")
-            output_file.write(
-                f"  Median: {statistics.median(positive_magnitudes):.3f}\n"
-            )
-            output_file.write(
-                f"  Std Dev: {statistics.pstdev(positive_magnitudes):.3f}\n"
-            )
-            output_file.write(f"  Min: {min(positive_magnitudes):.3f}\n")
-            output_file.write(f"  Max: {max(positive_magnitudes):.3f}\n")
-
-        output_file.write(
-            f"\nNegative SHAP Magnitudes (N={len(negative_magnitudes)}):\n"
-        )
-        if negative_magnitudes:
-            output_file.write(f"  Mean: {statistics.mean(negative_magnitudes):.3f}\n")
-            output_file.write(
-                f"  Median: {statistics.median(negative_magnitudes):.3f}\n"
-            )
-            output_file.write(
-                f"  Std Dev: {statistics.pstdev(negative_magnitudes):.3f}\n"
-            )
-            output_file.write(f"  Min: {min(negative_magnitudes):.3f}\n")
-            output_file.write(f"  Max: {max(negative_magnitudes):.3f}\n")
-
-        # Identify most impactful features
-        sorted_by_impact = sorted(
-            [(e, f) for e, fs in summary_data.items() for f in fs],
-            key=lambda x: abs(x[1]["magnitude"]),
-            reverse=True,
-        )[:10]
-
-        output_file.write(
-            f"\nTop 10 most impactful features (by absolute magnitude):\n"
-        )
-        for experiment_name, feature in sorted_by_impact:
-            output_file.write(
-                f"  {experiment_name}: {feature['feature_name']} ({feature['magnitude']}, {feature['direction']})\n"
-            )
-
-    def _analyze_model_differences(self, summary_data, output_file):
-        """Analyze differences in feature importance based on experimental configurations (e.g., exclude_default vs exclude_base_model_metrics)."""
-        # Group experiments by exclude condition based on naming patterns
-        exclude_groups = defaultdict(list)
-        for experiment_name in summary_data.keys():
-            # Identify exclude condition from experiment name
-            if "exclude_default" in experiment_name:
-                exclude_condition = "exclude_default"
-            elif "exclude_base_model_metrics" in experiment_name:
-                exclude_condition = "exclude_base_model_metrics"
-            else:
-                exclude_condition = "other"
-
-            exclude_groups[exclude_condition].append(experiment_name)
-
-        output_file.write(f"Experiment distribution by exclude condition:\n")
-        for exclude_condition, experiments in exclude_groups.items():
-            output_file.write(
-                f"  {exclude_condition}: {len(experiments)} experiments\n"
-            )
-
-        # Compare feature importance across different exclude conditions
-        if len(exclude_groups) > 1:
-            output_file.write(
-                f"\nFeature ranking differences across exclude conditions:\n"
-            )
-
-            # Collect top features for each exclude condition
-            exclude_top_features = defaultdict(Counter)
-            for exclude_condition, experiments in exclude_groups.items():
-                for experiment in experiments:
-                    features = summary_data[experiment]
-                    # Get top features for this experiment
-                    for feature_data in features[:3]:  # Top 3 features per experiment
-                        exclude_top_features[exclude_condition][
-                            feature_data["feature_name"]
-                        ] += 1
-
-            # Compare top features across exclude conditions
-            all_features = set()
-            for counter in exclude_top_features.values():
-                all_features.update(counter.keys())
-
-            if all_features:
-                output_file.write(
-                    f"\nCommon features across exclude conditions (top 3 from each experiment):\n"
-                )
-                for feature in sorted(all_features):
-                    feature_counts_by_condition = {}
-                    for exclude_condition, counter in exclude_top_features.items():
-                        feature_counts_by_condition[exclude_condition] = counter.get(
-                            feature, 0
-                        )
-
-                    # Only show features that appear in multiple exclude conditions
-                    active_conditions = {
-                        k: v for k, v in feature_counts_by_condition.items() if v > 0
-                    }
-                    if len(active_conditions) > 1:
-                        counts_str = ", ".join(
-                            [f"{k}:{v}" for k, v in active_conditions.items()]
-                        )
-                        output_file.write(f"  {feature} -> {counts_str}\n")
-
-        # If there are multiple experiments for the same exclude condition, analyze consistency within exclude conditions
-        output_file.write(f"\nConsistency within exclude conditions:\n")
-        for exclude_condition, experiments in exclude_groups.items():
-            if len(experiments) > 1:
-                # Calculate average overlap of top features within this exclude condition
-                experiment_features = []
-                for experiment in experiments:
-                    top_features = {
-                        f["feature_name"] for f in summary_data[experiment][:5]
-                    }
-                    experiment_features.append(top_features)
-
-                # Calculate pairwise overlaps
-                if len(experiment_features) > 1:
-                    overlaps = []
-                    for i in range(len(experiment_features)):
-                        for j in range(i + 1, len(experiment_features)):
-                            common = len(
-                                experiment_features[i] & experiment_features[j]
-                            )
-                            overlaps.append(common / 5 * 100)  # As percentage of top 5
-
-                    if overlaps:
-                        avg_within_condition_overlap = statistics.mean(overlaps)
-                        output_file.write(
-                            f"  {exclude_condition}: Avg top-5 overlap within condition: {avg_within_condition_overlap:.1f}%\n"
-                        )
-                else:
-                    output_file.write(
-                        f"  {exclude_condition}: Only one experiment, no overlap calculation\n"
-                    )
-            else:
-                output_file.write(
-                    f"  {exclude_condition}: Only one experiment, no consistency analysis\n"
-                )
-
-
 def main():
     """Main function to demonstrate the summarizer functionality."""
     # Get script directory
@@ -1168,9 +973,9 @@ def main():
         input_dir=str(input_dir),
         output_dir=str(output_dir),
     )
-    summarizer.analyze_visualizations_with_llm(n=n_top_analysis)
+    # summarizer.analyze_visualizations_with_llm(n=n_top_analysis)
     # Perform hierarchical statistical analysis on the summary data
-    # summarizer.perform_hierarchical_statistical_analysis()
+    summarizer.perform_hierarchical_statistical_analysis()
 
     print("\nLLM analysis completed!")
 
