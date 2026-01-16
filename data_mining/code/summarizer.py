@@ -104,15 +104,15 @@ Based on these visualizations, identify the top {n} most important features cons
 Return ONLY a JSON array with these fields for each feature:
 - rank: (number) feature rank (1 to {n})
 - feature_name: (string) name of the feature
-- direction: (string) effect direction ("positive" or "negative") based on SHAP value impact
-- magnitude: (number) effect magnitude based on importance scores and SHAP values
-- reason: (string) reason for the effect magnitude based on the visualizations
+- shap_correlation: (number) correlation between feature value and SHAP value based on SHAP importance (both XGBoost and LightGBM). Positive values indicate positive correlation, negative values indicate negative correlation, and the magnitude represents the strength.
+- overall_direction: (number) overall effect direction based on SHAP value impact. Positive values indicate positive correlation, negative values indicate negative correlation, and the magnitude represents the strength.
+- reason: (string) reason for the shap_correlation magnitude and overall_direction based on the visualizations
 
 Example JSON output:
 ```json
 [
-  {{"rank": 1, "feature_name": "feature1", "direction": "positive", "magnitude": 0.5, "reason": ""}},
-  {{"rank": 2, "feature_name": "feature2", "direction": "negative", "magnitude": 0.3, "reason": ""}}
+  {{"rank": 1, "feature_name": "feature1", "shap_correlation": 0.5, "overall_direction": "positive", "reason": ""}},
+  {{"rank": 2, "feature_name": "feature2", "shap_correlation": -0.3, "overall_direction": "negative", "reason": ""}}
 ]
 ```
 """
@@ -1168,9 +1168,9 @@ def main():
         input_dir=str(input_dir),
         output_dir=str(output_dir),
     )
-    # summarizer.analyze_visualizations_with_llm(n=n_top_analysis)
+    summarizer.analyze_visualizations_with_llm(n=n_top_analysis)
     # Perform hierarchical statistical analysis on the summary data
-    summarizer.perform_hierarchical_statistical_analysis()
+    # summarizer.perform_hierarchical_statistical_analysis()
 
     print("\nLLM analysis completed!")
 
