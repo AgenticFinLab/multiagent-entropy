@@ -327,7 +327,9 @@ class AggregatedResultsVisualizer:
         print(f"{'='*80}")
 
         # Try to load existing results to continue from where we left off
-        summary_path = self.output_dir / "summary.json"
+        summary_dir = self.output_dir.parent / "results_summary"
+        summary_dir.mkdir(parents=True, exist_ok=True)
+        summary_path = summary_dir / "summary.json"
         all_analysis_results = {}
         if summary_path.exists():
             try:
@@ -636,7 +638,7 @@ def main():
         feature_importance_from=feature_importance_from,
         shap_data_dir=str(shap_data_dir),
     )
-    # visualizer.visualize_all_experiments()
+    visualizer.visualize_all_experiments()
 
     # New functionality: Analyze visualizations with LLM
     # n parameter controls the number of top features to identify
