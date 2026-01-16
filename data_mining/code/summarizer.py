@@ -95,9 +95,9 @@ class VisualizationSummarizer:
 Analyze the visualization image containing four subplots:
 
 1. Feature Importance Comparison (top-left): Shows normalized importance scores for features across LightGBM, XGBoost, and Mean Normalized metrics.
-2. SHAP Importance - XGBoost (top-right): Displays SHAP feature importance for the XGBoost model using dot plots.
+2. SHAP Importance - XGBoost (top-right): Displays SHAP feature importance for the XGBoost model using dot plots. The correlation between feature value and SHAP value is shown.
 3. SHAP Value Impact (bottom-left): Shows mean SHAP values for features, with positive effects in green and negative effects in red.
-4. SHAP Importance - LightGBM (bottom-right): Displays SHAP feature importance for the LightGBM model using dot plots.
+4. SHAP Importance - LightGBM (bottom-right): Displays SHAP feature importance for the LightGBM model using dot plots. The correlation between feature value and SHAP value is shown.
 
 Based on these visualizations, identify the top {n} most important features considering both the importance scores and SHAP values.
 
@@ -973,7 +973,8 @@ def main():
         input_dir=str(input_dir),
         output_dir=str(output_dir),
     )
-    # summarizer.analyze_visualizations_with_llm(n=n_top_analysis)
+    # Analyze visualizations with LLM and identify top features
+    summarizer.analyze_visualizations_with_llm(n=n_top_analysis)
     # Perform hierarchical statistical analysis on the summary data
     summarizer.perform_hierarchical_statistical_analysis()
 
