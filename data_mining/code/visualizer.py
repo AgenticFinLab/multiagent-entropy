@@ -326,10 +326,26 @@ class AggregatedResultsVisualizer:
         print(f"Target: {len(image_files)} images, top {n} features each")
         print(f"{'='*80}")
 
+        # Try to load existing results to continue from where we left off
+        summary_path = self.output_dir / "summary.json"
         all_analysis_results = {}
+        if summary_path.exists():
+            try:
+                with open(summary_path, "r", encoding="utf-8") as f:
+                    all_analysis_results = json.load(f)
+                print(f"Loaded {len(all_analysis_results)} existing results from {summary_path}")
+            except Exception as e:
+                print(f"Could not load existing results file: {str(e)}. Starting fresh.")
+                all_analysis_results = {}
 
         for image_path in image_files:
             exp_name = image_path.stem
+            
+            # Skip if this image has already been processed
+            if exp_name in all_analysis_results:
+                print(f"Skipping {exp_name} (already processed)")
+                continue
+                
             print(f"Processing: {exp_name}...")
 
             try:
@@ -428,6 +444,15 @@ Example JSON output:
                         continue
                     all_analysis_results[exp_name] = analysis_result
                     print(f"   Successfully analyzed {exp_name}")
+                    
+                    # Save to summary.json after each successful analysis
+                    try:
+                        with open(summary_path, "w", encoding="utf-8") as f:
+                            json.dump(all_analysis_results, f, indent=4, ensure_ascii=False)
+                        print(f"   Results saved to: {summary_path} (current progress: {len(all_analysis_results)} items)")
+                    except Exception as save_error:
+                        print(f"   Error saving intermediate results: {str(save_error)}")
+                        
                 except json.JSONDecodeError as je:
                     print(f"   Error parsing JSON for {exp_name}: {str(je)}")
                     print(f"   Content received: {content_text[:200]}...")  # Print first 200 chars of response
@@ -438,16 +463,10 @@ Example JSON output:
                 # Continue to next image
                 continue
 
-        # Save to summary.json
-        summary_path = self.output_dir / "summary.json"
-        try:
-            with open(summary_path, "w", encoding="utf-8") as f:
-                json.dump(all_analysis_results, f, indent=4, ensure_ascii=False)
-            print(f"\n{'='*80}")
-            print(f"LLM analysis completed! Results saved to: {summary_path}")
-            print(f"{'='*80}\n")
-        except Exception as e:
-            print(f"Error saving summary.json: {str(e)}")
+        print(f"\n{'='*80}")
+        print(f"LLM analysis completed! Final results saved to: {summary_path}")
+        print(f"Total analyzed: {len(all_analysis_results)} items")
+        print(f"{'='*80}\n")
 
     def _plot_feature_importance(self, ax, df: pd.DataFrame):
         """Plots feature importance comparison."""
