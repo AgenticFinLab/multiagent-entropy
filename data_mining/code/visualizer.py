@@ -106,7 +106,7 @@ class AggregatedResultsVisualizer:
             print(f"   Error loading SHAP data: {str(e)}")
             return None, None
 
-    def _plot_shap_importance(self, ax, shap_values_df, X_test_df, model_name: str):
+    def _plot_shap_importance(self, ax, shap_values_df, X_test_df, model_name: str, correlation_data: dict = None, df_sorted: pd.DataFrame = None):
         """Plots SHAP importance subplot similar to shap_analyzer.py."""
         if not SHAP_AVAILABLE:
             ax.text(
@@ -135,14 +135,31 @@ class AggregatedResultsVisualizer:
             shap_values = shap_values_df.values
             X_test_values = X_test_df.values
 
+            # Get the feature names in the order they will be displayed by SHAP
+            # Use the same ordering as in the main sorting (based on df_sorted) to ensure consistency
+            if df_sorted is not None:
+                # Use the features from df_sorted in the same order
+                feature_names = df_sorted['feature'].values
+                # Only include features that are present in the SHAP data
+                feature_names = [f for f in feature_names if f in shap_values_df.columns]
+                # Limit to top 20 or however many features we have
+                feature_names = feature_names[:min(self.n_features, len(feature_names))]
+            else:
+                # Fallback to SHAP-based sorting
+                mean_abs_shap = np.abs(shap_values).mean(0)
+                feature_indices = np.argsort(mean_abs_shap)[::-1][:self.n_features]  # Top n_features features
+                feature_names = np.array(shap_values_df.columns)[feature_indices]
+            
             plt.sca(ax)
+            # Create a custom plot since we want to control feature order
+            # Instead of using shap.summary_plot directly, we'll use shap.plots.beeswarm or reorder
             shap.summary_plot(
                 shap_values,
                 X_test_values,
                 feature_names=None,  # Hide feature names
                 plot_type="dot",
                 show=False,
-                max_display=20,
+                max_display=len(feature_names),  # Use our determined feature count
                 color=plt.get_cmap("coolwarm"),
             )
 
@@ -160,6 +177,33 @@ class AggregatedResultsVisualizer:
             ax.set_xlabel(
                 "SHAP value (impact on model output)", fontsize=9, fontweight="bold"
             )
+            
+            # If correlation data is provided, annotate the plot with correlation values
+            if correlation_data:
+                # Annotate each feature with its correlation value
+                y_ticks = ax.get_yticks()
+                for i, feature in enumerate(feature_names):
+                    if i < len(y_ticks) and feature in correlation_data:
+                        # Get the correlation value for this model
+                        if model_name.lower() == 'lightgbm':
+                            corr_val = correlation_data[feature]['lightgbm_shap_correlation']
+                        elif model_name.lower() == 'xgboost':
+                            corr_val = correlation_data[feature]['xgboost_shap_correlation']
+                        else:
+                            corr_val = correlation_data[feature]['mean_shap_correlation']
+                        
+                        # Position annotation to the right of the plot
+                        ax.annotate(
+                            f'r={corr_val:.3f}',
+                            xy=(0, y_ticks[i]),
+                            xytext=(ax.get_xlim()[1] * 1.2, y_ticks[i]),  # Slightly to the right of the plot
+                            fontsize=5.5,
+                            verticalalignment='center',
+                            horizontalalignment='left',
+                            color='red',
+                            weight='bold',
+                            bbox=dict(boxstyle='round,pad=0.1', facecolor='white', alpha=0.8, edgecolor='none')
+                        )
 
         except Exception as e:
             print(f"   Error plotting SHAP importance for {model_name}: {str(e)}")
@@ -255,17 +299,29 @@ class AggregatedResultsVisualizer:
         fig = plt.figure(figsize=(8, 12))
         gs = fig.add_gridspec(8, 2, hspace=4, wspace=0.6)
 
+        # Extract correlation data for top features
+        top_features = set(df_sorted['feature'].values)
+        correlation_data = {}
+        for _, row in df.iterrows():
+            feature = row['feature']
+            if feature in top_features:
+                correlation_data[feature] = {
+                    'lightgbm_shap_correlation': row.get('lightgbm_shap_correlation', 0),
+                    'xgboost_shap_correlation': row.get('xgboost_shap_correlation', 0),
+                    'mean_shap_correlation': row.get('mean_shap_correlation', 0)
+                }
+
         # 1. Feature Importance Comparison
         ax1 = fig.add_subplot(gs[:4, 0])
         self._plot_feature_importance(ax1, df_sorted)
 
         # 2. SHAP Importance - LightGBM
         ax2 = fig.add_subplot(gs[4:8, 1])
-        self._plot_shap_importance(ax2, shap_lgb, X_test_lgb, "LightGBM")
+        self._plot_shap_importance(ax2, shap_lgb, X_test_lgb, "LightGBM", correlation_data, df_sorted)
 
         # 3. SHAP Importance - XGBoost
         ax3 = fig.add_subplot(gs[:4, 1])
-        self._plot_shap_importance(ax3, shap_xgb, X_test_xgb, "XGBoost")
+        self._plot_shap_importance(ax3, shap_xgb, X_test_xgb, "XGBoost", correlation_data, df_sorted)
 
         # 4. SHAP Value Impact (Mean SHAP)
         ax4 = fig.add_subplot(gs[4:8, 0])
