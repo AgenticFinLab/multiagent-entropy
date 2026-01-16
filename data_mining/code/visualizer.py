@@ -371,7 +371,7 @@ Return ONLY a JSON array with these fields for each feature:
 - feature_name: (string) name of the feature
 - direction: (string) effect direction ("positive" or "negative") based on SHAP value impact
 - magnitude: (number) effect magnitude based on importance scores and SHAP values
-- reason: (string) reason for the feature's importance based on the visualizations
+- reason: (string) reason for the effect magnitude based on the visualizations
 
 Example JSON output:
 ```json
@@ -638,7 +638,7 @@ def main():
         feature_importance_from=feature_importance_from,
         shap_data_dir=str(shap_data_dir),
     )
-    visualizer.visualize_all_experiments()
+    # visualizer.visualize_all_experiments()
 
     # New functionality: Analyze visualizations with LLM
     # n parameter controls the number of top features to identify
