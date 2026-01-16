@@ -101,6 +101,12 @@ class ExperimentAggregator:
             "xgboost_shap_values": exp_path
             / "shap"
             / "shap_values_XGBoost_classification.csv",
+            "lightgbm_x_test": exp_path
+            / "shap"
+            / "X_test_LightGBM_classification.csv",
+            "xgboost_x_test": exp_path
+            / "shap"
+            / "X_test_XGBoost_classification.csv",
         }
 
         # Check if files exist
@@ -206,6 +212,8 @@ class ExperimentAggregator:
         """
         lgb_shap_values = data["lightgbm_shap_values"]
         xgb_shap_values = data["xgboost_shap_values"]
+        lgb_x_test = data.get("lightgbm_x_test")
+        xgb_x_test = data.get("xgboost_x_test")
 
         # Remove non-feature columns (e.g., sample_index)
         non_feature_cols = ["sample_index"]
@@ -222,6 +230,19 @@ class ExperimentAggregator:
         )
         xgb_stats = self._calculate_shap_stats(xgb_shap_values[xgb_features], "xgboost")
 
+        # Calculate feature-SHAP correlation if X_test data is available
+        if lgb_x_test is not None and xgb_x_test is not None:
+            lgb_corr_stats = self._calculate_feature_shap_correlation(
+                lgb_x_test, lgb_shap_values, "lightgbm"
+            )
+            xgb_corr_stats = self._calculate_feature_shap_correlation(
+                xgb_x_test, xgb_shap_values, "xgboost"
+            )
+            
+            # Merge correlation statistics
+            summary_df = summary_df.merge(lgb_corr_stats, on="feature", how="left")
+            summary_df = summary_df.merge(xgb_corr_stats, on="feature", how="left")
+
         # Merge statistical data
         summary_df = summary_df.merge(lgb_stats, on="feature", how="left")
         summary_df = summary_df.merge(xgb_stats, on="feature", how="left")
@@ -230,6 +251,50 @@ class ExperimentAggregator:
         summary_df = self._calculate_combined_metrics(summary_df)
 
         return summary_df
+
+    def _calculate_feature_shap_correlation(
+        self, x_test_df: pd.DataFrame, shap_df: pd.DataFrame, model_name: str
+    ) -> pd.DataFrame:
+        """Calculates correlation between feature values and SHAP values.
+
+        Args:
+            x_test_df: DataFrame containing feature values (X_test)
+            shap_df: DataFrame containing SHAP values
+            model_name: Model name (used for column name prefix)
+
+        Returns:
+            DataFrame containing correlation coefficients
+        """
+        correlations = []
+        
+        # Get common features between X_test and SHAP data
+        x_test_features = set(x_test_df.columns)
+        shap_features = set(shap_df.columns)
+        common_features = x_test_features.intersection(shap_features)
+        
+        for feature in common_features:
+            # Get feature values and corresponding SHAP values
+            feature_values = x_test_df[feature].values
+            shap_values = shap_df[feature].values
+            
+            # Ensure arrays have the same length
+            min_length = min(len(feature_values), len(shap_values))
+            feature_values = feature_values[:min_length]
+            shap_values = shap_values[:min_length]
+            
+            # Calculate Pearson correlation coefficient
+            correlation = np.corrcoef(feature_values, shap_values)[0, 1]
+            
+            # If correlation is NaN (e.g., due to constant values), set to 0
+            if np.isnan(correlation):
+                correlation = 0.0
+            
+            correlations.append({
+                "feature": feature,
+                f"{model_name}_shap_correlation": correlation
+            })
+        
+        return pd.DataFrame(correlations)
 
     def _calculate_shap_stats(
         self, shap_df: pd.DataFrame, model_name: str
@@ -336,6 +401,11 @@ class ExperimentAggregator:
 
         df["overall_impact_direction"] = df.apply(determine_overall_direction, axis=1)
 
+        # Average SHAP correlation between feature values and SHAP values
+        df["mean_shap_correlation"] = (
+            df.get("lightgbm_shap_correlation", 0) + df.get("xgboost_shap_correlation", 0)
+        ) / 2
+
         # Impact strength (considering both importance and direction consistency)
         # impact_strength = feature_importance * (1 - direction_mismatch)
         # This metric helps to find features with strong impact and consistent direction
@@ -359,6 +429,7 @@ class ExperimentAggregator:
             "mean_shap",
             "mean_positive_ratio",
             "mean_negative_ratio",
+            "mean_shap_correlation",
             "overall_impact_direction",
             "impact_strength",
         ]
