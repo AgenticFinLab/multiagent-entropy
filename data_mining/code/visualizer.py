@@ -312,17 +312,33 @@ class AggregatedResultsVisualizer:
         ax.grid(axis="x", alpha=0.3)
         ax.set_facecolor('#f8f9fa')
 
-        # Add value labels, avoid overlap
+        # Add value labels, avoid overlap and boundary issues
         for i, (feature, value) in enumerate(zip(features, mean_shap)):
             if abs(value) > 0.001:
+                # Calculate label position to avoid boundary issues
+                bar_width = value
+                offset = 0.005  # Reduced offset to prevent boundary issues
+                
+                # Determine the x-position for the label based on the sign of the value
+                if value >= 0:
+                    # For positive values, place text to the right of the bar
+                    x_pos = min(bar_width + offset, ax.get_xlim()[1] * 0.95)  # Keep within 95% of axis range
+                    ha_align = "left"
+                else:
+                    # For negative values, place text to the left of the bar
+                    x_pos = max(bar_width - offset, ax.get_xlim()[0] * 0.95)  # Keep within 95% of axis range
+                    ha_align = "right"
+                
+                # Add the text with adjusted position
                 ax.text(
-                    value + (0.01 if value >= 0 else -0.01),
+                    x_pos,
                     y_positions[i],
                     f"{value:.3f}",
                     va="center",
-                    ha="left" if value > 0 else "right",
+                    ha=ha_align,
                     fontsize=7,
                     weight='normal',
+                    bbox=dict(boxstyle='round,pad=0.1', facecolor='white', alpha=0.7, edgecolor='none')
                 )
 
     def _collect_experiment_summary(self, exp_name: str, df_sorted: pd.DataFrame):
