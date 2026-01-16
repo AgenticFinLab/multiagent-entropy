@@ -58,9 +58,6 @@ class AggregatedResultsVisualizer:
 
         # Create output directory if it doesn't exist
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Store experiment summaries for final report
-        self.experiment_summaries = []
 
     def _load_shap_data(self, exp_name: str, model_name: str, task_type: str):
         """Loads SHAP values and X_test data for a specific model.
@@ -121,7 +118,6 @@ class AggregatedResultsVisualizer:
         try:
             shap_values = shap_values_df.values
             X_test_values = X_test_df.values
-            feature_names = list(shap_values_df.columns)
 
             plt.sca(ax)
             shap.summary_plot(
@@ -189,9 +185,7 @@ class AggregatedResultsVisualizer:
         print(f"   Failed: {failed}")
         print(f"   Total: {len(csv_files)}")
         print(f"{'='*80}\n")
-        
-        # Generate summary file after processing all experiments
-        self._generate_summary_file()
+
 
     def visualize_experiment(self, csv_file: Path, exp_name: str):
         """Creates visualizations for a single experiment.
@@ -254,9 +248,6 @@ class AggregatedResultsVisualizer:
         plt.savefig(output_file, dpi=300, bbox_inches="tight", facecolor='white', edgecolor='none')
         plt.close(fig)
         print(f"   Saved visualization to: {output_file}")
-        
-        # Collect summary information for this experiment
-        self._collect_experiment_summary(exp_name, df_sorted)
 
     def _plot_feature_importance(self, ax, df: pd.DataFrame):
         """Plots feature importance comparison."""
@@ -340,73 +331,6 @@ class AggregatedResultsVisualizer:
                     weight='normal',
                     bbox=dict(boxstyle='round,pad=0.1', facecolor='white', alpha=0.7, edgecolor='none')
                 )
-
-    def _collect_experiment_summary(self, exp_name: str, df_sorted: pd.DataFrame):
-        """Collects summary information for a single experiment.
-        
-        Args:
-            exp_name: Name of the experiment
-            df_sorted: DataFrame with top features sorted by importance
-        """
-        # Extract top features and their impact directions
-        summary_data = []
-        for _, row in df_sorted.iterrows():
-            feature = row['feature']
-            importance = row[self.feature_importance_from]
-            impact_direction = row['overall_impact_direction']
-            
-            summary_data.append({
-                'feature': feature,
-                'importance': importance,
-                'impact_direction': impact_direction
-            })
-        
-        # Store experiment summary
-        self.experiment_summaries.append({
-            'experiment_name': exp_name,
-            'features': summary_data
-        })
-    
-    def _generate_summary_file(self):
-        """Generates a summary.txt file with feature importance and impact directions."""
-        if not self.experiment_summaries:
-            print("No experiment summaries to generate report.")
-            return
-        
-        summary_file_path = self.output_dir / "summary.txt"
-        
-        with open(summary_file_path, 'w', encoding='utf-8') as f:
-            f.write("Experiment Feature Importance Summary\n")
-            f.write("===================================\n\n")
-            
-            for exp_summary in self.experiment_summaries:
-                exp_name = exp_summary['experiment_name']
-                features = exp_summary['features']
-                
-                f.write(f"Experiment: {exp_name}\n")
-                f.write(f"Top {self.n_features} Most Important Features:\n")
-                f.write("-" * 40 + "\n")
-                
-                # Sort features by importance in descending order
-                sorted_features = sorted(features, key=lambda x: x['importance'], reverse=True)
-                
-                for i, feature_data in enumerate(sorted_features, 1):
-                    feature = feature_data['feature']
-                    importance = feature_data['importance']
-                    impact_direction = feature_data['impact_direction']
-                    
-                    # Determine impact direction description
-                    direction_desc = {
-                        'positive': 'Positive influence',
-                        'negative': 'Negative influence',
-                        'mixed': 'Mixed influence'
-                    }.get(impact_direction, f'{impact_direction} influence')
-                    
-                    f.write(f"  {i:2d}. {feature:<30} (Importance: {importance:>8.4f}, {direction_desc})\n")
-                
-                f.write("\n")
-        
-        print(f"Summary file saved to: {summary_file_path}")
 
 
 def main():
