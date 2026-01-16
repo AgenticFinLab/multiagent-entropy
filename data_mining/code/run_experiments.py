@@ -20,6 +20,9 @@ from typing import Dict, List, Optional
 
 from aggregator import ExperimentAggregator
 from visualizer import AggregatedResultsVisualizer
+from summarizer import VisualizationSummarizer
+
+
 
 # Configure logging
 logging.basicConfig(
@@ -455,6 +458,17 @@ def main():
         default=True,
         help="Run visualization of aggregated results after aggregation (default: True)",
     )
+    parser.add_argument(
+        "--run-summarization",
+        default=True,
+        help="Run summarization of generated images after visualization (default: True)",
+    )
+    parser.add_argument(
+        "--n-top-analysis",
+        type=int,
+        default=5,
+        help="Number of top features to summarize (default: 5)",
+    )
     
     args = parser.parse_args()
        
@@ -574,6 +588,24 @@ def main():
             logger.info("Visualization of aggregated results completed!")
         except Exception as e:
             logger.error(f"Error during visualization: {str(e)}", exc_info=True)
+            raise
+    
+    if args.run_summarization:
+        logger.info("\nStarting summarization of generated images...")
+        try:
+            script_dir = Path(__file__).parent
+            project_root = script_dir.parent
+            input_dir = project_root / "results_visualizations"
+            output_dir = project_root / "results_summaries"
+                
+            summarizer = VisualizationSummarizer(
+                str(input_dir),
+                str(output_dir),
+            )
+            summarizer.analyze_visualizations_with_llm(n=args.n_top_analysis)
+            logger.info("Summarization of generated images completed!")
+        except Exception as e:
+            logger.error(f"Error during summarization: {str(e)}", exc_info=True)
             raise
     
     # Print final summary
