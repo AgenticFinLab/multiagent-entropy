@@ -18,6 +18,12 @@ from threading import Lock
 from datetime import datetime
 from typing import Dict, List, Optional
 
+from aggregator import ExperimentAggregator
+from visualizer import AggregatedResultsVisualizer
+from summarizer import VisualizationSummarizer
+
+
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -412,31 +418,56 @@ def main():
     parser.add_argument(
         '--dataset-list',
         nargs='+',
-        default=["gsm8k", "aime2024_8192", "aime2025_8192", "all"],  # Changed to None to detect if the argument was provided
+        # Changed to None to detect if the argument was provided
+        default=["math500", "aime2024_8192", "aime2025_8192", "gsm8k", "all"],  
         help="List of dataset names to use in experiments (use 'all' for all/default)"
     )
     parser.add_argument(
         '--model-list',
         nargs='+',
-        default=["qwen3_4b", "qwen3_8b", "all"],  # Changed to None to detect if the argument was provided
+        # Changed to None to detect if the argument was provided
+        default=["qwen3_4b", "qwen3_8b", "all"],  
         help="List of model names to use in experiments (use 'all' for all/default)"
     )
     parser.add_argument(
         '--arch-list',
         nargs='+',
-        default=["all"],  # Changed to None to detect if the argument was provided
+        # Changed to None to detect if the argument was provided
+        default=["all"],  
         help="List of architecture types to use in experiments (use 'all' for all/default)"
     )
     parser.add_argument(
         '--exclude-feature-list',
         nargs='+',
-        default=["base_model_metrics", "default"],  # Changed to None to detect if the argument was provided
+        # Changed to None to detect if the argument was provided
+        default=["base_model_metrics", "default"],  
         help="List of exclude feature options to use in experiments (use 'default' for default and 'all' for all)"
     )
     parser.add_argument(
         '--generate-config-only',
         action='store_true',
         help="Generate configuration file only without running experiments"
+    )
+    parser.add_argument(
+        "--run-aggregation",
+        default=True,
+        help="Run experiment results aggregation after analysis (default: True)",
+    )
+    parser.add_argument(
+        "--run-visualization",
+        default=True,
+        help="Run visualization of aggregated results after aggregation (default: True)",
+    )
+    parser.add_argument(
+        "--run-summarization",
+        default=True,
+        help="Run summarization of generated images after visualization (default: True)",
+    )
+    parser.add_argument(
+        "--n-top-analysis",
+        type=int,
+        default=5,
+        help="Number of top features to summarize (default: 5)",
     )
     
     args = parser.parse_args()
@@ -520,6 +551,62 @@ def main():
     
     # Generate reports
     generate_report(results, args.output_dir)
+
+    # Run aggregation if requested
+    if args.run_aggregation:
+        logger.info("\nStarting experiment results aggregation...")
+        try:
+            script_dir = Path(__file__).parent
+            project_root = script_dir.parent
+            results_dir = project_root / "results"
+            output_dir = project_root / "results_aggregated"
+            output_dir.mkdir(parents=True, exist_ok=True)
+                
+            aggregator = ExperimentAggregator(str(results_dir), str(output_dir))
+            aggregator.aggregate_all_experiments()
+            logger.info("Experiment results aggregation completed!")
+        except Exception as e:
+            logger.error(f"Error during aggregation: {str(e)}", exc_info=True)
+            raise
+        
+    # Run visualization if requested
+    if args.run_visualization:
+        logger.info("\nStarting visualization of aggregated results...")
+        try:
+            script_dir = Path(__file__).parent
+            project_root = script_dir.parent
+            input_dir = project_root / "results_aggregated"
+            output_dir = project_root / "results_visualizations"
+                
+            visualizer = AggregatedResultsVisualizer(
+                str(input_dir),
+                str(output_dir),
+                n_features=20,
+                feature_importance_from="mean_importance_normalized",
+            )
+            visualizer.visualize_all_experiments()
+            logger.info("Visualization of aggregated results completed!")
+        except Exception as e:
+            logger.error(f"Error during visualization: {str(e)}", exc_info=True)
+            raise
+    
+    if args.run_summarization:
+        logger.info("\nStarting summarization of generated images...")
+        try:
+            script_dir = Path(__file__).parent
+            project_root = script_dir.parent
+            input_dir = project_root / "results_visualizations"
+            output_dir = project_root / "results_summaries"
+                
+            summarizer = VisualizationSummarizer(
+                str(input_dir),
+                str(output_dir),
+            )
+            summarizer.analyze_visualizations_with_llm(n=args.n_top_analysis)
+            logger.info("Summarization of generated images completed!")
+        except Exception as e:
+            logger.error(f"Error during summarization: {str(e)}", exc_info=True)
+            raise
     
     # Print final summary
     successful_count = sum(1 for r in results if r['status'] == 'SUCCESS')

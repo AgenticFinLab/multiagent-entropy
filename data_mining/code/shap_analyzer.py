@@ -286,6 +286,13 @@ class ShapAnalyzer:
             )
             shap_df.to_csv(shap_csv_path)
             logger.info(f"SHAP values saved to CSV: {shap_csv_path}")
+            
+            # Save X_test to CSV for later visualization
+            X_test_csv_path = (
+                self.output_dir / f"X_test_{model_name}_{task_type}.csv"
+            )
+            X_test.to_csv(X_test_csv_path)
+            logger.info(f"X_test data saved to CSV: {X_test_csv_path}")
 
             # Save mean absolute SHAP values (feature importance) to CSV
             mean_abs_shap = np.abs(shap_values_for_plots).mean(0)

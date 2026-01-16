@@ -7,6 +7,7 @@ results_aggregated directory, including:
 3. Impact direction statistics
 """
 
+import os
 import warnings
 from pathlib import Path
 
@@ -15,18 +16,19 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+
+try:
+    import shap
+
+    SHAP_AVAILABLE = True
+except ImportError:
+    SHAP_AVAILABLE = False
+    print("Warning: SHAP not available. SHAP importance plots will be skipped.")
+
 warnings.filterwarnings("ignore")
 
 # Set enhanced plotting style
 sns.set_style("whitegrid", {"axes.spines.top": False, "axes.spines.right": False})
-plt.rcParams["figure.figsize"] = (16, 12)
-plt.rcParams["font.size"] = 11
-plt.rcParams["axes.labelsize"] = 12
-plt.rcParams["axes.titlesize"] = 14
-plt.rcParams["xtick.labelsize"] = 10
-plt.rcParams["ytick.labelsize"] = 10
-plt.rcParams["legend.fontsize"] = 11
-plt.rcParams["figure.titlesize"] = 16
 
 
 class AggregatedResultsVisualizer:
@@ -38,6 +40,7 @@ class AggregatedResultsVisualizer:
         output_dir: str,
         n_features: int = 20,
         feature_importance_from: str = "mean_importance_normalized",
+        shap_data_dir: str = None,
     ):
         """Initializes the visualizer.
 
@@ -48,14 +51,131 @@ class AggregatedResultsVisualizer:
             feature_importance_from: Column name to use for feature importance ranking.
                 Options: 'lightgbm_importance', 'xgboost_importance',
                         'mean_importance', 'mean_importance_normalized'
+            shap_data_dir: Base directory containing SHAP results for experiments
         """
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
         self.n_features = n_features
         self.feature_importance_from = feature_importance_from
+        self.shap_data_dir = Path(shap_data_dir) if shap_data_dir else None
 
         # Create output directory if it doesn't exist
         self.output_dir.mkdir(parents=True, exist_ok=True)
+
+    def _load_shap_data(self, exp_name: str, model_name: str, task_type: str):
+        """Loads SHAP values and X_test data for a specific model.
+
+        Args:
+            exp_name: Name of the experiment
+            model_name: Name of the model (e.g., 'LightGBM', 'XGBoost')
+            task_type: Type of task ('classification' or 'regression')
+
+        Returns:
+            Tuple of (shap_values_df, X_test_df) or (None, None) if files not found
+        """
+        if self.shap_data_dir is None:
+            return None, None
+
+        # Construct path to SHAP directory for this experiment
+        shap_dir = self.shap_data_dir / exp_name / "shap"
+
+        if not shap_dir.exists():
+            print(f"   Warning: SHAP directory not found: {shap_dir}")
+            return None, None
+
+        # Load SHAP values CSV
+        shap_csv_path = shap_dir / f"shap_values_{model_name}_{task_type}.csv"
+        if not shap_csv_path.exists():
+            print(f"   Warning: SHAP values file not found: {shap_csv_path}")
+            return None, None
+
+        # Load X_test CSV
+        x_test_csv_path = shap_dir / f"X_test_{model_name}_{task_type}.csv"
+        if not x_test_csv_path.exists():
+            print(f"   Warning: X_test file not found: {x_test_csv_path}")
+            return None, None
+
+        try:
+            shap_values_df = pd.read_csv(shap_csv_path, index_col="sample_index")
+            X_test_df = pd.read_csv(x_test_csv_path, index_col=0)
+            print(
+                f"   Loaded SHAP data: {len(shap_values_df)} samples, {len(shap_values_df.columns)} features"
+            )
+            return shap_values_df, X_test_df
+        except Exception as e:
+            print(f"   Error loading SHAP data: {str(e)}")
+            return None, None
+
+    def _plot_shap_importance(self, ax, shap_values_df, X_test_df, model_name: str):
+        """Plots SHAP importance subplot similar to shap_analyzer.py."""
+        if not SHAP_AVAILABLE:
+            ax.text(
+                0.5, 0.5, "SHAP not available", ha="center", va="center", fontsize=8
+            )
+            ax.set_title(
+                f"SHAP Importance - {model_name}", fontweight="bold", fontsize=10
+            )
+            return
+
+        if shap_values_df is None or X_test_df is None:
+            ax.text(
+                0.5,
+                0.5,
+                "SHAP data not available",
+                ha="center",
+                va="center",
+                fontsize=8,
+            )
+            ax.set_title(
+                f"SHAP Importance - {model_name}", fontweight="bold", fontsize=10
+            )
+            return
+
+        try:
+            shap_values = shap_values_df.values
+            X_test_values = X_test_df.values
+
+            plt.sca(ax)
+            shap.summary_plot(
+                shap_values,
+                X_test_values,
+                feature_names=None,  # Hide feature names
+                plot_type="dot",
+                show=False,
+                max_display=20,
+                color=plt.get_cmap("coolwarm"),
+            )
+
+            ax.set_title(
+                f"SHAP Importance - {model_name}",
+                fontweight="bold",
+                fontsize=11,
+                pad=15,
+            )
+            ax.set_facecolor("#f8f9fa")
+
+            # Adjust y-axis tick labels
+            ax.tick_params(axis="y", labelsize=8)
+            ax.set_ylabel("Features", fontsize=9, fontweight="bold")
+            ax.set_xlabel(
+                "SHAP value (impact on model output)", fontsize=9, fontweight="bold"
+            )
+
+        except Exception as e:
+            print(f"   Error plotting SHAP importance for {model_name}: {str(e)}")
+            ax.clear()
+            ax.text(
+                0.5,
+                0.5,
+                f"Error: {str(e)}",
+                ha="center",
+                va="center",
+                fontsize=8,
+                wrap=True,
+            )
+            ax.set_title(
+                f"SHAP Importance - {model_name}", fontweight="bold", fontsize=12
+            )
 
     def visualize_all_experiments(self):
         """Visualizes all CSV files in the input directory."""
@@ -89,6 +209,7 @@ class AggregatedResultsVisualizer:
                 print(f"Failed: {exp_name}")
                 print(f"   Error message: {str(e)}")
                 import traceback
+
                 traceback.print_exc()
 
         print(f"\n{'='*80}")
@@ -122,43 +243,51 @@ class AggregatedResultsVisualizer:
             by=self.feature_importance_from, ascending=False
         ).head(self.n_features)
 
+        # Try to load SHAP data for LightGBM and XGBoost
+        shap_lgb, X_test_lgb = self._load_shap_data(
+            exp_name, "LightGBM", "classification"
+        )
+        shap_xgb, X_test_xgb = self._load_shap_data(
+            exp_name, "XGBoost", "classification"
+        )
+
         # Create figure with subplots
-        fig = plt.figure(figsize=(12, 28))
-        gs = fig.add_gridspec(4, 1, height_ratios=[2.5, 2.5, 2.5, 1], hspace=0.4, wspace=0.3)
+        fig = plt.figure(figsize=(8, 12))
+        gs = fig.add_gridspec(8, 2, hspace=4, wspace=0.6)
 
         # 1. Feature Importance Comparison
-        ax1 = fig.add_subplot(gs[0, 0])
+        ax1 = fig.add_subplot(gs[:4, 0])
         self._plot_feature_importance(ax1, df_sorted)
 
-        # 2. SHAP Value Visualization
-        ax2 = fig.add_subplot(gs[1, 0])
-        self._plot_shap_values(ax2, df_sorted)
+        # 2. SHAP Importance - LightGBM
+        ax2 = fig.add_subplot(gs[4:8, 1])
+        self._plot_shap_importance(ax2, shap_lgb, X_test_lgb, "LightGBM")
 
-        # 3. SHAP Statistics - Positive vs Negative Ratios
-        ax3 = fig.add_subplot(gs[2, 0])
-        self._plot_shap_ratios(ax3, df_sorted)
+        # 3. SHAP Importance - XGBoost
+        ax3 = fig.add_subplot(gs[:4, 1])
+        self._plot_shap_importance(ax3, shap_xgb, X_test_xgb, "XGBoost")
 
-        # 4. Feature Importance Distribution
-        ax4 = fig.add_subplot(gs[3, 0])
-        self._plot_importance_distribution(ax4, df)
+        # 4. SHAP Value Impact (Mean SHAP)
+        ax4 = fig.add_subplot(gs[4:8, 0])
+        self._plot_shap_values(ax4, df_sorted)
 
         # Add main title
         fig.suptitle(
             f"Experiment Analysis: {exp_name}\n(Top {self.n_features} features by {self.feature_importance_from})",
-            fontsize=18,
+            fontsize=12,
             fontweight="bold",
-            y=0.95,
+            y=0.98,
         )
-        
-        # Add subtle footer with timestamp
-        import datetime
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-        fig.text(0.02, 0.02, f'Generated on: {timestamp}',
-                 fontsize=9, style='italic', color='#666666')
 
         # Save figure
         output_file = self.output_dir / f"{exp_name}.png"
-        plt.savefig(output_file, dpi=300, bbox_inches="tight", facecolor='white', edgecolor='none')
+        plt.savefig(
+            output_file,
+            dpi=300,
+            bbox_inches="tight",
+            facecolor="white",
+            edgecolor="none",
+        )
         plt.close(fig)
         print(f"   Saved visualization to: {output_file}")
 
@@ -169,147 +298,132 @@ class AggregatedResultsVisualizer:
         xgb_imp = df["xgboost_importance"].values
         mean_imp_norm = df[self.feature_importance_from].values
 
-        # Increase spacing between bars by modifying the x positions
+        # Normalize for better comparison
+        lgb_norm = (
+            (lgb_imp - lgb_imp.min()) / (lgb_imp.max() - lgb_imp.min())
+            if lgb_imp.max() > lgb_imp.min()
+            else lgb_imp * 0
+        )
+        xgb_norm = (
+            (xgb_imp - xgb_imp.min()) / (xgb_imp.max() - xgb_imp.min())
+            if xgb_imp.max() > xgb_imp.min()
+            else xgb_imp * 0
+        )
+
         x = np.arange(len(features))
         width = 0.25
 
-        # Normalize for better comparison
-        lgb_norm = (lgb_imp - lgb_imp.min()) / (lgb_imp.max() - lgb_imp.min()) if lgb_imp.max() > lgb_imp.min() else lgb_imp * 0
-        xgb_norm = (xgb_imp - xgb_imp.min()) / (xgb_imp.max() - xgb_imp.min()) if xgb_imp.max() > xgb_imp.min() else xgb_imp * 0
-
-        # Improved color palette
-        ax.barh(x - width, lgb_norm, width, label="LightGBM (normalized)", alpha=0.8, 
-                color="#1f77b4", edgecolor='white', linewidth=0.8)
-        ax.barh(x, xgb_norm, width, label="XGBoost (normalized)", alpha=0.8, 
-                color="#ff7f0e", edgecolor='white', linewidth=0.8)
-        ax.barh(x + width, mean_imp_norm, width, label="Mean Normalized", alpha=0.8, 
-                color="#2ca02c", edgecolor='white', linewidth=0.8)
+        ax.barh(
+            x - width,
+            lgb_norm,
+            width,
+            label="LightGBM (normalized)",
+            alpha=0.8,
+            color="#1f77b4",
+            edgecolor="white",
+            linewidth=0.8,
+        )
+        ax.barh(
+            x,
+            xgb_norm,
+            width,
+            label="XGBoost (normalized)",
+            alpha=0.8,
+            color="#ff7f0e",
+            edgecolor="white",
+            linewidth=0.8,
+        )
+        ax.barh(
+            x + width,
+            mean_imp_norm,
+            width,
+            label="Mean Normalized",
+            alpha=0.8,
+            color="#2ca02c",
+            edgecolor="white",
+            linewidth=0.8,
+        )
 
         ax.set_yticks(x)
-        ax.set_yticklabels(features, fontsize=10, ha='right')
-        ax.set_xlabel("Normalized Importance", fontweight="bold", fontsize=12)
-        ax.set_title("Feature Importance Comparison", fontweight="bold", fontsize=14, pad=15)
-        ax.legend(loc="lower right", frameon=True, fancybox=True, shadow=True)
+        ax.set_yticklabels(features, fontsize=8, ha="right")
+        ax.set_xlabel("Normalized Importance", fontweight="bold", fontsize=9)
+        ax.set_title(
+            "Feature Importance Comparison", fontweight="bold", fontsize=11, pad=15
+        )
+        ax.legend(
+            loc="lower right", frameon=True, fancybox=True, shadow=True, fontsize=8
+        )
         ax.invert_yaxis()
         ax.grid(axis="x", alpha=0.3)
-        
-        # Add subtle background color
-        ax.set_facecolor('#f8f9fa')
+        ax.set_facecolor("#f8f9fa")
+
+        # Automatically adjust y-axis labels, avoid overlap
+        plt.setp(ax.get_yticklabels(), rotation=0, ha="right", rotation_mode="anchor")
+        # Removed inner tight_layout call to avoid interfering with global layout
 
     def _plot_shap_values(self, ax, df: pd.DataFrame):
         """Plots SHAP values for top features."""
-        features = df["feature"].values[:20]  # Top 20 for clarity
-        mean_shap = df["mean_shap"].values[:20]
+        features = df["feature"].values[: self.n_features]
+        mean_shap = df["mean_shap"].values[: self.n_features]
 
-        # Increase spacing between bars
-        y_positions = np.arange(len(features)) 
-        
+        y_positions = np.arange(len(features))
+
         colors = ["#2E8B57" if val > 0 else "#DC143C" for val in mean_shap]
 
-        bars = ax.barh(y_positions, mean_shap, color=colors, alpha=0.8, edgecolor='white', linewidth=0.8)
+        bars = ax.barh(
+            y_positions,
+            mean_shap,
+            color=colors,
+            alpha=0.8,
+            edgecolor="white",
+            linewidth=0.8,
+        )
         ax.axvline(x=0, color="black", linestyle="--", linewidth=1.5, alpha=0.7)
-        ax.set_xlabel("Mean SHAP Value", fontweight="bold", fontsize=12)
-        ax.set_title("SHAP Value Impact\n(Top 20 Features)", fontweight="bold", fontsize=14, pad=15)
+        ax.set_xlabel("Mean SHAP Value", fontweight="bold", fontsize=9)
+        ax.set_title("SHAP Value Impact", fontweight="bold", fontsize=11, pad=15)
         ax.set_yticks(y_positions)
-        ax.set_yticklabels(features, fontsize=10, ha='right')
+        ax.set_yticklabels(features, fontsize=8, ha="right")
         ax.invert_yaxis()
         ax.grid(axis="x", alpha=0.3)
-        
-        # Add subtle background color
-        ax.set_facecolor('#f8f9fa')
+        ax.set_facecolor("#f8f9fa")
 
-        # Add value labels
+        # Add value labels, avoid overlap and boundary issues
         for i, (feature, value) in enumerate(zip(features, mean_shap)):
-            ax.text(
-                value,
-                y_positions[i],
-                f" {value:.3f}",
-                va="center",
-                ha="left" if value > 0 else "right",
-                fontsize=9,
-                weight='normal'
-            )
+            if abs(value) > 0.001:
+                # Calculate label position to avoid boundary issues
+                bar_width = value
+                offset = 0.005  # Reduced offset to prevent boundary issues
 
-    def _plot_impact_direction(self, ax, df: pd.DataFrame):
-        """Plots impact direction distribution."""
-        direction_counts = df["overall_impact_direction"].value_counts()
+                # Determine the x-position for the label based on the sign of the value
+                if value >= 0:
+                    # For positive values, place text to the right of the bar
+                    x_pos = min(
+                        bar_width + offset, ax.get_xlim()[1] * 0.95
+                    )  # Keep within 95% of axis range
+                    ha_align = "left"
+                else:
+                    # For negative values, place text to the left of the bar
+                    x_pos = max(
+                        bar_width - offset, ax.get_xlim()[0] * 0.95
+                    )  # Keep within 95% of axis range
+                    ha_align = "right"
 
-        colors = {"positive": "#2E8B57", "negative": "#DC143C", "mixed": "#FFA500"}
-        plot_colors = [colors.get(dir, "#888888") for dir in direction_counts.index]
-
-        wedges, texts, autotexts = ax.pie(
-            direction_counts.values,
-            labels=direction_counts.index,
-            autopct="%1.1f%%",
-            colors=plot_colors,
-            startangle=90,
-            textprops={"fontsize": 12, "weight": "bold"},
-            wedgeprops=dict(width=0.5, edgecolor='white', linewidth=1.2)  # Add doughnut style and edges
-        )
-
-        for autotext in autotexts:
-            autotext.set_color("white")
-            autotext.set_fontweight("bold")
-
-        ax.set_title("Impact Direction Distribution", fontweight="bold", fontsize=14, pad=20)
-        
-        # Add subtle background color
-        ax.set_facecolor('#f8f9fa')
-
-    def _plot_shap_ratios(self, ax, df: pd.DataFrame):
-        """Plots positive vs negative SHAP ratios."""
-        features = df["feature"].values[:20]
-        pos_ratio = df["mean_positive_ratio"].values[:20]
-        neg_ratio = df["mean_negative_ratio"].values[:20]
-
-        # Increase spacing between bars
-        x = np.arange(len(features))
-        width = 0.35
-
-        ax.barh(x - width / 2, pos_ratio, width, label="Positive Ratio", color="#2E8B57", alpha=0.8, 
-                edgecolor='white', linewidth=0.8)
-        ax.barh(x + width / 2, neg_ratio, width, label="Negative Ratio", color="#DC143C", alpha=0.8, 
-                edgecolor='white', linewidth=0.8)
-
-        ax.set_yticks(x)
-        ax.set_yticklabels(features, fontsize=10, ha='right')
-        ax.set_xlabel("Ratio", fontweight="bold", fontsize=12)
-        ax.set_title("SHAP Positive/Negative Ratios\n(Top 20 Features)", fontweight="bold", fontsize=14, pad=15)
-        ax.legend(frameon=True, fancybox=True, shadow=True)
-        ax.invert_yaxis()
-        ax.grid(axis="x", alpha=0.3)
-        
-        # Add subtle background color
-        ax.set_facecolor('#f8f9fa')
-
-    def _plot_importance_distribution(self, ax, df: pd.DataFrame):
-        """Plots distribution of feature importance."""
-        mean_imp_norm = df[self.feature_importance_from].values
-
-        ax.hist(mean_imp_norm, bins=30, color="#6A4C93", alpha=0.7, edgecolor="black")
-        ax.axvline(
-            mean_imp_norm.mean(),
-            color="red",
-            linestyle="--",
-            linewidth=2,
-            label=f"Mean: {mean_imp_norm.mean():.3f}",
-        )
-        ax.axvline(
-            np.median(mean_imp_norm),
-            color="green",
-            linestyle="--",
-            linewidth=2,
-            label=f"Median: {np.median(mean_imp_norm):.3f}",
-        )
-
-        ax.set_xlabel(f"{self.feature_importance_from}", fontweight="bold", fontsize=12)
-        ax.set_ylabel("Frequency", fontweight="bold")
-        ax.set_title("Feature Importance Distribution\n(All Features)", fontweight="bold", fontsize=14, pad=15)
-        ax.legend(frameon=True, fancybox=True, shadow=True)
-        ax.grid(axis="y", alpha=0.3)
-        
-        # Add subtle background color
-        ax.set_facecolor('#f8f9fa')
+                # Add the text with adjusted position
+                ax.text(
+                    x_pos,
+                    y_positions[i],
+                    f"{value:.3f}",
+                    va="center",
+                    ha=ha_align,
+                    fontsize=7,
+                    weight="normal",
+                    bbox=dict(
+                        boxstyle="round,pad=0.1",
+                        facecolor="white",
+                        alpha=0.7,
+                        edgecolor="none",
+                    ),
+                )
 
 
 def main():
@@ -321,6 +435,7 @@ def main():
     # Set paths
     input_dir = project_root / "results_aggregated"
     output_dir = project_root / "results_visualizations"
+    shap_data_dir = project_root / "results"  # Base directory for SHAP data
 
     # Configuration
     n_features = 20  # Number of top features to display
@@ -331,6 +446,7 @@ def main():
     print("=" * 80)
     print(f"Input directory: {input_dir}")
     print(f"Output directory: {output_dir}")
+    print(f"SHAP data directory: {shap_data_dir}")
     print(f"Top features to display: {n_features}")
     print(f"Feature importance ranking from: {feature_importance_from}")
     print("=" * 80)
@@ -341,11 +457,11 @@ def main():
         str(output_dir),
         n_features=n_features,
         feature_importance_from=feature_importance_from,
+        shap_data_dir=str(shap_data_dir),
     )
     visualizer.visualize_all_experiments()
 
-    print("\nAll visualizations completed!")
-
+    print("\nVisualizations completed!")
 
 if __name__ == "__main__":
     main()
