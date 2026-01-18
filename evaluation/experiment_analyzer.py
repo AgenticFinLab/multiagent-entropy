@@ -59,6 +59,7 @@ class ExperimentAnalyzer:
         model_name: str,
         experiment_name: str,
         task_type: str = "math",
+        timeout: int = 10,
     ) -> Dict[str, Any]:
         """Analyze a single experiment.
 
@@ -68,6 +69,7 @@ class ExperimentAnalyzer:
             experiment_name: Name of the experiment to analyze.
             task_type: Type of task (e.g., "math", "code", "option").
                        If not provided or "auto", will be inferred from dataset.
+            timeout: Maximum time in seconds to execute code for code tasks.
 
         Returns:
             Dictionary containing experiment metrics and analysis results.
@@ -159,6 +161,7 @@ class ExperimentAnalyzer:
         model_name: str,
         experiment_name: str,
         task_type: str,
+        timeout: int = 10,
     ) -> Dict[str, Any]:
         """Analyze metrics for a single sample.
 
@@ -171,6 +174,7 @@ class ExperimentAnalyzer:
             model_name: Model name.
             experiment_name: Experiment name.
             task_type: Type of task (e.g., "math", "code", "option").
+            timeout: Maximum time in seconds to execute code for code tasks.
 
         Returns:
             Dictionary containing sample-level metrics.
@@ -233,7 +237,7 @@ class ExperimentAnalyzer:
             if ground_truth and predicted_answer and format_compliance:
                 test_cases = ground_truth.get("test_cases") if ground_truth else None
                 is_correct = self.metrics_calculator.is_answer_correct_by_task_type(
-                    predicted_answer, ground_truth["groundtruth"], task_type, test_cases
+                    predicted_answer, ground_truth["groundtruth"], task_type, test_cases, timeout
                 )
 
             # Generate agent key based on architecture and execution order
@@ -359,7 +363,7 @@ class ExperimentAnalyzer:
         return final_agent_key
 
     def analyze_all_experiments(
-        self, dataset: str, task_type: str = "math"
+        self, dataset: str, task_type: str = "math", timeout: int = 10
     ) -> Dict[str, Any]:
         """Analyze all experiments for a given dataset.
 
@@ -367,6 +371,7 @@ class ExperimentAnalyzer:
             dataset: Dataset name (e.g., "gsm8k", "humaneval").
             task_type: Type of task (e.g., "math", "code", "option").
                        If not provided or "auto", will be inferred from dataset.
+            timeout: Maximum time in seconds to execute code for code tasks.
 
         Returns:
             Dictionary containing metrics for all experiments, grouped by model.
@@ -387,7 +392,7 @@ class ExperimentAnalyzer:
             for experiment_name in experiments:
                 try:
                     metrics = self.analyze_experiment(
-                        dataset, model_name, experiment_name, task_type
+                        dataset, model_name, experiment_name, task_type, timeout
                     )
                     all_metrics["models"][model_name]["experiments"][
                         experiment_name

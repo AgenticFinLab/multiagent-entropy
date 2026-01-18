@@ -4,13 +4,18 @@ This module provides utilities for calculating various metrics including
 accuracy, time cost, and entropy from experiment results.
 """
 
-import io
 import re
+import io
 import sys
-import torch
+import concurrent.futures
 from typing import Dict, Any, List, Optional
 
+import torch
 from math_verify import parse, verify
+
+
+class TimeoutError(Exception):
+    pass
 
 
 class MetricsCalculator:
@@ -164,6 +169,7 @@ class MetricsCalculator:
         predicted_code: Optional[str],
         ground_truth_code: str,
         test_cases: Optional[str] = None,
+        timeout: int = 10,
     ) -> bool:
         """Check if predicted code passes all test cases.
 
@@ -171,6 +177,7 @@ class MetricsCalculator:
             predicted_code: Predicted Python code string.
             ground_truth_code: Ground truth code (for reference).
             test_cases: Test cases to validate the code against.
+            timeout: Maximum time in seconds to execute the code.
 
         Returns:
             True if code passes all tests, False otherwise.
@@ -183,7 +190,7 @@ class MetricsCalculator:
         if not test_cases:
             return False
 
-        try:
+        def execute_code_with_testcases():
             # Capture stdout to suppress print statements from predicted code
             old_stdout = sys.stdout
             captured_output = io.StringIO()
@@ -200,7 +207,7 @@ class MetricsCalculator:
             finally:
                 # Restore original stdout
                 sys.stdout = old_stdout
-
+            
             # Check if test cases define a check function
             if "check" in test_namespace:
                 # Run check function for each callable in predicted code
@@ -219,6 +226,16 @@ class MetricsCalculator:
 
             # All tests passed
             return True
+
+        try:
+            # Use ThreadPoolExecutor with timeout to execute the code safely
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(execute_code_with_testcases)
+                result = future.result(timeout=timeout)
+                return result
+        except concurrent.futures.TimeoutError:
+            # Code took too long to execute
+            return False
         # Return False if any error occurs during execution
         except Exception as e:
             return False
@@ -229,6 +246,7 @@ class MetricsCalculator:
         ground_truth: str,
         task_type: str = "math",
         test_cases: Optional[str] = None,
+        timeout: int = 10,
     ) -> bool:
         """Check if predicted answer matches ground truth based on task type.
 
@@ -244,7 +262,7 @@ class MetricsCalculator:
         # For code tasks, use code verification with test cases
         if task_type == "code":
             return MetricsCalculator.is_code_correct(
-                predicted, ground_truth, test_cases
+                predicted, ground_truth, test_cases, timeout
             )
         # For math and option tasks, use mathematical verification
         else:

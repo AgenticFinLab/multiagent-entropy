@@ -41,7 +41,7 @@ def main():
         type=str,
         nargs="*",
         choices=DATASETS,
-        default=["aime2024_8192"],
+        default=["humaneval"],
         help="Datasets to analyze (space-separated list)",
     )
     # Add flag to analyze all datasets
@@ -64,6 +64,13 @@ def main():
         choices=["math", "code", "option", "auto"],
         default="auto",
         help="Task type (auto to infer from dataset)",
+    )
+    # Add timeout argument for code execution
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=10,
+        help="Maximum time in seconds to execute code for code tasks",
     )
     # Add experiment argument for analyzing a specific experiment
     parser.add_argument(
@@ -136,7 +143,7 @@ def main():
             try:
                 # Analyze the specified experiment
                 metrics = analyzer.analyze_experiment(
-                    dataset, args.model, args.experiment, args.task_type
+                    dataset, args.model, args.experiment, args.task_type, args.timeout
                 )
 
                 # Determine output path for results
@@ -200,7 +207,7 @@ def main():
         else:
             print(f"Analyzing all experiments for dataset: {dataset}")
             # Analyze all experiments in the dataset
-            all_metrics = analyzer.analyze_all_experiments(dataset, args.task_type)
+            all_metrics = analyzer.analyze_all_experiments(dataset, args.task_type, args.timeout)
 
             # Determine output path for all metrics
             if args.output:
