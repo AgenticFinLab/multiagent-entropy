@@ -14,4 +14,4 @@ task_type: "math"
 # Generation configuration (overrides base_config.yml)
 # AIME2024 problems require longer reasoning chains
 generation_config:
-  max_new_tokens: 8192
+  max_new_tokens: 16384
