@@ -227,7 +227,19 @@ class Aggregator:
         Returns:
             List of dictionaries containing sample-level data
         """
-        return FeatureEnhancer.build_sample_records(entropy_data, metrics_data)
+        sample_records = FeatureEnhancer.build_sample_records(entropy_data, metrics_data)
+        
+        # Get task_type from metrics_data
+        task_type = metrics_data.get("task_type", "")
+        
+        # If task_type is "code", remove all debate architecture records
+        if task_type == "code":
+            sample_records = [
+                record for record in sample_records 
+                if record.get("architecture", "") != "debate"
+            ]
+        
+        return sample_records
 
     def extract_round_level_data(
         self, entropy_data: Dict[str, Any], metrics_data: Dict[str, Any]
@@ -241,11 +253,21 @@ class Aggregator:
         Returns:
             Dictionary mapping (exp_name, round_num) to round statistics
         """
+        # Get task_type from metrics_data
+        task_type = metrics_data.get("task_type", "")
+        
         round_stats = {}
 
         # Iterate through models and experiments to extract round-level data
         for model_name, model_entropy in entropy_data.get("models", {}).items():
             for exp_name, exp_entropy in model_entropy.get("experiments", {}).items():
+                # Get architecture type for filtering
+                architecture = exp_entropy.get("agent_architecture", "unknown")
+                
+                # If task_type is "code" and architecture is "debate", skip this experiment
+                if task_type == "code" and architecture == "debate":
+                    continue
+
                 # Skip experiments with errors
                 if "error" in exp_entropy:
                     continue
@@ -272,7 +294,6 @@ class Aggregator:
                     continue
 
                 # Get architecture type for time calculation
-                architecture = exp_entropy.get("agent_architecture", "unknown")
                 micro_stats = exp_entropy.get("micro_statistics", {})
                 samples_entropy = micro_stats.get("samples", {})
                 samples_metrics = exp_metrics.get("samples", {})
@@ -377,11 +398,21 @@ class Aggregator:
         Returns:
             Dictionary mapping (exp_name, agent_name) to agent statistics
         """
+        # Get task_type from metrics_data
+        task_type = metrics_data.get("task_type", "")
+        
         agent_stats = {}
 
         # Iterate through models and experiments to extract agent-level data
         for model_name, model_entropy in entropy_data.get("models", {}).items():
             for exp_name, exp_entropy in model_entropy.get("experiments", {}).items():
+                # Get architecture type for filtering
+                architecture = exp_entropy.get("agent_architecture", "unknown")
+                
+                # If task_type is "code" and architecture is "debate", skip this experiment
+                if task_type == "code" and architecture == "debate":
+                    continue
+
                 # Skip experiments with errors
                 if "error" in exp_entropy:
                     continue
@@ -423,6 +454,9 @@ class Aggregator:
         Returns:
             Dictionary mapping exp_name to experiment statistics
         """
+        # Get task_type from metrics_data
+        task_type = metrics_data.get("task_type", "")
+        
         exp_stats = {}
 
         # Calculate base model statistics for comparison
@@ -431,6 +465,13 @@ class Aggregator:
         # Iterate through models and experiments to extract experiment-level data
         for model_name, model_entropy in entropy_data.get("models", {}).items():
             for exp_name, exp_entropy in model_entropy.get("experiments", {}).items():
+                # Get architecture type for filtering
+                architecture = exp_entropy.get("agent_architecture", "unknown")
+                
+                # If task_type is "code" and architecture is "debate", skip this experiment
+                if task_type == "code" and architecture == "debate":
+                    continue
+
                 # Skip experiments with errors
                 if "error" in exp_entropy:
                     continue
@@ -442,7 +483,6 @@ class Aggregator:
                     continue
 
                 # Extract experiment metadata
-                architecture = exp_entropy.get("agent_architecture", "unknown")
                 macro_stats = exp_entropy.get("macro_statistics", {})
                 exp_level = macro_stats.get("experiment_level", {})
 
