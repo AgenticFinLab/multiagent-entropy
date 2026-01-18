@@ -192,6 +192,11 @@ class FeatureEnhancer:
                         "average_entropy_per_token", 0
                     )
 
+                    # Extract sample_final_predicted_answer_entropy if it exists
+                    sample_final_predicted_answer_entropy = sample_entropy.get(
+                        "final_predicted_answer_entropy", None
+                    )
+
                     # Sample-level distribution shape features
                     sample_shape_features: Dict[str, Any] = {}
                     # Range and IQR
@@ -783,6 +788,7 @@ class FeatureEnhancer:
                             "sample_num_agents": sample_num_agents,
                             "sample_all_agents_token_count": sample_all_agents_token_count,
                             "sample_avg_entropy_per_token": sample_avg_entropy_per_token,
+                            "sample_final_predicted_answer_entropy": sample_final_predicted_answer_entropy,
                             "agent_total_entropy": agent_entropy_data.get(
                                 "total_entropy", 0
                             ),

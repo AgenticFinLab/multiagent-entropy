@@ -858,6 +858,7 @@ class Aggregator:
             "sample_num_agents",
             "sample_all_agents_token_count",
             "sample_avg_entropy_per_token",
+            "sample_final_predicted_answer_entropy",
             "sample_entropy_stability_index",
             "sample_avg_entropy_per_agent",
             "exp_total_entropy",
