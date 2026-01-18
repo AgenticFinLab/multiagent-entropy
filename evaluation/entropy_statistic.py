@@ -355,6 +355,9 @@ class EntropyStatistic:
             sequence_agent_type = None
             sequence_execution_order = None
 
+            # Get tokenizer once for the experiment
+            tokenizer = self._get_tokenizer(lm_name) if lm_name else None
+
             # Process each entropy sample in the sequence
             for entropy_info in sample_entropies:
                 # Capture agent type and execution order from first sample
@@ -364,6 +367,27 @@ class EntropyStatistic:
 
                 # Get entropy tensor for current sample
                 entropy_tensor = entropy_info["entropy_tensor"]
+                result_id = entropy_info["result_id"]
+
+                # Calculate predicted_answer_entropy for this specific agent inference
+                predicted_answer_entropy = None
+                if tokenizer and all_results and result_id in all_results:
+                    response = all_results[result_id].get("response", "")
+                    # Extract answer based on task type
+                    if task_type in ["math", "option"]:
+                        answer, ok = MetricsCalculator.extract_boxed_answer(response)
+                    elif task_type == "code":
+                        answer, ok = MetricsCalculator.extract_code_answer(response)
+                    else:
+                        answer, ok = MetricsCalculator.extract_boxed_answer(response)
+                    
+                    if ok and answer:
+                        predicted_answer_entropy = self._get_answer_token_entropy(
+                            response, answer, tokenizer, result_id, [entropy_info]
+                        )
+                
+                # Store it back in entropy_info to use it when building agents dict later
+                entropy_info["predicted_answer_entropy"] = predicted_answer_entropy
 
                 # Convert tensor to numpy array for statistical calculations
                 if isinstance(entropy_tensor, torch.Tensor):
@@ -483,6 +507,7 @@ class EntropyStatistic:
                     "agent_type": sequence_agent_type,
                     "execution_order": sequence_execution_order,
                     "round_number": round_number,
+                    "predicted_answer_entropy": sample_entropies[0].get("predicted_answer_entropy") if sequence_sample_count > 0 else None,
                     "total_entropy": sequence_total_entropy,
                     "max_entropy": sequence_max_entropy / sequence_sample_count,
                     "mean_entropy": sequence_mean_entropy / sequence_sample_count,

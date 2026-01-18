@@ -121,6 +121,9 @@ class FeatureEnhancer:
                                     "total_entropy": float(total_entropy),
                                     "token_count": int(token_count),
                                     "avg_entropy_per_token": float(avg_entropy_per_token),
+                                    "final_predicted_answer_entropy": agent_entropy_data.get(
+                                        "predicted_answer_entropy"
+                                    ),
                                 }
                             break
 
@@ -296,12 +299,94 @@ class FeatureEnhancer:
                     base_sample_avg_entropy_per_token = float(
                         base_sample_entropy_data.get("avg_entropy_per_token", 0.0)
                     )
+                    base_model_final_predicted_answer_entropy = base_sample_entropy_data.get(
+                        "final_predicted_answer_entropy"
+                    )
 
                     sample_base_entropy_features: Dict[str, Any] = {
                         "base_sample_total_entropy": base_sample_total_entropy,
                         "base_sample_token_count": base_sample_token_count,
                         "base_sample_avg_entropy_per_token": base_sample_avg_entropy_per_token,
+                        "base_model_final_predicted_answer_entropy": base_model_final_predicted_answer_entropy,
                     }
+
+                    # Calculate statistics comparing base model and sample final predicted answer entropy
+                    if base_model_final_predicted_answer_entropy is not None and sample_final_predicted_answer_entropy is not None:
+                        sample_base_entropy_features[
+                            "base_model_vs_sample_final_answer_entropy_diff"
+                        ] = (
+                            base_model_final_predicted_answer_entropy
+                            - sample_final_predicted_answer_entropy
+                        )
+                        
+                        if sample_final_predicted_answer_entropy != 0:
+                            sample_base_entropy_features[
+                                "base_model_vs_sample_final_answer_entropy_ratio"
+                            ] = (
+                                base_model_final_predicted_answer_entropy
+                                / sample_final_predicted_answer_entropy
+                            )
+                        else:
+                            sample_base_entropy_features[
+                                "base_model_vs_sample_final_answer_entropy_ratio"
+                            ] = 0.0
+                        
+                        sample_base_entropy_features[
+                            "answer_token_entropy_change"
+                        ] = abs(
+                            base_model_final_predicted_answer_entropy
+                            - sample_final_predicted_answer_entropy
+                        )
+                        
+                        # Direction of change: positive if base model entropy is higher, negative if sample entropy is higher
+                        sample_base_entropy_features[
+                            "answer_token_entropy_change_direction"
+                        ] = (
+                            base_model_final_predicted_answer_entropy
+                            - sample_final_predicted_answer_entropy
+                        )
+                    elif base_model_final_predicted_answer_entropy is not None:
+                        # If only base model entropy is available
+                        sample_base_entropy_features[
+                            "base_model_vs_sample_final_answer_entropy_diff"
+                        ] = base_model_final_predicted_answer_entropy
+                        sample_base_entropy_features[
+                            "base_model_vs_sample_final_answer_entropy_ratio"
+                        ] = 0.0
+                        sample_base_entropy_features[
+                            "answer_token_entropy_change"
+                        ] = abs(base_model_final_predicted_answer_entropy)
+                        sample_base_entropy_features[
+                            "answer_token_entropy_change_direction"
+                        ] = base_model_final_predicted_answer_entropy
+                    elif sample_final_predicted_answer_entropy is not None:
+                        # If only sample entropy is available
+                        sample_base_entropy_features[
+                            "base_model_vs_sample_final_answer_entropy_diff"
+                        ] = -sample_final_predicted_answer_entropy
+                        sample_base_entropy_features[
+                            "base_model_vs_sample_final_answer_entropy_ratio"
+                        ] = 0.0
+                        sample_base_entropy_features[
+                            "answer_token_entropy_change"
+                        ] = abs(sample_final_predicted_answer_entropy)
+                        sample_base_entropy_features[
+                            "answer_token_entropy_change_direction"
+                        ] = -sample_final_predicted_answer_entropy
+                    else:
+                        # If neither is available
+                        sample_base_entropy_features[
+                            "base_model_vs_sample_final_answer_entropy_diff"
+                        ] = 0.0
+                        sample_base_entropy_features[
+                            "base_model_vs_sample_final_answer_entropy_ratio"
+                        ] = 0.0
+                        sample_base_entropy_features[
+                            "answer_token_entropy_change"
+                        ] = 0.0
+                        sample_base_entropy_features[
+                            "answer_token_entropy_change_direction"
+                        ] = 0.0
 
                     if base_sample_total_entropy > 0:
                         sample_base_entropy_features["sample_entropy_ratio_vs_base_total"] = (
