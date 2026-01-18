@@ -24,6 +24,7 @@ EXPERIMENT_STATISTICS = [
 ]
 
 # Exclude identifiers and statistics that would leak target information
+# ALL experiment will exclude this feature group
 DEFAULT_EXCLUDE_COLUMNS = EXPERIMENT_IDENTIFIER + SAMPLE_IDENTIFIER + EXPERIMENT_STATISTICS
 
 # Base model metrics
@@ -46,9 +47,19 @@ SAMPLE_BASELINE_ENTROPY = [
     "sample_entropy_reduction_vs_base_total",
     "sample_avg_entropy_per_token_ratio_vs_base",
     "sample_avg_entropy_per_token_diff_vs_base",
+    # new: token entropy of base model finally predicted answer
+    "base_model_final_predicted_answer_entropy",
+    "base_model_vs_sample_final_answer_entropy_diff",
+    "base_model_vs_sample_final_answer_entropy_ratio",
+    "answer_token_entropy_change",
+    "answer_token_entropy_change_direction",
 ]
 
-BASE_MODEL_METRICS = DEFAULT_EXCLUDE_COLUMNS + BASE_MODEL_METRICS_EXPERIMENT_LEVEL + BASE_MODEL_METRICS_SAMPLE_LEVEL + SAMPLE_BASELINE_ENTROPY
+# Base model metrics without entropy, means exclude the accuracy metrics of base model in the experiment, remain the entropy metrics of base model in the experiment
+BASE_MODEL_WO_ENTROPY = DEFAULT_EXCLUDE_COLUMNS + BASE_MODEL_METRICS_EXPERIMENT_LEVEL + BASE_MODEL_METRICS_SAMPLE_LEVEL
+
+# Base model metrics with entropy, means exclude all the metrics of base model in the experiment
+BASE_MODEL_ALL_METRICS = BASE_MODEL_WO_ENTROPY + SAMPLE_BASELINE_ENTROPY
 
 # Round statistics
 ROUND_STATISTICS = [
@@ -81,6 +92,8 @@ SAMPLE_STATISTICS = [
     "sample_all_agents_token_count",
     "sample_avg_entropy_per_token",
     "sample_entropy_stability_index",
+    # new: token entropy of MAS finally predicted answer
+    "sample_final_predicted_answer_entropy",
 ]
 
 
@@ -313,7 +326,7 @@ SAMPLE_ROUND2_AGENT_STATISTICS = [
 
 # All features combined
 ALL_FEATURES = (
-    BASE_MODEL_METRICS + 
+    BASE_MODEL_ALL_METRICS + 
     ROUND_STATISTICS +
     SAMPLE_STATISTICS +
     SAMPLE_DISTRIBUTION_SHAPE +
@@ -331,7 +344,8 @@ ALL_FEATURES = (
 # Define feature groups for easy access
 FEATURE_GROUPS = {
     "default": DEFAULT_EXCLUDE_COLUMNS,
-    "base_model_metrics": BASE_MODEL_METRICS,
+    "base_model_wo_entropy": BASE_MODEL_WO_ENTROPY,
+    "base_model_all_metrics": BASE_MODEL_ALL_METRICS,
     "experiment_identifier": EXPERIMENT_IDENTIFIER,
     "sample_identifier": SAMPLE_IDENTIFIER,
     "experiment_statistics": EXPERIMENT_STATISTICS,
