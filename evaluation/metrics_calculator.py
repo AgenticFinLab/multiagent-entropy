@@ -4,7 +4,9 @@ This module provides utilities for calculating various metrics including
 accuracy, time cost, and entropy from experiment results.
 """
 
+import io
 import re
+import sys
 import torch
 from typing import Dict, Any, List, Optional
 
@@ -182,13 +184,22 @@ class MetricsCalculator:
             return False
 
         try:
-            # Execute predicted code in isolated namespace
-            local_namespace = {}
-            exec(predicted_code, {}, local_namespace)
+            # Capture stdout to suppress print statements from predicted code
+            old_stdout = sys.stdout
+            captured_output = io.StringIO()
+            sys.stdout = captured_output
+            
+            try:
+                # Execute predicted code in isolated namespace
+                local_namespace = {}
+                exec(predicted_code, {}, local_namespace)
 
-            # Execute test cases in copy of local namespace
-            test_namespace = local_namespace.copy()
-            exec(test_cases, {}, test_namespace)
+                # Execute test cases in copy of local namespace
+                test_namespace = local_namespace.copy()
+                exec(test_cases, {}, test_namespace)
+            finally:
+                # Restore original stdout
+                sys.stdout = old_stdout
 
             # Check if test cases define a check function
             if "check" in test_namespace:
