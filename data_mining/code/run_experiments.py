@@ -419,7 +419,7 @@ def main():
         '--dataset-list',
         nargs='+',
         # Changed to None to detect if the argument was provided
-        default=["math500", "aime2024_8192", "aime2025_8192", "gsm8k", "all"],  
+        default=["math500", "aime2024_8192", "aime2025_8192", "gsm8k", "humaneval","all"],  
         help="List of dataset names to use in experiments (use 'all' for all/default)"
     )
     parser.add_argument(
@@ -440,7 +440,7 @@ def main():
         '--exclude-feature-list',
         nargs='+',
         # Changed to None to detect if the argument was provided
-        default=["base_model_metrics", "default"],  
+        default=["base_model_wo_entropy", "base_model_all_metrics", "default"],  
         help="List of exclude feature options to use in experiments (use 'default' for default and 'all' for all)"
     )
     parser.add_argument(
@@ -602,8 +602,9 @@ def main():
                 str(input_dir),
                 str(output_dir),
             )
-            summarizer.analyze_visualizations_with_llm(n=args.n_top_analysis)
-            logger.info("Summarization of generated images completed!")
+            summarizer.analyze_visualizations(n=args.n_top_analysis)
+            # Perform hierarchical statistical analysis on the summary data
+            summarizer.perform_hierarchical_statistical_analysis()
         except Exception as e:
             logger.error(f"Error during summarization: {str(e)}", exc_info=True)
             raise
