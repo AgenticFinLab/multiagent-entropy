@@ -1,230 +1,120 @@
-"""LLM-based analysis of visualization images.
+"""Direct data-driven summary generation.
 
-This module provides functionality to analyze visualization images using LLMs,
-specifically designed to extract insights from feature importance and SHAP value plots.
+This module provides functionality to analyze experiment results directly from 
+aggregated CSV data, extracting insights from feature importance and SHAP values
+without requiring LLM-based image analysis.
 """
 
 import os
 import json
-import base64
 import statistics
+import pandas as pd
 from pathlib import Path
 from collections import Counter, defaultdict
 
-from openai import OpenAI
-
 
 class VisualizationSummarizer:
-    """Class to handle LLM-based analysis of visualization images."""
+    """Class to handle direct data-based analysis of experiment results."""
 
-    def __init__(self, input_dir: str, output_dir: str):
+    def __init__(self, input_dir: str, output_dir: str, sort_column: str):
         """Initializes the summarizer.
 
         Args:
-            input_dir: Directory containing visualization images to analyze
-            output_dir: Directory to store LLM analysis results
+            input_dir: Directory containing aggregated CSV files to analyze
+            output_dir: Directory to store analysis results
         """
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
+        self.sort_column = sort_column
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-    def analyze_visualizations_with_llm(self, n: int = 5):
-        """Analyzes generated visualizations using ByteDance Ark OpenAI API.
+    def analyze_visualizations(self, n: int = 5):
+        """Analyzes experiment results directly from CSV data in input_dir.
 
         Args:
             n: Number of most important features to identify.
         """
-        api_key = os.getenv("ARK_API_KEY")
-        if not api_key:
-            print(
-                "\nError: ARK_API_KEY environment variable not set. Skipping LLM analysis."
-            )
-            print("Please set it with: export ARK_API_KEY='your-api-key'")
-            return
-
-        client = OpenAI(
-            base_url="https://ark.cn-beijing.volces.com/api/v3",
-            api_key=api_key,
-        )
-
-        # Find all PNG files in input directory
-        image_files = sorted(list(self.input_dir.glob("*.png")))
-        if not image_files:
-            print(f"\nWarning: No visualization images found in {self.input_dir}")
-            print("Please run visualizations first by generating visualization images.")
+        # Find all CSV files in input directory
+        csv_files = sorted(list(self.input_dir.glob("*.csv")))
+        if not csv_files:
+            print(f"\nWarning: No aggregated CSV files found in {self.input_dir}")
             return
 
         print(f"\n{'='*80}")
-        print(f"Starting LLM Analysis (using doubao-seed-1-8-251228)")
-        print(f"Target: {len(image_files)} images, top {n} features each")
+        print(f"Starting Direct Data Analysis")
+        print(f"Target: {len(csv_files)} files, top {n} features each")
         print(f"{'='*80}")
 
         # Try to load existing results to continue from where we left off
         summary_path = self.output_dir / "summary.json"
         all_analysis_results = {}
-        if summary_path.exists():
-            try:
-                with open(summary_path, "r", encoding="utf-8") as f:
-                    all_analysis_results = json.load(f)
-                print(
-                    f"Loaded {len(all_analysis_results)} existing results from {summary_path}"
-                )
-            except Exception as e:
-                print(
-                    f"Could not load existing results file: {str(e)}. Starting fresh."
-                )
-                all_analysis_results = {}
-
-        for image_path in image_files:
-            exp_name = image_path.stem
-
-            # Skip if this image has already been processed
-            if exp_name in all_analysis_results:
-                print(f"Skipping {exp_name} (already processed)")
-                continue
+        
+        for csv_path in csv_files:
+            exp_name = csv_path.stem
 
             print(f"Processing: {exp_name}...")
 
             try:
-                # Read and encode image to base64
-                with open(image_path, "rb") as img_file:
-                    base64_image = base64.b64encode(img_file.read()).decode("utf-8")
-
-                # Format prompt as requested
-                prompt = f"""
-Analyze the visualization image containing four subplots:
-
-1. Feature Importance Comparison (top-left): Shows normalized importance scores for features across LightGBM, XGBoost, and Mean Normalized metrics.
-2. SHAP Importance - XGBoost (top-right): Displays SHAP feature importance for the XGBoost model using dot plots. The correlation between feature value and SHAP value is shown.
-3. SHAP Value Impact (bottom-left): Shows mean SHAP values for features, with positive effects in green and negative effects in red.
-4. SHAP Importance - LightGBM (bottom-right): Displays SHAP feature importance for the LightGBM model using dot plots. The correlation between feature value and SHAP value is shown.
-
-Based on these visualizations, identify the top {n} most important features considering both the importance scores and SHAP values.
-
-Return ONLY a JSON array with these fields for each feature:
-- rank: (number) feature rank (1 to {n})
-- feature_name: (string) name of the feature
-- shap_correlation: (number) correlation between feature value and SHAP value based on SHAP importance (both XGBoost and LightGBM). Positive values indicate positive correlation, negative values indicate negative correlation, and the magnitude represents the strength.
-- overall_direction: (number) overall effect direction based on SHAP value impact. Positive values indicate positive correlation, negative values indicate negative correlation, and the magnitude represents the strength.
-- reason: (string) reason for the shap_correlation magnitude and overall_direction based on the visualizations
-
-Example JSON output:
-```json
-[
-  {{"rank": 1, "feature_name": "feature1", "shap_correlation": 0.5, "overall_direction": 0.8, "reason": ""}},
-  {{"rank": 2, "feature_name": "feature2", "shap_correlation": -0.3, "overall_direction": -0.6, "reason": ""}}
-]
-```
-"""
-
-                # Call API using the specific format provided in the example
-                response = client.responses.create(
-                    model="doubao-seed-1-8-251228",
-                    input=[
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "input_image",
-                                    "image_url": f"data:image/png;base64,{base64_image}",
-                                },
-                                {"type": "input_text", "text": prompt},
-                            ],
-                        }
-                    ],
-                )
-                # Extract content from response
-                content_text = ""
-                # Handle the Ark responses API structure
-                try:
-                    if hasattr(response, "output") and response.output:
-                        # Look through each item in the output array
-                        for output_item in response.output:
-                            # Check if this is a message-type output with content
-                            if hasattr(output_item, "content") and output_item.content:
-                                # Process each content item in the message
-                                for content_item in output_item.content:
-                                    if (
-                                        hasattr(content_item, "type")
-                                        and content_item.type == "output_text"
-                                        and hasattr(content_item, "text")
-                                    ):
-                                        content_text = content_item.text
-                                        break
-                            if content_text:  # Found content, exit outer loop
-                                break
-                    elif hasattr(response, "choices"):
-                        # Handle standard OpenAI API response structure
-                        if response.choices and len(response.choices) > 0:
-                            first_choice = response.choices[0]
-                            if hasattr(first_choice, "message") and hasattr(
-                                first_choice.message, "content"
-                            ):
-                                content_text = first_choice.message.content
-                except (AttributeError, IndexError, TypeError) as e:
-                    print(
-                        f"   Error extracting content from response for {exp_name}: {str(e)}"
-                    )
-                    continue
-
-                if not content_text:
-                    print(f"   Warning: No text content returned for {exp_name}")
-                    continue
-
-                # Parse JSON results
-                json_str = content_text.strip()
-                if "```json" in json_str:
-                    json_str = json_str.split("```json")[1].split("```")[0].strip()
-                elif "```" in json_str:
-                    json_str = json_str.split("```")[1].split("```")[0].strip()
-
-                try:
-                    analysis_result = json.loads(json_str)
-                    # Check if analysis_result is a list (as expected) and not None
-                    if analysis_result is None:
-                        print(f"   Warning: Parsed JSON is null for {exp_name}")
+                # Read CSV data
+                df = pd.read_csv(csv_path)
+                
+                # Determine which column to use for sorting
+                sort_col = self.sort_column
+                if sort_col not in df.columns:
+                    sort_col = 'mean_importance'
+                if sort_col not in df.columns:
+                    # Fallback to any importance column
+                    importance_cols = [c for c in df.columns if 'importance' in c]
+                    if importance_cols:
+                        sort_col = importance_cols[0]
+                    else:
+                        print(f"   Warning: No importance column found in {exp_name}")
                         continue
-                    if not isinstance(analysis_result, list):
-                        print(
-                            f"   Warning: Expected list but got {type(analysis_result)} for {exp_name}"
-                        )
-                        continue
-                    all_analysis_results[exp_name] = analysis_result
-                    print(f"   Successfully analyzed {exp_name}")
 
-                    # Save to summary.json after each successful analysis
-                    try:
-                        with open(summary_path, "w", encoding="utf-8") as f:
-                            json.dump(
-                                all_analysis_results, f, indent=4, ensure_ascii=False
-                            )
-                        print(
-                            f"   Results saved to: {summary_path} (current progress: {len(all_analysis_results)} items)"
-                        )
-                    except Exception as save_error:
-                        print(
-                            f"   Error saving intermediate results: {str(save_error)}"
-                        )
-
-                except json.JSONDecodeError as je:
-                    print(f"   Error parsing JSON for {exp_name}: {str(je)}")
-                    print(
-                        f"   Content received: {content_text[:200]}..."
-                    )  # Print first 200 chars of response
-                    continue
+                # Sort and get top n features
+                df_sorted = df.sort_values(by=sort_col, ascending=False).head(n)
+                
+                analysis_result = []
+                for i, (_, row) in enumerate(df_sorted.iterrows()):
+                    feature_name = row['feature']
+                    
+                    # Extract SHAP metrics directly from data
+                    shap_corr = row.get('mean_shap_correlation', 0)
+                    overall_dir = row.get('mean_shap', 0)
+                    
+                    # Generate a reason based on data
+                    reason = f"Feature '{feature_name}' is ranked {i+1} in importance based on {sort_col}. "
+                    reason += f"It shows a SHAP correlation of {shap_corr:.4f} and a mean SHAP impact of {overall_dir:.4f}."
+                    
+                    analysis_result.append({
+                        "rank": i + 1,
+                        "feature_name": feature_name,
+                        "shap_correlation": float(shap_corr),
+                        "overall_direction": float(overall_dir),
+                        "reason": reason
+                    })
+                
+                all_analysis_results[exp_name] = analysis_result
+                print(f"   Successfully analyzed {exp_name}")
 
             except Exception as e:
                 print(f"   Error analyzing {exp_name}: {str(e)}")
-                # Continue to next image
                 continue
 
+        # Save results to summary.json
+        try:
+            with open(summary_path, "w", encoding="utf-8") as f:
+                json.dump(all_analysis_results, f, indent=4, ensure_ascii=False)
+            print(f"Results saved to: {summary_path}")
+        except Exception as e:
+            print(f"Error saving summary.json: {str(e)}")
+
         print(f"\n{'='*80}")
-        print(f"LLM analysis completed! Final results saved to: {summary_path}")
-        print(f"Total analyzed: {len(all_analysis_results)} items")
+        print(f"Analysis completed! Total processed: {len(all_analysis_results)}")
         print(f"{'='*80}\n")
 
     def perform_hierarchical_statistical_analysis(self):
-        """Performs hierarchical statistical analysis on the summary data and saves results to summary_sta.md in markdown format."""
+        """Performs hierarchical statistical analysis on the summary data and saves results to summary.md in markdown format."""
         summary_path = self.output_dir / "summary.json"
 
         # Load the summary data
@@ -236,7 +126,7 @@ Example JSON output:
             summary_data = json.load(f)
 
         # Prepare output file
-        output_path = self.output_dir / "summary_sta.md"
+        output_path = self.output_dir / "summary.md"
 
         with open(output_path, "w", encoding="utf-8") as f:
             # Write header
@@ -955,16 +845,16 @@ def main():
     project_root = script_dir.parent
 
     # Set paths
-    input_dir = project_root / "results_visualizations"
+    input_dir = project_root / "results_aggregated"
     output_dir = project_root / "results_summaries"
 
     # Configuration
     n_top_analysis = 5  # Number of top features to identify
 
     print("=" * 80)
-    print("Visualization LLM Analysis Tool")
+    print("Direct Data Analysis Tool")
     print("=" * 80)
-    print(f"Visualization directory: {output_dir}")
+    print(f"Aggregated data directory: {input_dir}")
     print(f"Top features to identify: {n_top_analysis}")
     print("=" * 80)
 
@@ -972,13 +862,14 @@ def main():
     summarizer = VisualizationSummarizer(
         input_dir=str(input_dir),
         output_dir=str(output_dir),
+        sort_column="mean_importance_normalized",
     )
-    # Analyze visualizations with LLM and identify top features
-    summarizer.analyze_visualizations_with_llm(n=n_top_analysis)
+    # Analyze visualizations directly from data
+    summarizer.analyze_visualizations(n=n_top_analysis)
     # Perform hierarchical statistical analysis on the summary data
     summarizer.perform_hierarchical_statistical_analysis()
 
-    print("\nLLM analysis completed!")
+    print("\nAnalysis completed!")
 
 
 if __name__ == "__main__":
