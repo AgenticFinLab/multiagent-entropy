@@ -4,6 +4,7 @@ This module provides utilities for calculating various metrics including
 accuracy, time cost, and entropy from experiment results.
 """
 
+import os
 import re
 import multiprocessing
 from typing import Optional
@@ -12,6 +13,7 @@ from typing import Dict, Any, List, Optional
 import torch
 from math_verify import parse, verify
 
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 class TimeoutError(Exception):
     pass
