@@ -181,7 +181,6 @@ class MetricsCalculator:
         Returns:
             True if code passes all tests, False otherwise.
         """
-        print("111-Predicted Code:", predicted_code)
         # Return False if no predicted code was provided
         if not predicted_code:
             return False
@@ -279,7 +278,6 @@ class MetricsCalculator:
         # Create and start the process
         process = multiprocessing.Process(target=execute_code_in_process, args=(result_queue,))
         process.start()
-        print("222-Test Cases:", test_cases)
         try:
             # Wait for the result with timeout
             result = result_queue.get(timeout=timeout)
