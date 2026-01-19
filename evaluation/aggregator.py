@@ -886,7 +886,18 @@ class Aggregator:
             "final_format_compliance",
             "base_model_is_finally_correct",
             "base_model_format_compliance",
-            "base_model_final_predicted_answer_entropy",
+            "base_model_answer_token_count",
+            "base_model_max_answer_token_entropy",
+            "base_model_mean_answer_token_entropy",
+            "base_model_min_answer_token_entropy",
+            "base_model_std_answer_token_entropy",
+            "base_model_median_answer_token_entropy",
+            "sample_answer_token_count",
+            "sample_max_answer_token_entropy",
+            "sample_mean_answer_token_entropy",
+            "sample_min_answer_token_entropy",
+            "sample_std_answer_token_entropy",
+            "sample_median_answer_token_entropy",
             "sample_total_entropy",
             "sample_max_entropy",
             "sample_min_entropy",
@@ -899,7 +910,6 @@ class Aggregator:
             "sample_num_agents",
             "sample_all_agents_token_count",
             "sample_avg_entropy_per_token",
-            "sample_final_predicted_answer_entropy",
             "sample_entropy_stability_index",
             "sample_avg_entropy_per_agent",
             "exp_total_entropy",
@@ -978,13 +988,6 @@ class Aggregator:
 
         # Add dynamic round comparison features
         merged_records = self.add_dynamic_round_features(merged_records)
-
-        # Handle None values for sample_final_predicted_answer_entropy
-        for record in merged_records:
-            if record.get("sample_final_predicted_answer_entropy") is None:
-                record["sample_final_predicted_answer_entropy"] = 0.0
-            elif record["sample_final_predicted_answer_entropy"] == "":
-                record["sample_final_predicted_answer_entropy"] = 0.0
 
         # Write all aggregated data to a single CSV file
         self.write_csv(merged_records, "all_aggregated_data.csv")

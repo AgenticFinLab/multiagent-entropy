@@ -678,8 +678,8 @@ class EntropyStatistic:
         tokenizer: Any,
         result_id: str,
         agents_data: List[Dict[str, Any]],
-    ) -> Optional[float]:
-        """Find the entropy of the token containing the final answer.
+    ) -> Optional[Dict[str, float]]:
+        """Find the entropy statistics of tokens containing the final answer.
 
         Args:
             response: Response text from the agent.
@@ -689,7 +689,14 @@ class EntropyStatistic:
             agents_data: List of entropy data for all agents in a sample.
 
         Returns:
-            Entropy of the answer token, or None if not found.
+            Dictionary containing answer token entropy statistics:
+            - answer_token_count: Number of tokens in the answer
+            - max_answer_token_entropy: Maximum entropy value among answer tokens
+            - mean_answer_token_entropy: Average entropy value of answer tokens
+            - min_answer_token_entropy: Minimum entropy value among answer tokens
+            - std_answer_token_entropy: Standard deviation of answer token entropies
+            - median_answer_token_entropy: Median entropy value of answer tokens
+            Returns None if answer tokens not found.
         """
         # Find the last \boxed{...} that contains the answer
         # MetricsCalculator.extract_boxed_answer returns the content of the last \boxed match
@@ -721,14 +728,17 @@ class EntropyStatistic:
             )
             offsets = encoding["offset_mapping"]
 
-            # Find token index that contains the start_char
-            token_idx = -1
-            for i, (start, end) in enumerate(offsets):
-                if start <= start_char < end:
-                    token_idx = i
-                    break
+            # Find the answer end position in the text
+            end_char = start_char + len(answer)
 
-            if token_idx != -1:
+            # Find all token indices that overlap with the answer span
+            answer_token_indices = []
+            for i, (token_start, token_end) in enumerate(offsets):
+                # Token overlaps with answer if it starts before answer ends and ends after answer starts
+                if token_start < end_char and token_end > start_char:
+                    answer_token_indices.append(i)
+
+            if len(answer_token_indices) > 0:
                 # Find the entropy tensor for this result_id
                 entropy_tensor = None
                 for data in agents_data:
@@ -737,9 +747,25 @@ class EntropyStatistic:
                         break
 
                 if entropy_tensor is not None:
-                    # Ensure token_idx is within bounds of the entropy tensor
-                    if token_idx < len(entropy_tensor):
-                        return float(entropy_tensor[token_idx].item())
+                    # Extract entropies for all answer tokens within bounds
+                    answer_entropies = []
+                    for idx in answer_token_indices:
+                        if idx < len(entropy_tensor):
+                            answer_entropies.append(float(entropy_tensor[idx].item()))
+
+                    if len(answer_entropies) > 0:
+                        # Convert to numpy array for statistical calculations
+                        answer_entropies_array = np.array(answer_entropies)
+                        
+                        # Calculate statistics
+                        return {
+                            "answer_token_count": len(answer_entropies),
+                            "max_answer_token_entropy": float(np.max(answer_entropies_array)),
+                            "mean_answer_token_entropy": float(np.mean(answer_entropies_array)),
+                            "min_answer_token_entropy": float(np.min(answer_entropies_array)),
+                            "std_answer_token_entropy": float(np.std(answer_entropies_array)),
+                            "median_answer_token_entropy": float(np.median(answer_entropies_array)),
+                        }
         except Exception as e:
             print(f"Error calculating answer token entropy: {e}")
 
