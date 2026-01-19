@@ -47,8 +47,13 @@ SAMPLE_BASELINE_ENTROPY = [
     "sample_entropy_reduction_vs_base_total",
     "sample_avg_entropy_per_token_ratio_vs_base",
     "sample_avg_entropy_per_token_diff_vs_base",
-    # new: token entropy of base model finally predicted answer
-    "base_model_final_predicted_answer_entropy",
+    # new: token entropy statistics of base model finally predicted answer
+    "base_model_answer_token_count",
+    "base_model_max_answer_token_entropy",
+    "base_model_mean_answer_token_entropy",
+    "base_model_min_answer_token_entropy",
+    "base_model_std_answer_token_entropy",
+    "base_model_median_answer_token_entropy",
     "base_model_vs_sample_final_answer_entropy_diff",
     "base_model_vs_sample_final_answer_entropy_ratio",
     "answer_token_entropy_change",
@@ -92,8 +97,13 @@ SAMPLE_STATISTICS = [
     "sample_all_agents_token_count",
     "sample_avg_entropy_per_token",
     "sample_entropy_stability_index",
-    # new: token entropy of MAS finally predicted answer
-    "sample_final_predicted_answer_entropy",
+    # new: token entropy statistics of MAS finally predicted answer
+    "sample_answer_token_count",
+    "sample_max_answer_token_entropy",
+    "sample_mean_answer_token_entropy",
+    "sample_min_answer_token_entropy",
+    "sample_std_answer_token_entropy",
+    "sample_median_answer_token_entropy",
 ]
 
 
