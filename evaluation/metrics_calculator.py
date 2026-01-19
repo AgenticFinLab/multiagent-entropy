@@ -5,9 +5,8 @@ accuracy, time cost, and entropy from experiment results.
 """
 
 import re
-import io
-import sys
-import concurrent.futures
+import multiprocessing
+from typing import Optional
 from typing import Dict, Any, List, Optional
 
 import torch
@@ -182,6 +181,7 @@ class MetricsCalculator:
         Returns:
             True if code passes all tests, False otherwise.
         """
+        print("111-Predicted Code:", predicted_code)
         # Return False if no predicted code was provided
         if not predicted_code:
             return False
@@ -190,25 +190,71 @@ class MetricsCalculator:
         if not test_cases:
             return False
 
-        def execute_code_with_testcases():
+        def execute_code_in_process(result_queue):
+            """Execute code in a separate process and put result in queue."""
+            import sys
+            import io
+            
             # Capture stdout to suppress print statements from predicted code
             old_stdout = sys.stdout
             captured_output = io.StringIO()
             sys.stdout = captured_output
             
             try:
-                # Execute predicted code in isolated namespace
+                # Execute predicted code in isolated namespace with restricted builtins
                 local_namespace = {}
-                exec(predicted_code, {}, local_namespace)
+                restricted_builtins = {
+                    'len': len,
+                    'range': range,
+                    'enumerate': enumerate,
+                    'zip': zip,
+                    'min': min,
+                    'max': max,
+                    'sum': sum,
+                    'abs': abs,
+                    'round': round,
+                    'int': int,
+                    'float': float,
+                    'str': str,
+                    'bool': bool,
+                    'list': list,
+                    'dict': dict,
+                    'set': set,
+                    'tuple': tuple,
+                    'sorted': sorted,
+                    'reversed': reversed,
+                    'map': map,
+                    'filter': filter,
+                    'any': any,
+                    'all': all,
+                    'isinstance': isinstance,
+                    'type': type,
+                    'Exception': Exception,
+                    'ValueError': ValueError,
+                    'TypeError': TypeError,
+                    'IndexError': IndexError,
+                    'KeyError': KeyError,
+                    'AttributeError': AttributeError,
+                    'AssertionError': AssertionError,
+                    'RuntimeError': RuntimeError,
+                }
+                safe_globals = {'__builtins__': restricted_builtins}
+                exec(predicted_code, safe_globals, local_namespace)
 
                 # Execute test cases in copy of local namespace
                 test_namespace = local_namespace.copy()
-                exec(test_cases, {}, test_namespace)
+                exec(test_cases, safe_globals, test_namespace)
+            except Exception:
+                # Restore original stdout in case of exception
+                sys.stdout = old_stdout
+                result_queue.put(False)
+                return
             finally:
                 # Restore original stdout
                 sys.stdout = old_stdout
             
             # Check if test cases define a check function
+            success = True
             if "check" in test_namespace:
                 # Run check function for each callable in predicted code
                 for func_name, func in local_namespace.items():
@@ -219,25 +265,39 @@ class MetricsCalculator:
                             test_namespace["check"](func)
                         # Return False if assertion fails
                         except AssertionError:
-                            return False
+                            success = False
+                            break
                         # Continue if other exceptions occur
                         except Exception:
                             continue
 
-            # All tests passed
-            return True
+            result_queue.put(success)
 
+        # Create a queue to get the result from the subprocess
+        result_queue = multiprocessing.Queue()
+        
+        # Create and start the process
+        process = multiprocessing.Process(target=execute_code_in_process, args=(result_queue,))
+        process.start()
+        print("222-Test Cases:", test_cases)
         try:
-            # Use ThreadPoolExecutor with timeout to execute the code safely
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(execute_code_with_testcases)
-                result = future.result(timeout=timeout)
-                return result
-        except concurrent.futures.TimeoutError:
-            # Code took too long to execute
-            return False
-        # Return False if any error occurs during execution
-        except Exception as e:
+            # Wait for the result with timeout
+            result = result_queue.get(timeout=timeout)
+            process.join(timeout=timeout)
+            
+            # If process is still alive after timeout, terminate it
+            if process.is_alive():
+                process.terminate()
+                process.join()
+                return False
+            
+            return result
+            
+        except:
+            # If anything goes wrong, make sure to terminate the process
+            if process.is_alive():
+                process.terminate()
+                process.join()
             return False
 
     @staticmethod
