@@ -29,6 +29,8 @@ def extract_summary_fields(
         "exp_format_compliance_rate",
         "base_model_accuracy",
         "base_model_format_compliance_rate",
+        "base_model_mean_answer_token_entropy",
+        "sample_mean_answer_token_entropy",
     ]
 
     # Initialize list to store summary records
@@ -42,6 +44,8 @@ def extract_summary_fields(
         "exp_format_compliance_rate",
         "base_model_accuracy",
         "base_model_format_compliance_rate",
+        "base_model_mean_answer_token_entropy",
+        "sample_mean_answer_token_entropy",
     ]
 
     # Open and read the input CSV file
@@ -122,7 +126,7 @@ def main():
     parser.add_argument(
         "--dataset",
         type=str,
-        default="aime2025",
+        default="gsm8k",
         help="Dataset name (used if input/output paths are not provided)",
     )
 
