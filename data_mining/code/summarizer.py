@@ -172,34 +172,53 @@ class VisualizationSummarizer:
         self._analyze_exclude_condition_differences(summary_data, output_file)
 
     def _analyze_by_exclude_conditions(self, summary_data, output_file):
-        """Analyze data by exclude conditions (exclude_default vs exclude_base_model_metrics)."""
+        """Analyze data by exclude conditions (exclude_default vs exclude_base_model_all_metrics vs exclude_base_model_wo_entropy)."""
         # Group datasets by exclude condition
         exclude_default_data = {}
-        exclude_base_data = {}
+        exclude_base_all_metrics_data = {}
+        exclude_base_wo_entropy_data = {}
 
         for experiment_name, features in summary_data.items():
             # More precise identification of exclude condition based on exact match
             if experiment_name.endswith("exclude_default"):
                 exclude_default_data[experiment_name] = features
-            elif experiment_name.endswith("exclude_base_model_metrics"):
-                exclude_base_data[experiment_name] = features
+            elif experiment_name.endswith("exclude_base_model_all_metrics"):
+                exclude_base_all_metrics_data[experiment_name] = features
+            elif experiment_name.endswith("exclude_base_model_wo_entropy"):
+                exclude_base_wo_entropy_data[experiment_name] = features
             # Also check for exclude patterns in middle of name
             elif "exclude_default" in experiment_name and not experiment_name.endswith(
                 "exclude_default"
             ):
                 exclude_default_data[experiment_name] = features
             elif (
-                "exclude_base_model_metrics" in experiment_name
-                and not experiment_name.endswith("exclude_base_model_metrics")
+                "exclude_base_model_all_metrics" in experiment_name
+                and not experiment_name.endswith("exclude_base_model_all_metrics")
             ):
-                exclude_base_data[experiment_name] = features
+                exclude_base_all_metrics_data[experiment_name] = features
+            elif (
+                "exclude_base_model_wo_entropy" in experiment_name
+                and not experiment_name.endswith("exclude_base_model_wo_entropy")
+            ):
+                exclude_base_wo_entropy_data[experiment_name] = features
             # Handle exclude_{exclude feature group} format (all datasets, all models)
             elif experiment_name.startswith("exclude_"):
-                # If it starts with exclude_, add to both groups or determine based on specific pattern
+                # If it starts with exclude_, determine based on specific pattern
                 if "default" in experiment_name:
                     exclude_default_data[experiment_name] = features
+                elif "base_model_all_metrics" in experiment_name:
+                    exclude_base_all_metrics_data[experiment_name] = features
+                elif "base_model_wo_entropy" in experiment_name:
+                    exclude_base_wo_entropy_data[experiment_name] = features
                 elif "base_model_metrics" in experiment_name:
-                    exclude_base_data[experiment_name] = features
+                    # Ambiguous case, let's check for 'all' or 'wo'
+                    if "all" in experiment_name:
+                        exclude_base_all_metrics_data[experiment_name] = features
+                    elif "wo" in experiment_name:
+                        exclude_base_wo_entropy_data[experiment_name] = features
+                    else:
+                        # Default to all_metrics if ambiguous
+                        exclude_base_all_metrics_data[experiment_name] = features
                 else:
                     # If unsure, add to exclude_default group
                     exclude_default_data[experiment_name] = features
@@ -211,20 +230,44 @@ class VisualizationSummarizer:
             self._analyze_overlap(exclude_default_data, output_file)
             self._analyze_shap_distribution(exclude_default_data, output_file)
 
-        if exclude_base_data:
+        if exclude_base_all_metrics_data:
             output_file.write(
-                "\n### Analysis for exclude_base_model_metrics condition\n"
+                "\n### Analysis for exclude_base_model_all_metrics condition\n"
             )
-            self._analyze_ranking_consistency(exclude_base_data, output_file)
-            self._analyze_direction_distribution(exclude_base_data, output_file)
-            self._analyze_overlap(exclude_base_data, output_file)
-            self._analyze_shap_distribution(exclude_base_data, output_file)
+            self._analyze_ranking_consistency(exclude_base_all_metrics_data, output_file)
+            self._analyze_direction_distribution(exclude_base_all_metrics_data, output_file)
+            self._analyze_overlap(exclude_base_all_metrics_data, output_file)
+            self._analyze_shap_distribution(exclude_base_all_metrics_data, output_file)
 
-        # Compare the two exclude conditions
-        if exclude_default_data and exclude_base_data:
+        if exclude_base_wo_entropy_data:
+            output_file.write(
+                "\n### Analysis for exclude_base_model_wo_entropy condition\n"
+            )
+            self._analyze_ranking_consistency(exclude_base_wo_entropy_data, output_file)
+            self._analyze_direction_distribution(exclude_base_wo_entropy_data, output_file)
+            self._analyze_overlap(exclude_base_wo_entropy_data, output_file)
+            self._analyze_shap_distribution(exclude_base_wo_entropy_data, output_file)
+
+        # Compare the exclude conditions
+        if exclude_default_data and exclude_base_all_metrics_data and exclude_base_wo_entropy_data:
+            output_file.write("\n### Comparison Between All Three Exclude Conditions\n")
+            self._compare_three_exclude_conditions(
+                exclude_default_data, exclude_base_all_metrics_data, exclude_base_wo_entropy_data, output_file
+            )
+        elif exclude_default_data and exclude_base_all_metrics_data:
             output_file.write("\n### Comparison Between Exclude Conditions\n")
             self._compare_exclude_conditions(
-                exclude_default_data, exclude_base_data, output_file
+                exclude_default_data, exclude_base_all_metrics_data, output_file
+            )
+        elif exclude_default_data and exclude_base_wo_entropy_data:
+            output_file.write("\n### Comparison Between Exclude Conditions\n")
+            self._compare_exclude_conditions(
+                exclude_default_data, exclude_base_wo_entropy_data, output_file
+            )
+        elif exclude_base_all_metrics_data and exclude_base_wo_entropy_data:
+            output_file.write("\n### Comparison Between Exclude Conditions\n")
+            self._compare_exclude_conditions(
+                exclude_base_all_metrics_data, exclude_base_wo_entropy_data, output_file
             )
 
     def _analyze_by_datasets(self, summary_data, output_file):
@@ -321,7 +364,7 @@ class VisualizationSummarizer:
             
             elif experiment_name.startswith("exclude_"):
                 # Format: exclude_{exclude feature group} (all datasets, all models)
-                exclude_condition = experiment_name[len("exclude_") + 1:]  # Take everything after "exclude_" (skip the underscore)
+                exclude_condition = experiment_name[len("exclude_"):]  # Take everything after "exclude_"
                 model_type = "All Models"
                 dataset_type = "All Datasets"
 
@@ -371,6 +414,78 @@ class VisualizationSummarizer:
         for feature in common_features:
             output_file.write(
                 f"- {feature} (exclude_default: {top_exclude_default[feature]}, exclude_base: {top_exclude_base[feature]})\n"
+            )
+
+    def _compare_three_exclude_conditions(
+        self, exclude_default_data, exclude_base_all_data, exclude_base_wo_data, output_file
+    ):
+        """Compare the three exclude conditions."""
+        output_file.write("#### Feature Ranking Comparison\n")
+
+        # Get top features from each condition
+        def get_top_features(data, n=5):
+            feature_counts = Counter()
+            for dataset, features in data.items():
+                for feature_data in features[:n]:  # Only top n features
+                    feature_counts[feature_data["feature_name"]] += 1
+            return feature_counts
+
+        top_exclude_default = get_top_features(exclude_default_data)
+        top_exclude_base_all = get_top_features(exclude_base_all_data)
+        top_exclude_base_wo = get_top_features(exclude_base_wo_data)
+
+        output_file.write("**Top features in exclude_default condition:**\n")
+        for feature, count in top_exclude_default.most_common(10):
+            output_file.write(f"- {feature}: {count} datasets\n")
+
+        output_file.write(
+            "\n**Top features in exclude_base_model_all_metrics condition:**\n"
+        )
+        for feature, count in top_exclude_base_all.most_common(10):
+            output_file.write(f"- {feature}: {count} datasets\n")
+
+        output_file.write(
+            "\n**Top features in exclude_base_model_wo_entropy condition:**\n"
+        )
+        for feature, count in top_exclude_base_wo.most_common(10):
+            output_file.write(f"- {feature}: {count} datasets\n")
+
+        # Calculate overlap between all three
+        common_features_all = set(top_exclude_default.keys()) & set(top_exclude_base_all.keys()) & set(top_exclude_base_wo.keys())
+        output_file.write(
+            f"\n**Common features in all three conditions:** {len(common_features_all)}\n"
+        )
+        for feature in common_features_all:
+            output_file.write(
+                f"- {feature} (exclude_default: {top_exclude_default[feature]}, exclude_base_all: {top_exclude_base_all[feature]}, exclude_base_wo: {top_exclude_base_wo[feature]})\n"
+            )
+
+        # Calculate pairwise overlaps
+        common_features_default_all = set(top_exclude_default.keys()) & set(top_exclude_base_all.keys())
+        output_file.write(
+            f"\n**Common features in exclude_default and exclude_base_model_all_metrics:** {len(common_features_default_all)}\n"
+        )
+        for feature in common_features_default_all:
+            output_file.write(
+                f"- {feature} (exclude_default: {top_exclude_default[feature]}, exclude_base_all: {top_exclude_base_all[feature]})\n"
+            )
+
+        common_features_default_wo = set(top_exclude_default.keys()) & set(top_exclude_base_wo.keys())
+        output_file.write(
+            f"\n**Common features in exclude_default and exclude_base_model_wo_entropy:** {len(common_features_default_wo)}\n"
+        )
+        for feature in common_features_default_wo:
+            output_file.write(
+                f"- {feature} (exclude_default: {top_exclude_default[feature]}, exclude_base_wo: {top_exclude_base_wo[feature]})\n"
+            )
+
+        common_features_all_wo = set(top_exclude_base_all.keys()) & set(top_exclude_base_wo.keys())
+        output_file.write(
+            f"\n**Common features in exclude_base_model_all_metrics and exclude_base_model_wo_entropy:** {len(common_features_all_wo)}\n"
+        )
+        for feature in common_features_all_wo:
+            output_file.write(
+                f"- {feature} (exclude_base_all: {top_exclude_base_all[feature]}, exclude_base_wo: {top_exclude_base_wo[feature]})\n"
             )
 
     def _analyze_ranking_consistency(self, summary_data, output_file):
@@ -751,7 +866,8 @@ class VisualizationSummarizer:
                 elif "base_model_metrics" in dataset_name:
                     exclude_condition = "exclude_base_model_metrics"
                 else:
-                    exclude_condition = "other"
+                    # Extract the actual exclude condition after "exclude_"
+                    exclude_condition = dataset_name[len("exclude_"):]
             else:
                 exclude_condition = "other"
 
