@@ -25,11 +25,8 @@ def extract_summary_fields(
     summary_fields = [
         "model_name",
         "architecture",
-        "exp_total_entropy",
-        "exp_infer_average_entropy",
         "exp_accuracy",
         "exp_format_compliance_rate",
-        "exp_total_time",
         "base_model_accuracy",
         "base_model_format_compliance_rate",
     ]
@@ -41,11 +38,8 @@ def extract_summary_fields(
 
     # Define fields that should be treated as numeric values
     numeric_fields = [
-        "exp_total_entropy",
-        "exp_infer_average_entropy",
         "exp_accuracy",
         "exp_format_compliance_rate",
-        "exp_total_time",
         "base_model_accuracy",
         "base_model_format_compliance_rate",
     ]
