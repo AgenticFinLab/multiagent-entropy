@@ -12,7 +12,7 @@ SAMPLE_IDENTIFIER = [
 ]
 
 # Experiment statistics
-EXPERIMENT_STATISTICS = [
+EXPERIMENT_METRICS = [
     "exp_num_inferences",
     "exp_accuracy",
     "exp_format_compliance_rate",
@@ -21,17 +21,10 @@ EXPERIMENT_STATISTICS = [
 # Exclude identifiers and statistics that would leak target information
 # ALL experiment will exclude this feature group
 DEFAULT_EXCLUDE_COLUMNS = (
-    EXPERIMENT_IDENTIFIER + SAMPLE_IDENTIFIER + EXPERIMENT_STATISTICS
+    EXPERIMENT_IDENTIFIER 
+    + SAMPLE_IDENTIFIER 
+    + EXPERIMENT_METRICS
 )
-
-
-EXPERIMENT_METRICS = [
-    "exp_total_entropy",
-    "exp_infer_average_entropy",
-    "exp_total_time",
-    "exp_total_token",
-    "architecture",
-]
 
 # Base model metrics
 BASE_MODEL_METRICS_EXPERIMENT_LEVEL = [
@@ -75,6 +68,14 @@ BASE_MODEL_WO_ENTROPY = (
 
 # Base model metrics with entropy, means exclude all the metrics of base model in the experiment
 BASE_MODEL_ALL_METRICS = BASE_MODEL_WO_ENTROPY + SAMPLE_BASELINE_ENTROPY
+
+EXPERIMENT_STATISTICS = [
+    "exp_total_entropy",
+    "exp_infer_average_entropy",
+    "exp_total_time",
+    "exp_total_token",
+    "architecture",
+]
 
 # Round statistics
 ROUND_STATISTICS = [
