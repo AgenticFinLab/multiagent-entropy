@@ -2,7 +2,6 @@
 EXPERIMENT_IDENTIFIER = [
     "model_name",
     "sample_id",
-    # "architecture",
     "num_rounds",
 ]
 
@@ -14,18 +13,25 @@ SAMPLE_IDENTIFIER = [
 
 # Experiment statistics
 EXPERIMENT_STATISTICS = [
-    "exp_total_entropy",
-    "exp_infer_average_entropy",
     "exp_num_inferences",
     "exp_accuracy",
     "exp_format_compliance_rate",
-    "exp_total_time",
-    "exp_total_token",
 ]
 
 # Exclude identifiers and statistics that would leak target information
 # ALL experiment will exclude this feature group
-DEFAULT_EXCLUDE_COLUMNS = EXPERIMENT_IDENTIFIER + SAMPLE_IDENTIFIER + EXPERIMENT_STATISTICS
+DEFAULT_EXCLUDE_COLUMNS = (
+    EXPERIMENT_IDENTIFIER + SAMPLE_IDENTIFIER + EXPERIMENT_STATISTICS
+)
+
+
+EXPERIMENT_METRICS = [
+    "exp_total_entropy",
+    "exp_infer_average_entropy",
+    "exp_total_time",
+    "exp_total_token",
+    "architecture",
+]
 
 # Base model metrics
 BASE_MODEL_METRICS_EXPERIMENT_LEVEL = [
@@ -61,7 +67,11 @@ SAMPLE_BASELINE_ENTROPY = [
 ]
 
 # Base model metrics without entropy, means exclude the accuracy metrics of base model in the experiment, remain the entropy metrics of base model in the experiment
-BASE_MODEL_WO_ENTROPY = DEFAULT_EXCLUDE_COLUMNS + BASE_MODEL_METRICS_EXPERIMENT_LEVEL + BASE_MODEL_METRICS_SAMPLE_LEVEL
+BASE_MODEL_WO_ENTROPY = (
+    DEFAULT_EXCLUDE_COLUMNS
+    + BASE_MODEL_METRICS_EXPERIMENT_LEVEL
+    + BASE_MODEL_METRICS_SAMPLE_LEVEL
+)
 
 # Base model metrics with entropy, means exclude all the metrics of base model in the experiment
 BASE_MODEL_ALL_METRICS = BASE_MODEL_WO_ENTROPY + SAMPLE_BASELINE_ENTROPY
@@ -336,20 +346,24 @@ SAMPLE_ROUND2_AGENT_STATISTICS = [
 
 # All features combined
 ALL_FEATURES = (
-    BASE_MODEL_ALL_METRICS + 
-    ROUND_STATISTICS +
-    SAMPLE_STATISTICS +
-    SAMPLE_DISTRIBUTION_SHAPE +
-    SAMPLE_BASELINE_ENTROPY +
-    AGGREGATION_OVER_AGENTS +
-    SAMPLE_ROUND_WISE_AGGREGATED +
-    CROSS_ROUND_AGGREGATED +
-    INTRA_ROUND_AGENT_DISTRIBUTION +
-    CROSS_ROUND_AGENT_SPREAD_CHANGE +
-    SAMPLE_ROUND1_AGENT_STATISTICS +
-    SAMPLE_ROUND2_AGENT_STATISTICS
+    DEFAULT_EXCLUDE_COLUMNS
+    + EXPERIMENT_METRICS
+    + BASE_MODEL_METRICS_EXPERIMENT_LEVEL
+    + BASE_MODEL_METRICS_SAMPLE_LEVEL
+    + ROUND_STATISTICS
+    + SAMPLE_STATISTICS
+    + SAMPLE_DISTRIBUTION_SHAPE
+    + SAMPLE_BASELINE_ENTROPY
+    + AGGREGATION_OVER_AGENTS
+    + SAMPLE_ROUND_WISE_AGGREGATED
+    + CROSS_ROUND_AGGREGATED
+    + INTRA_ROUND_AGENT_DISTRIBUTION
+    + CROSS_ROUND_AGENT_SPREAD_CHANGE
+    + SAMPLE_ROUND1_AGENT_STATISTICS
+    + SAMPLE_ROUND2_AGENT_STATISTICS
 )
 
+print(len(ALL_FEATURES))
 
 # Define feature groups for easy access
 FEATURE_GROUPS = {
