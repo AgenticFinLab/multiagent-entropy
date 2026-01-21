@@ -26,11 +26,13 @@ def extract_summary_fields(
         "model_name",
         "architecture",
         "exp_accuracy",
-        "exp_format_compliance_rate",
         "base_model_accuracy",
-        "base_model_format_compliance_rate",
         "base_model_mean_answer_token_entropy",
         "sample_mean_answer_token_entropy",
+        "exp_total_time",
+        "exp_total_token",
+        "base_model_format_compliance_rate",
+        "exp_format_compliance_rate",
     ]
 
     # Initialize list to store summary records
@@ -46,6 +48,8 @@ def extract_summary_fields(
         "base_model_format_compliance_rate",
         "base_model_mean_answer_token_entropy",
         "sample_mean_answer_token_entropy",
+        "exp_total_time",
+        "exp_total_token",
     ]
 
     # Open and read the input CSV file
@@ -102,6 +106,78 @@ def extract_summary_fields(
     return summary_records
 
 
+def extract_summary_fields_for_multiple_datasets(
+    datasets: List[str], output_csv_path: Path
+) -> List[Dict[str, Any]]:
+    """Extract summary fields from multiple datasets and combine them.
+
+    Args:
+        datasets: List of dataset names to process
+        output_csv_path: Path to the output summary CSV file
+
+    Returns:
+        List of combined summary records
+    """
+    all_summary_records = []
+    
+    # Process each dataset in the list
+    for dataset in datasets:
+        print(f"Processing dataset: {dataset}")
+        
+        # Construct paths for this dataset
+        base_path = Path(__file__).parent.parent / "evaluation" / "results"
+        input_path = base_path / dataset / "all_aggregated_data.csv"
+        
+        # Process the individual dataset
+        if input_path.exists():
+            dataset_records = extract_summary_fields(input_path, base_path / dataset / "all_summary_data.csv")
+            
+            # Add dataset information to each record
+            for record in dataset_records:
+                record["dataset"] = dataset  # Add dataset name to each record
+                
+            # Append to the combined list
+            all_summary_records.extend(dataset_records)
+        else:
+            print(f"Warning: Input file does not exist for dataset {dataset}: {input_path}")
+    
+    # Create output directory if it doesn't exist
+    output_csv_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Ensure the dataset field is added to the summary fields for writing
+    summary_fields = [
+        "dataset",  # Add dataset field to the beginning
+        "model_name",
+        "architecture",
+        "exp_accuracy",
+        "base_model_accuracy",
+        "base_model_mean_answer_token_entropy",
+        "sample_mean_answer_token_entropy",
+        "exp_total_time",
+        "exp_total_token",
+        "base_model_format_compliance_rate",
+        "exp_format_compliance_rate",
+    ]
+
+    # Write combined summary records to output CSV file
+    with open(output_csv_path, "w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=summary_fields)
+        # Write CSV header
+        writer.writeheader()
+        # Write all combined summary records
+        for record in all_summary_records:
+            # Ensure all records have all fields, filling missing ones with empty strings
+            for field in summary_fields:
+                if field not in record:
+                    record[field] = ""
+        writer.writerows(all_summary_records)
+
+    # Print success message
+    print(f"Successfully wrote {len(all_summary_records)} combined summary records from {len(datasets)} datasets to {output_csv_path}")
+
+    return all_summary_records
+
+
 def main():
     """Main function to extract summary fields from aggregated CSV."""
     # Create argument parser with description
@@ -122,12 +198,12 @@ def main():
         default=None,
         help="Path to the output summary CSV file. If not provided, uses evaluation/results/{dataset}/all_summary_data.csv",
     )
-    # Add dataset argument for default path construction
+    # Add dataset argument for default path construction - now accepts single dataset or comma-separated list
     parser.add_argument(
         "--dataset",
         type=str,
-        default="gsm8k",
-        help="Dataset name (used if input/output paths are not provided)",
+        default="gsm8k,humaneval,mmlu,math500,aime2024_16384,aime2025_16384",
+        help="Dataset name or comma-separated list of dataset names to process",
     )
 
     # Parse command-line arguments
@@ -136,24 +212,33 @@ def main():
     # Construct base path for evaluation results
     base_path = Path(__file__).parent.parent / "evaluation" / "results"
 
-    # Determine input path from argument or default
-    if args.input:
-        input_path = Path(args.input)
-    else:
-        input_path = base_path / args.dataset / "all_aggregated_data.csv"
-
+    # Determine datasets to process - support both single dataset and multiple datasets
+    datasets = [ds.strip() for ds in args.dataset.split(',')] if ',' in args.dataset else [args.dataset]
+    
     # Determine output path from argument or default
     if args.output:
         output_path = Path(args.output)
     else:
-        output_path = base_path / args.dataset / "all_summary_data.csv"
+        # If processing multiple datasets, use a default name for the combined output
+        if len(datasets) > 1:
+            output_path = base_path / "combined_summary_data.csv"
+        else:
+            output_path = base_path / datasets[0] / "all_summary_data.csv"
 
     # Print input and output paths for user information
-    print(f"Extracting summary from: {input_path}")
+    if len(datasets) > 1:
+        print(f"Extracting summary from multiple datasets: {datasets}")
+    else:
+        input_path = base_path / datasets[0] / "all_aggregated_data.csv"
+        print(f"Extracting summary from: {input_path}")
     print(f"Output will be saved to: {output_path}")
 
-    # Extract summary fields from input CSV and write to output CSV
-    summary_records = extract_summary_fields(input_path, output_path)
+    # Extract summary fields - use different method based on whether we have multiple datasets
+    if len(datasets) > 1:
+        summary_records = extract_summary_fields_for_multiple_datasets(datasets, output_path)
+    else:
+        input_path = base_path / datasets[0] / "all_aggregated_data.csv"
+        summary_records = extract_summary_fields(input_path, output_path)
     
 if __name__ == "__main__":
     # Execute main function when script is run directly
