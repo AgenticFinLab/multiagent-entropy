@@ -31,8 +31,6 @@ def extract_summary_fields(
         "sample_mean_answer_token_entropy",
         "exp_total_time",
         "exp_total_token",
-        "base_model_format_compliance_rate",
-        "exp_format_compliance_rate",
     ]
 
     # Initialize list to store summary records
@@ -43,9 +41,7 @@ def extract_summary_fields(
     # Define fields that should be treated as numeric values
     numeric_fields = [
         "exp_accuracy",
-        "exp_format_compliance_rate",
         "base_model_accuracy",
-        "base_model_format_compliance_rate",
         "base_model_mean_answer_token_entropy",
         "sample_mean_answer_token_entropy",
         "exp_total_time",
@@ -76,7 +72,19 @@ def extract_summary_fields(
                 # Convert numeric fields to float and round to 3 decimal places
                 if field in numeric_fields and value:
                     try:
-                        summary_record[field] = round(float(value), 3)
+                        num_value = float(value)
+                        # Apply transformations according to requirements
+                        if field == "exp_accuracy":
+                            # Convert to percentage
+                            summary_record[field] = round(num_value * 100, 3)
+                        if field == "base_model_accuracy":
+                            # Convert to percentage
+                            summary_record[field] = round(num_value * 100, 3)
+                        elif field == "exp_total_token":
+                            # Convert to 100K units
+                            summary_record[field] = round(num_value / 100000, 3)
+                        else:
+                            summary_record[field] = round(num_value, 3)
                     except (ValueError, TypeError):
                         summary_record[field] = value
                 else:
@@ -91,14 +99,57 @@ def extract_summary_fields(
 
     # Create output directory if it doesn't exist
     output_csv_path.parent.mkdir(parents=True, exist_ok=True)
-
+    
+    # Define the desired column names in the final output for single dataset
+    output_summary_fields = [
+        "dataset",  # Add dataset field to the beginning
+        "model_name",
+        "architecture",
+        "sample_mean_answer_token_entropy",  # entropy
+        "exp_accuracy",  # accuracy (will be converted to percentage)
+        "exp_total_token",  # token (will be converted to 100K units)
+        "exp_total_time",  # time
+        "base_model_accuracy",  # base model accuracy
+        "base_model_mean_answer_token_entropy",  # base model entropy
+    ]
+    
+    # Map the internal field names to the desired column names in output
+    field_mapping = {
+        "sample_mean_answer_token_entropy": "entropy",
+        "exp_accuracy": "accuracy",
+        "exp_total_token": "token",
+        "exp_total_time": "time",
+        "base_model_accuracy": "base model accuracy",
+        "base_model_mean_answer_token_entropy": "base model entropy",
+        "model_name": "model"
+    }
+    
+    # Remap field names for the output
+    output_fieldnames = []
+    for field in output_summary_fields:
+        output_fieldnames.append(field_mapping.get(field, field))
+    
+    # Transform records to use new field names
+    transformed_records = []
+    for record in summary_records:
+        # Add empty dataset field for single dataset case
+        record["dataset"] = ""  # Will be filled by the calling function if needed
+        transformed_record = {}
+        for field in output_summary_fields:
+            new_field_name = field_mapping.get(field, field)
+            transformed_record[new_field_name] = record.get(field, "")
+        transformed_records.append(transformed_record)
+    
+    # Sort the records by model, then by architecture for consistent ordering
+    transformed_records.sort(key=lambda x: (x.get('model', ''), x.get('architecture', '')))
+    
     # Write summary records to output CSV file
     with open(output_csv_path, "w", newline="", encoding="utf-8") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=summary_fields)
+        writer = csv.DictWriter(csvfile, fieldnames=output_fieldnames)
         # Write CSV header
         writer.writeheader()
-        # Write all summary records
-        writer.writerows(summary_records)
+        # Write all transformed summary records
+        writer.writerows(transformed_records)
 
     # Print success message
     print(f"Successfully wrote {len(summary_records)} summary records to {output_csv_path}")
@@ -144,33 +195,54 @@ def extract_summary_fields_for_multiple_datasets(
     # Create output directory if it doesn't exist
     output_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Ensure the dataset field is added to the summary fields for writing
+    # Define the desired column names in the final output
     summary_fields = [
         "dataset",  # Add dataset field to the beginning
         "model_name",
         "architecture",
-        "exp_accuracy",
-        "base_model_accuracy",
-        "base_model_mean_answer_token_entropy",
-        "sample_mean_answer_token_entropy",
-        "exp_total_time",
-        "exp_total_token",
-        "base_model_format_compliance_rate",
-        "exp_format_compliance_rate",
+        "sample_mean_answer_token_entropy",  # entropy
+        "exp_accuracy",  # accuracy (will be converted to percentage)
+        "exp_total_token",  # token (will be converted to 100K units)
+        "exp_total_time",  # time
+        "base_model_accuracy",  # base model accuracy
+        "base_model_mean_answer_token_entropy",  # base model entropy
     ]
+    
+    # Map the internal field names to the desired column names in output
+    field_mapping = {
+        "sample_mean_answer_token_entropy": "entropy",
+        "exp_accuracy": "accuracy",
+        "exp_total_token": "token",
+        "exp_total_time": "time",
+        "base_model_accuracy": "base model accuracy",
+        "base_model_mean_answer_token_entropy": "base model entropy",
+        "model_name": "model"
+    }
 
     # Write combined summary records to output CSV file
+    # Remap field names for the output
+    output_fieldnames = []
+    for field in summary_fields:
+        output_fieldnames.append(field_mapping.get(field, field))
+    
+    # Transform records to use new field names
+    transformed_records = []
+    for record in all_summary_records:
+        transformed_record = {}
+        for field in summary_fields:
+            new_field_name = field_mapping.get(field, field)
+            transformed_record[new_field_name] = record.get(field, "")
+        transformed_records.append(transformed_record)
+    
+    # Sort the records by dataset, model, then by architecture for consistent ordering
+    transformed_records.sort(key=lambda x: (x.get('dataset', ''), x.get('model', ''), x.get('architecture', '')))
+    
     with open(output_csv_path, "w", newline="", encoding="utf-8") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=summary_fields)
+        writer = csv.DictWriter(csvfile, fieldnames=output_fieldnames)
         # Write CSV header
         writer.writeheader()
-        # Write all combined summary records
-        for record in all_summary_records:
-            # Ensure all records have all fields, filling missing ones with empty strings
-            for field in summary_fields:
-                if field not in record:
-                    record[field] = ""
-        writer.writerows(all_summary_records)
+        # Write all transformed summary records
+        writer.writerows(transformed_records)
 
     # Print success message
     print(f"Successfully wrote {len(all_summary_records)} combined summary records from {len(datasets)} datasets to {output_csv_path}")
