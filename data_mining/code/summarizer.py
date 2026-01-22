@@ -75,22 +75,40 @@ class VisualizationSummarizer:
                 df_sorted = df.sort_values(by=sort_col, ascending=False).head(n)
                 
                 analysis_result = []
+                
+                # Calculate mean_importance_normalized by finding the max mean_importance value for normalization
+                mean_importance_values = []
+                for _, row in df_sorted.iterrows():
+                    mean_importance = row.get('mean_importance', 0)
+                    if pd.notna(mean_importance):
+                        mean_importance_values.append(float(mean_importance))
+                
+                max_importance = max(mean_importance_values) if mean_importance_values else 1
+                
                 for i, (_, row) in enumerate(df_sorted.iterrows()):
                     feature_name = row['feature']
                     
                     # Extract SHAP metrics directly from data
                     shap_corr = row.get('mean_shap_correlation', 0)
                     overall_dir = row.get('mean_shap', 0)
+                    mean_importance = row.get('mean_importance', 0)
+                    
+                    # Calculate normalized importance
+                    if max_importance != 0:
+                        mean_importance_normalized = float(mean_importance) / max_importance
+                    else:
+                        mean_importance_normalized = 0
                     
                     # Generate a reason based on data
                     reason = f"Feature '{feature_name}' is ranked {i+1} in importance based on {sort_col}. "
-                    reason += f"It shows a SHAP correlation of {shap_corr:.4f} and a mean SHAP impact of {overall_dir:.4f}."
+                    reason += f"It shows a SHAP correlation of {shap_corr:.4f}, a mean SHAP impact of {overall_dir:.4f}, and a normalized mean importance of {mean_importance_normalized:.4f}."
                     
                     analysis_result.append({
                         "rank": i + 1,
                         "feature_name": feature_name,
                         "shap_correlation": float(shap_corr),
                         "overall_direction": float(overall_dir),
+                        "mean_importance_normalized": mean_importance_normalized,
                         "reason": reason
                     })
                 
