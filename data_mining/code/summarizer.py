@@ -71,19 +71,19 @@ class VisualizationSummarizer:
                         print(f"   Warning: No importance column found in {exp_name}")
                         continue
 
+                # Calculate mean_importance_normalized by finding the max mean_importance value across ALL features for normalization
+                all_mean_importance_values = []
+                for _, row in df.iterrows():  # Use full dataframe, not just top n
+                    mean_importance = row.get('mean_importance', 0)
+                    if pd.notna(mean_importance):
+                        all_mean_importance_values.append(float(mean_importance))
+                
+                max_importance = max(all_mean_importance_values) if all_mean_importance_values else 1
+                
                 # Sort and get top n features
                 df_sorted = df.sort_values(by=sort_col, ascending=False).head(n)
                 
                 analysis_result = []
-                
-                # Calculate mean_importance_normalized by finding the max mean_importance value for normalization
-                mean_importance_values = []
-                for _, row in df_sorted.iterrows():
-                    mean_importance = row.get('mean_importance', 0)
-                    if pd.notna(mean_importance):
-                        mean_importance_values.append(float(mean_importance))
-                
-                max_importance = max(mean_importance_values) if mean_importance_values else 1
                 
                 for i, (_, row) in enumerate(df_sorted.iterrows()):
                     feature_name = row['feature']
@@ -93,11 +93,16 @@ class VisualizationSummarizer:
                     overall_dir = row.get('mean_shap', 0)
                     mean_importance = row.get('mean_importance', 0)
                     
-                    # Calculate normalized importance
-                    if max_importance != 0:
-                        mean_importance_normalized = float(mean_importance) / max_importance
+                    # First check if mean_importance_normalized already exists in the data
+                    existing_normalized = row.get('mean_importance_normalized', None)
+                    if existing_normalized is not None:
+                        mean_importance_normalized = float(existing_normalized)
                     else:
-                        mean_importance_normalized = 0
+                        # Calculate normalized importance using max from ALL features
+                        if max_importance != 0:
+                            mean_importance_normalized = float(mean_importance) / max_importance
+                        else:
+                            mean_importance_normalized = 0
                     
                     # Generate a reason based on data
                     reason = f"Feature '{feature_name}' is ranked {i+1} in importance based on {sort_col}. "
