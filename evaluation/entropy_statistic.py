@@ -40,11 +40,14 @@ class EntropyStatistic:
         self.base_path = Path(base_path)
         self.tokenizer_cache = {}
 
-    def analyze_all_experiments_entropy(self, dataset: str) -> Dict[str, Any]:
+    def analyze_all_experiments_entropy(
+        self, dataset: str, models: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
         """Analyze entropy for all experiments in a dataset.
 
         Args:
             dataset: Dataset name (e.g., "gsm8k", "humaneval").
+            models: Optional list of model names to analyze. If not provided, analyze all.
 
         Returns:
             Dictionary containing entropy analysis results for all experiments,
@@ -52,6 +55,14 @@ class EntropyStatistic:
         """
         # Get all experiments grouped by model for the specified dataset
         experiments_by_model = self.data_loader.get_experiments_by_dataset(dataset)
+
+        # Filter models if a list is provided
+        if models:
+            experiments_by_model = {
+                model_name: experiments
+                for model_name, experiments in experiments_by_model.items()
+                if model_name in models
+            }
 
         # Initialize results dictionary with dataset and model/architecture structures
         all_results = {
@@ -678,7 +689,7 @@ class EntropyStatistic:
         tokenizer: Any,
         result_id: str,
         agents_data: List[Dict[str, Any]],
-    ) -> Optional[Dict[str, float]]:
+    ) -> Optional[Dict[str, Any]]:
         """Find the entropy statistics of tokens containing the final answer.
 
         Args:
@@ -696,6 +707,7 @@ class EntropyStatistic:
             - min_answer_token_entropy: Minimum entropy value among answer tokens
             - std_answer_token_entropy: Standard deviation of answer token entropies
             - median_answer_token_entropy: Median entropy value of answer tokens
+            - answer_token_entropies: List of entropy values for all answer tokens
             Returns None if answer tokens not found.
         """
         # Find the last \boxed{...} that contains the answer
@@ -765,6 +777,7 @@ class EntropyStatistic:
                             "min_answer_token_entropy": float(np.min(answer_entropies_array)),
                             "std_answer_token_entropy": float(np.std(answer_entropies_array)),
                             "median_answer_token_entropy": float(np.median(answer_entropies_array)),
+                            "answer_token_entropies": answer_entropies,
                         }
         except Exception as e:
             print(f"Error calculating answer token entropy: {e}")
