@@ -18,8 +18,6 @@ DATASETS = [
     "humaneval",
     "mmlu",
     "math500",
-    "aime2024_8192",
-    "aime2025_8192",
     "aime2024_16384",
     "aime2025_16384",
 ]
@@ -41,7 +39,7 @@ def main():
         type=str,
         nargs="*",
         choices=DATASETS,
-        default=["humaneval"],
+        default=DATASETS,
         help="Datasets to analyze (space-separated list)",
     )
     # Add flag to analyze all datasets
@@ -54,8 +52,9 @@ def main():
     parser.add_argument(
         "--model",
         type=str,
-        default=None,
-        help="Model name. If not provided, analyze all models",
+        nargs="*",
+        default=["qwen3_0_6b","qwen3_4b","qwen3_8b"],
+        help="Model names. If not provided, analyze all models",
     )
     # Add task type argument with choices for auto-detection
     parser.add_argument(
@@ -139,75 +138,78 @@ def main():
                 print("Error: --model is required when analyzing a specific experiment")
                 return
 
-            print(f"Analyzing experiment: {args.model}/{args.experiment}")
-            try:
-                # Analyze the specified experiment
-                metrics = analyzer.analyze_experiment(
-                    dataset, args.model, args.experiment, args.task_type, args.timeout
-                )
+            for model_name in args.model:
+                print(f"Analyzing experiment: {model_name}/{args.experiment}")
+                try:
+                    # Analyze the specified experiment
+                    metrics = analyzer.analyze_experiment(
+                        dataset, model_name, args.experiment, args.task_type, args.timeout
+                    )
 
-                # Determine output path for results
-                if args.output:
-                    output_path = args.output
-                else:
-                    output_dir = (
+                    # Determine output path for results
+                    if args.output:
+                        output_path = args.output
+                    else:
+                        output_dir = (
+                            Path(base_path)
+                            / "evaluation"
+                            / "results"
+                            / dataset
+                            / model_name
+                        )
+                        output_dir.mkdir(parents=True, exist_ok=True)
+                        output_path = output_dir / f"{args.experiment}_metrics.json"
+
+                    # Save analysis results to JSON file
+                    analyzer.save_results(metrics, output_path)
+                    print(f"Results saved to: {output_path}")
+                except Exception as e:
+                    print(f"Warning: Experiment analysis failed for {model_name}: {e}")
+                    print("Continuing with entropy and trend analysis...")
+
+                # Perform entropy analysis if entropy statistic is available
+                if entropy_statistic:
+                    print(
+                        f"\nAnalyzing entropy for experiment: {model_name}/{args.experiment}"
+                    )
+                    entropy_results = entropy_statistic.analyze_experiment_entropy(
+                        dataset, model_name, args.experiment
+                    )
+
+                    # Create output directory for entropy results
+                    entropy_output_dir = (
                         Path(base_path)
                         / "evaluation"
                         / "results"
                         / dataset
-                        / args.model
+                        / model_name
+                        / "entropy"
                     )
-                    output_dir.mkdir(parents=True, exist_ok=True)
-                    output_path = output_dir / f"{args.experiment}_metrics.json"
+                    entropy_output_dir.mkdir(parents=True, exist_ok=True)
 
-                # Save analysis results to JSON file
-                analyzer.save_results(metrics, output_path)
-                print(f"Results saved to: {output_path}")
-            except Exception as e:
-                print(f"Warning: Experiment analysis failed: {e}")
-                print("Continuing with entropy and trend analysis...")
+                    # Save entropy results to JSON
+                    json_output_path = (
+                        entropy_output_dir / f"{args.experiment}_entropy.json"
+                    )
+                    with open(json_output_path, "w", encoding="utf-8") as f:
+                        json.dump(entropy_results, f, indent=2, ensure_ascii=False)
+                    print(f"Entropy JSON saved to: {json_output_path}")
 
-            # Perform entropy analysis if entropy statistic is available
-            if entropy_statistic:
-                print(
-                    f"\nAnalyzing entropy for experiment: {args.model}/{args.experiment}"
-                )
-                entropy_results = entropy_statistic.analyze_experiment_entropy(
-                    dataset, args.model, args.experiment
-                )
-
-                # Create output directory for entropy results
-                entropy_output_dir = (
-                    Path(base_path)
-                    / "evaluation"
-                    / "results"
-                    / dataset
-                    / args.model
-                    / "entropy"
-                )
-                entropy_output_dir.mkdir(parents=True, exist_ok=True)
-
-                # Save entropy results to JSON
-                json_output_path = (
-                    entropy_output_dir / f"{args.experiment}_entropy.json"
-                )
-                with open(json_output_path, "w", encoding="utf-8") as f:
-                    json.dump(entropy_results, f, indent=2, ensure_ascii=False)
-                print(f"Entropy JSON saved to: {json_output_path}")
-
-                # Analyze entropy change trends
-                print(
-                    f"\nAnalyzing entropy change trends for experiment: {args.model}/{args.experiment}"
-                )
-                trend_results = entropy_statistic.analyze_entropy_change_trends(
-                    dataset, args.model, args.experiment
-                )
+                    # Analyze entropy change trends
+                    print(
+                        f"\nAnalyzing entropy change trends for experiment: {model_name}/{args.experiment}"
+                    )
+                    trend_results = entropy_statistic.analyze_entropy_change_trends(
+                        dataset, model_name, args.experiment
+                    )
 
         # Analyze all experiments if no specific experiment is provided
         else:
             print(f"Analyzing all experiments for dataset: {dataset}")
             # Analyze all experiments in the dataset
-            all_metrics = analyzer.analyze_all_experiments(dataset, args.task_type, args.timeout)
+            all_metrics = analyzer.analyze_all_experiments(
+                dataset, args.task_type, args.timeout, models=args.model
+            )
 
             # Determine output path for all metrics
             if args.output:
@@ -225,7 +227,7 @@ def main():
             if entropy_statistic:
                 print(f"\nAnalyzing entropy for all experiments in dataset: {dataset}")
                 entropy_results = entropy_statistic.analyze_all_experiments_entropy(
-                    dataset
+                    dataset, models=args.model
                 )
 
                 # Create output directory for entropy results
