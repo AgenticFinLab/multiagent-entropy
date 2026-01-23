@@ -1,0 +1,5 @@
+# Model-specific configuration for Qwen-2.5-7B-SimpleRL-Zoo
+# https://huggingface.co/hkust-nlp/Qwen-2.5-7B-SimpleRL-Zoo
+# SimpleRL-Zoo: Investigating and Taming Zero Reinforcement Learning for Open Base Models in the Wild (COLM25)
+
+lm_name: hkust-nlp/Qwen-2.5-7B-SimpleRL-Zoo
