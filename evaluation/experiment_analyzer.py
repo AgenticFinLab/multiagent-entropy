@@ -363,7 +363,11 @@ class ExperimentAnalyzer:
         return final_agent_key
 
     def analyze_all_experiments(
-        self, dataset: str, task_type: str = "math", timeout: int = 10
+        self,
+        dataset: str,
+        task_type: str = "math",
+        timeout: int = 10,
+        models: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Analyze all experiments for a given dataset.
 
@@ -372,6 +376,7 @@ class ExperimentAnalyzer:
             task_type: Type of task (e.g., "math", "code", "option").
                        If not provided or "auto", will be inferred from dataset.
             timeout: Maximum time in seconds to execute code for code tasks.
+            models: Optional list of model names to analyze. If not provided, analyze all.
 
         Returns:
             Dictionary containing metrics for all experiments, grouped by model.
@@ -382,6 +387,14 @@ class ExperimentAnalyzer:
 
         # Get all experiments grouped by model
         experiments_by_model = self.data_loader.get_experiments_by_dataset(dataset)
+
+        # Filter models if a list is provided
+        if models:
+            experiments_by_model = {
+                model_name: experiments
+                for model_name, experiments in experiments_by_model.items()
+                if model_name in models
+            }
 
         # Initialize all metrics dictionary
         all_metrics = {"dataset": dataset, "task_type": task_type, "models": {}}
