@@ -226,3 +226,8 @@ data_mining/data
 data_mining/results*
 data_mining/configs
 data_mining/experiment_reports
+
+# Plot
+plot/*/*.csv
+plot/*/*.png
+plot/*/*.pdf
