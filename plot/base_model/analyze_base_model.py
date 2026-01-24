@@ -140,45 +140,84 @@ class BaseModelVisualizer:
             ax: Matplotlib axis object
             top_n: Number of top features to display
         """
-        # Load feature importance data
-        fi_df = self.load_feature_importance(model_name='LightGBM')
+        # Load feature importance data from the new CSV file
+        csv_path = Path('data_mining/results_qwen/results_aggregated/exclude_base_model_wo_entropy.csv')
+        if not csv_path.exists():
+            raise FileNotFoundError(f"Feature importance file not found: {csv_path}")
         
-        # Sort and get top N features
-        fi_df = fi_df.sort_values('Importance', ascending=False).head(top_n)
+        fi_df = pd.read_csv(csv_path)
+        
+        # Apply min-max normalization to lightgbm_importance
+        lightgbm_min = fi_df['lightgbm_importance'].min()
+        lightgbm_max = fi_df['lightgbm_importance'].max()
+        if lightgbm_max > lightgbm_min:
+            fi_df['lightgbm_importance_normalized'] = (fi_df['lightgbm_importance'] - lightgbm_min) / (lightgbm_max - lightgbm_min)
+        else:
+            fi_df['lightgbm_importance_normalized'] = fi_df['lightgbm_importance']
+        
+        # Sort by mean_importance_normalized and get top N features
+        fi_df = fi_df.sort_values('mean_importance_normalized', ascending=False).head(top_n)
         
         # Calculate bar positions (y-axis coordinates)
-        y_pos = range(len(fi_df))
+        y_pos = np.arange(len(fi_df))
+        bar_height = 0.25  # Height of each bar
         
-        # Create horizontal bar plot
-        # Reduce 'height' (e.g., from default 0.8 to 0.6) to increase the gap between bars
+        # Define colors for the three bar types
+        colors = {
+            'lightgbm': '#91BFD8',      # Sky Blue
+            'xgboost': '#4575B4',        # Blue
+            'mean': '#D73027'            # Red
+        }
+        
+        # Create three horizontal bar plots for each feature
+        ax.barh(
+            y_pos - bar_height,
+            fi_df['lightgbm_importance_normalized'].values,
+            height=bar_height,
+            color=colors['lightgbm'],
+            edgecolor='white',
+            linewidth=0.8,
+            label='LightGBM (Normalized)'
+        )
+        
         ax.barh(
             y_pos,
-            fi_df['Importance'].values,
-            height=0.5,
-            color='#4575B4',
+            fi_df['xgboost_importance'].values,
+            height=bar_height,
+            color=colors['xgboost'],
             edgecolor='white',
-            linewidth=0.8
+            linewidth=0.8,
+            label='XGBoost'
+        )
+        
+        ax.barh(
+            y_pos + bar_height,
+            fi_df['mean_importance_normalized'].values,
+            height=bar_height,
+            color=colors['mean'],
+            edgecolor='white',
+            linewidth=0.8,
+            label='Mean (Normalized)'
         )
         
         # Set labels and ticks
         ax.set_yticks(y_pos)
         
-        # --- Option 1: Basic (Risk of overlap if names are long) ---
-        # ax.set_yticklabels(fi_df['Feature'].values, fontsize=11)
-        
-        # --- Option 2: Recommended (Auto-wrap text to prevent overlap) ---
-        import textwrap
-        labels = [textwrap.fill(text.replace('_', ' '), width=24) for text in fi_df['Feature'].values]
+        # Auto-wrap text to prevent overlap
+        labels = [textwrap.fill(text.replace('_', ' '), width=24) for text in fi_df['feature'].values]
         ax.set_yticklabels(labels, fontsize=11)
         
         ax.invert_yaxis()
         
         # Styling
-        ax.set_xlabel('LightGBM Feature Importance', fontsize=14)
+        ax.set_xlabel('Feature Importance', fontsize=14)
         ax.text(0.5, -0.2, '(d)', transform=ax.transAxes, 
                 ha='center', va='center', fontsize=16, fontweight='bold')
         ax.grid(True, axis='x', linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
         ax.set_axisbelow(True)
+        
+        # Add legend
+        ax.legend(loc='lower right', frameon=False, fontsize=12)
         
         # Remove top and right spines for a cleaner look
         sns.despine(ax=ax, top=True, right=True)
