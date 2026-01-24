@@ -4,57 +4,79 @@ Comprehensive Visualization for Multi-Agent System Analysis
 This module creates a three-subplot visualization maintaining ICML style consistency
 """
 
-import os
+import warnings
+from pathlib import Path
+
 import textwrap
-import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+import pandas as pd
 import seaborn as sns
-from matplotlib.patches import Patch
+import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
 
-from pathlib import Path
+warnings.filterwarnings("ignore")
+
+
 class MASVisualizer:
-    """Visualizer for multi-agent system comprehensive analysis with ICML-style formatting"""
+    """Visualizer for multi-agent system comprehensive analysis with ICML-style formatting."""
     
-    def __init__(self, base_dir='/home/yuxuanzhao/multiagent-entropy'):
-        """Initialize paths to data files"""
-        self.base_dir = base_dir
+    def __init__(
+        self,
+        feature_importance_path: str,
+        shap_x_test_path: str,
+        shap_values_path: str,
+        lightgbm_pred_path: str,
+        xgboost_pred_path: str,
+        output_dir: str,
+        top_features=None
+    ):
+        """
+        Initialize paths to data files.
         
-        # Define file paths
-        self.feature_importance_path = os.path.join(
-            base_dir, 
-            'data_mining/results_aggregated/exclude_base_model_all_metrics.csv'
-        )
-        self.x_test_path = os.path.join(
-            base_dir,
-            'data_mining/results/exclude_base_model_all_metrics/shap/X_test_LightGBM_classification.csv'
-        )
-        self.shap_values_path = os.path.join(
-            base_dir,
-            'data_mining/results/exclude_base_model_all_metrics/shap/shap_values_LightGBM_classification.csv'
-        )
-        self.lightgbm_pred_path = os.path.join(
-            base_dir,
-            'data_mining/results/exclude_base_model_all_metrics/shap/shap_prediction_probabilities_LightGBM_classification.csv'
-        )
-        self.xgboost_pred_path = os.path.join(
-            base_dir,
-            'data_mining/results/exclude_base_model_all_metrics/shap/shap_prediction_probabilities_XGBoost_classification.csv'
-        )
+        Args:
+            feature_importance_path: Path to aggregated feature importance CSV
+            shap_x_test_path: Path to X_test CSV for SHAP
+            shap_values_path: Path to SHAP values CSV
+            lightgbm_pred_path: Path to LightGBM prediction probabilities
+            xgboost_pred_path: Path to XGBoost prediction probabilities
+            output_dir: Directory to save output figures
+            top_features: List of feature names to focus on (e.g., ['sample_variance_entropy', ...])
+        """
+        self.feature_importance_path = Path(feature_importance_path)
+        self.shap_x_test_path = Path(shap_x_test_path)
+        self.shap_values_path = Path(shap_values_path)
+        self.lightgbm_pred_path = Path(lightgbm_pred_path)
+        self.xgboost_pred_path = Path(xgboost_pred_path)
+        self.output_dir = Path(output_dir)
         
-        # ICML color palette (from analyze_base_model.py)
-        self.colors = {
-            'lightgbm': '#D73027',
-            'xgboost': '#4575B4',
-            'mean': '#FEE090'
+        # Create output directory
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Define target features as instance variables
+        if top_features is None:
+            # Default fallback if not provided
+            self.feature1 = 'sample_variance_entropy'
+            self.feature2 = 'sample_round_1_q3_agent_variance_entropy'
+            self.focus_features = [self.feature1, self.feature2]
+        else:
+            self.focus_features = top_features
+            self.feature1 = top_features[0]
+            self.feature2 = top_features[1] if len(top_features) > 1 else top_features[0]
+        
+        # ICML color palette (consistent with analyze_base_model.py)
+        self.color_map = {
+            'centralized': '#D73027',
+            'debate': '#FC8D59',
+            'hybrid': '#FEE090',
+            'sequential': '#4575B4',
+            'single': '#91BFD8'
         }
         
         # Configure ICML-style plotting
-        self._setup_plot_style()
+        self._setup_plotting_style()
     
-    def _setup_plot_style(self):
-        """Configure matplotlib with ICML-style settings"""
+    def _setup_plotting_style(self):
+        """Configure matplotlib with ICML-style settings."""
         plt.rcParams['font.family'] = 'sans-serif'
         plt.rcParams['font.sans-serif'] = ['Arial', 'DejaVu Sans']
         plt.rcParams['font.size'] = 14
@@ -66,7 +88,7 @@ class MASVisualizer:
         plt.rcParams['legend.fontsize'] = 13
     
     def load_feature_importance(self):
-        """Load and process feature importance data"""
+        """Load and process feature importance data."""
         fi_df = pd.read_csv(self.feature_importance_path)
         # Sort by mean_importance_normalized in descending order
         fi_df = fi_df.sort_values('mean_importance_normalized', ascending=False).reset_index(drop=True)
@@ -77,26 +99,22 @@ class MASVisualizer:
         Load SHAP values and X_test data.
         
         Args:
-            model_name: Model name
+            model_name: Model name (unused here as paths are explicit, kept for signature consistency)
             
         Returns:
             Tuple of (shap_values_df, X_test_df)
         """
-        shap_csv_path = Path(self.shap_values_path)
-        x_test_csv_path = Path(self.x_test_path)
+        if not self.shap_values_path.exists():
+            raise FileNotFoundError(f"SHAP values file not found: {self.shap_values_path}")
+        if not self.shap_x_test_path.exists():
+            raise FileNotFoundError(f"X_test file not found: {self.shap_x_test_path}")
         
-        if not shap_csv_path.exists():
-            raise FileNotFoundError(f"SHAP values file not found: {shap_csv_path}")
-        if not x_test_csv_path.exists():
-            raise FileNotFoundError(f"X_test file not found: {x_test_csv_path}")
-        
-        shap_df = pd.read_csv(shap_csv_path, index_col='sample_index')
-        x_test_df = pd.read_csv(x_test_csv_path, index_col=0)
+        shap_df = pd.read_csv(self.shap_values_path, index_col='sample_index')
+        x_test_df = pd.read_csv(self.shap_x_test_path, index_col=0)
         
         print(f"Loaded SHAP data: {len(shap_df)} samples, {len(shap_df.columns)} features")
         return shap_df, x_test_df
 
-    
     def plot_feature_importance(self, ax, top_n=10):
         """
         Plot feature importance bar chart (Subplot 1).
@@ -106,11 +124,10 @@ class MASVisualizer:
             top_n: Number of top features to display
         """
         # Load feature importance data from the new CSV file
-        csv_path = Path(self.feature_importance_path)
-        if not csv_path.exists():
-            raise FileNotFoundError(f"Feature importance file not found: {csv_path}")
+        if not self.feature_importance_path.exists():
+            raise FileNotFoundError(f"Feature importance file not found: {self.feature_importance_path}")
         
-        fi_df = pd.read_csv(csv_path)
+        fi_df = pd.read_csv(self.feature_importance_path)
         
         # Apply min-max normalization to lightgbm_importance
         lightgbm_min = fi_df['lightgbm_importance'].min()
@@ -217,21 +234,14 @@ class MASVisualizer:
             ax: Matplotlib axis object
         """
         # Load SHAP data
-        shap_df, x_test_df = self.load_shap_data(model_name='LightGBM')
+        shap_df, x_test_df = self.load_shap_data()
         
-        # Focus features
-        focus_features = [
-            'sample_variance_entropy',
-            # 'sample_answer_token_count',
-            'sample_round_1_q3_agent_variance_entropy',
-            # "sample_round_1_q3_agent_std_entropy"
-        ]
-        
-        # Check if features exist
-        available_features = [f for f in focus_features if f in shap_df.columns and f in x_test_df.columns]
+        # Check if features exist in the loaded data
+        # Filter self.focus_features to only include those present in the dataframe
+        available_features = [f for f in self.focus_features if f in shap_df.columns and f in x_test_df.columns]
         
         if not available_features:
-            ax.text(0.5, 0.5, 'No base model features available in SHAP data',
+            ax.text(0.5, 0.5, 'No specified features available in SHAP data',
                    ha='center', va='center', fontsize=12)
             ax.text(0.5, -0.2, '(e)', transform=ax.transAxes, 
                     ha='center', va='center', fontsize=16, fontweight='bold')
@@ -242,13 +252,11 @@ class MASVisualizer:
         markers = ['o', 's', '^']
         
         for idx, feature in enumerate(available_features):
-
+            # Retain specific preprocessing logic if it matches specific known features
             if feature == 'sample_answer_token_count':
                 x_test_df[feature] /= 100.0
 
             feature_values = x_test_df[feature].values
-
-
             shap_values = shap_df[feature].values
             
             # Calculate correlation
@@ -256,9 +264,12 @@ class MASVisualizer:
             
             feature_map = {
                 'sample_variance_entropy': 'Sample Variance Entropy',
-                'sample_round_1_q3_agent_variance_entropy': 'Sample Round 1 Q3 Agent Variance Entropy',
-                # 'sample_answer_token_count': 'Sample Answer Token Count',
+                'sample_round_1_q3_agent_variance_entropy': 'Round 1 Q3 Variance Entropy',
+                'sample_answer_token_count': 'Sample Answer Token Count',
             }
+
+            # Get display name
+            display_name = feature_map.get(feature, feature.replace('_', ' ').title())
 
             # Plot scatter
             ax.scatter(
@@ -268,7 +279,7 @@ class MASVisualizer:
                 s=30,
                 color=colors[idx % len(colors)],
                 marker=markers[idx % len(markers)],
-                label=f'{feature_map.get(feature, feature)}\n(Pearson Correlation ={corr:.3f})',
+                label=f'{display_name}\n(Pearson Correlation ={corr:.3f})',
                 edgecolors='white',
                 linewidth=0.5
             )
@@ -278,22 +289,25 @@ class MASVisualizer:
         ax.set_ylabel('SHAP Value', fontsize=14)
         ax.text(0.5, -0.2, '(e)', transform=ax.transAxes, 
                 ha='center', va='center', fontsize=16, fontweight='bold')
-        ax.legend(loc='best', frameon=False, fontsize=13)
+        ax.legend(loc='upper right', frameon=False, fontsize=13)
         ax.grid(True, linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
         ax.set_axisbelow(True)
         sns.despine(ax=ax, top=True, right=True)
     
-    def plot_top2_entropy_scatter(self, ax, feature1='sample_variance_entropy', feature2='sample_round_1_q3_agent_variance_entropy'):
+    def plot_top2_entropy_scatter(self, ax):
         """
-        Plot scatter of two entropy features with prediction probability encoding (Subplot 3)
-        This is the most important subplot
+        Plot scatter of two entropy features with prediction probability encoding (Subplot 3).
+        Uses feature1 and feature2 defined in __init__.
         """
         # Load feature values from X_test
-        x_test = pd.read_csv(self.x_test_path)
+        x_test = pd.read_csv(self.shap_x_test_path)
+        
+        # Use instance variables feature1 and feature2
+        f1, f2 = self.feature1, self.feature2
         
         # Check if the required features exist in the dataset
-        if feature1 not in x_test.columns or feature2 not in x_test.columns:
-            print(f"Warning: Required features not found. Available features: {list(x_test.columns[:10])}...")
+        if f1 not in x_test.columns or f2 not in x_test.columns:
+            print(f"Warning: Required features not found ({f1}, {f2}). Available features: {list(x_test.columns[:10])}...")
             return
         
         # Load prediction probabilities for both classes
@@ -307,8 +321,8 @@ class MASVisualizer:
         xgb_prob1 = pd.to_numeric(xgboost_df['prob_class_1'].values, errors='coerce')
         
         # Get feature values
-        x1 = x_test[feature1].values
-        x2 = x_test[feature2].values
+        x1 = x_test[f1].values
+        x2 = x_test[f2].values
         
         # Align dimensions
         min_len = min(len(lgbm_prob0), len(xgb_prob0), len(x1), len(x2))
@@ -346,13 +360,17 @@ class MASVisualizer:
         if np.any(positive_mask):
             ax.scatter(x1[positive_mask], x2[positive_mask],
                       s=sizes_pos[positive_mask], c='#D73027', alpha=0.6,
-                      edgecolors='white', linewidths=0.5,
+                      edgecolors='white',
                       label=f'Positive (prob1 > prob0)', marker='^')
         
-        ax.set_xlabel(f'{feature1}', fontsize=15, fontweight='bold')
-        ax.set_ylabel(f'{feature2}', fontsize=15, fontweight='bold')
-        ax.set_title(f'(c) {feature1} vs {feature2}', 
-                    fontsize=16, fontweight='bold', pad=15)
+        # Format labels for display
+        def format_label(name):
+            return name.replace('_', ' ').title()
+
+        ax.set_xlabel(format_label(f1), fontsize=15)
+        ax.set_ylabel("Round 1 Q3 Variance Entropy", fontsize=15)
+        ax.text(0.5, -0.2, '(f)', transform=ax.transAxes, 
+                ha='center', va='center', fontsize=16, fontweight='bold')
         
         # Add grid
         ax.grid(alpha=0.3, linestyle='--', linewidth=0.8)
@@ -369,20 +387,15 @@ class MASVisualizer:
         # Add size legend annotation
         ax.text(0.02, 0.98, 'Point size ∝ Class Probability',
                transform=ax.transAxes, fontsize=11,
-               verticalalignment='top',
-               bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-    
-    def create_visualization(self, output_path=None):
+               verticalalignment='top')
+
+    def generate_comprehensive_figure(self):
         """
-        Create the comprehensive 3-subplot visualization
+        Generate the comprehensive three-subplot figure.
         """
         # Create figure with 3 subplots
-        fig, axes = plt.subplots(1, 3, figsize=(24, 7))
+        fig, axes = plt.subplots(1, 3, figsize=(18, 5))
         
-        # Adjust layout
-        plt.subplots_adjust(left=0.06, right=0.98, top=0.92, bottom=0.12, wspace=0.3)
-        
-        # Plot each subplot
         print("Generating subplot 1: Feature Importance...")
         self.plot_feature_importance(axes[0])
         
@@ -392,23 +405,49 @@ class MASVisualizer:
         print("Generating subplot 3: Top 2 Entropy Features Scatter...")
         self.plot_top2_entropy_scatter(axes[2])
         
+        # Adjust layout
+        plt.tight_layout()
+        
         # Save figure
-        if output_path is None:
-            output_path = os.path.join(self.base_dir, 'plot/mas/mas_analysis.pdf')
-        
+        output_path = self.output_dir / "mas_analysis.pdf"
         plt.savefig(output_path, dpi=1200, bbox_inches='tight', format='pdf')
-        print(f"Visualization saved to: {output_path}")
+        print(f"\nComprehensive figure saved to: {output_path}")
         
-        return fig
+        plt.close()
 
 
 def main():
-    """Main function to generate the comprehensive visualization"""
-    visualizer = MASVisualizer()
-   
-    print("\nGenerating comprehensive visualization...")
-    visualizer.create_visualization()
-    print("Done!")
+    """Main function to generate the comprehensive visualization."""
+    
+    # Define paths
+    base_dir = '/home/yuxuanzhao/multiagent-entropy'
+    feature_importance_path = f"{base_dir}/data_mining/results_aggregated/exclude_base_model_all_metrics.csv"
+    shap_x_test_path = f"{base_dir}/data_mining/results/exclude_base_model_all_metrics/shap/X_test_LightGBM_classification.csv"
+    shap_values_path = f"{base_dir}/data_mining/results/exclude_base_model_all_metrics/shap/shap_values_LightGBM_classification.csv"
+    lightgbm_pred_path = f"{base_dir}/data_mining/results/exclude_base_model_all_metrics/shap/shap_prediction_probabilities_LightGBM_classification.csv"
+    xgboost_pred_path = f"{base_dir}/data_mining/results/exclude_base_model_all_metrics/shap/shap_prediction_probabilities_XGBoost_classification.csv"
+    output_dir = f"{base_dir}/plot/mas"
+    
+    # Define the top features here to easily change them
+    top_features = [
+        'sample_variance_entropy', 
+        'sample_round_1_q3_agent_variance_entropy',
+        # 'sample_answer_token_count'
+    ]
+    
+    # Initialize visualizer
+    visualizer = MASVisualizer(
+        feature_importance_path=feature_importance_path,
+        shap_x_test_path=shap_x_test_path,
+        shap_values_path=shap_values_path,
+        lightgbm_pred_path=lightgbm_pred_path,
+        xgboost_pred_path=xgboost_pred_path,
+        output_dir=output_dir,
+        top_features=top_features
+    )
+    
+    # Generate comprehensive figure
+    visualizer.generate_comprehensive_figure()
 
 
 if __name__ == "__main__":
