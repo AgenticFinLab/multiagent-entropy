@@ -29,7 +29,6 @@ class BaseModelVisualizer:
         feature_importance_dir: str,
         shap_dir: str,
         merged_data_path: str,
-        combined_summary_path: str,
         output_dir: str
     ):
         """
@@ -39,13 +38,11 @@ class BaseModelVisualizer:
             feature_importance_dir: Directory containing feature importance CSVs
             shap_dir: Directory containing SHAP analysis results
             merged_data_path: Path to merged_datasets.csv
-            combined_summary_path: Path to combined_summary_data.csv
             output_dir: Directory to save output figures
         """
         self.feature_importance_dir = Path(feature_importance_dir)
         self.shap_dir = Path(shap_dir)
         self.merged_data_path = Path(merged_data_path)
-        self.combined_summary_path = Path(combined_summary_path)
         self.output_dir = Path(output_dir)
         
         # Create output directory
@@ -141,7 +138,7 @@ class BaseModelVisualizer:
             top_n: Number of top features to display
         """
         # Load feature importance data from the new CSV file
-        csv_path = Path('data_mining/results_qwen/results_aggregated/exclude_base_model_wo_entropy.csv')
+        csv_path = Path('data_mining/results_aggregated/exclude_base_model_wo_entropy.csv')
         if not csv_path.exists():
             raise FileNotFoundError(f"Feature importance file not found: {csv_path}")
         
@@ -154,6 +151,13 @@ class BaseModelVisualizer:
             fi_df['lightgbm_importance_normalized'] = (fi_df['lightgbm_importance'] - lightgbm_min) / (lightgbm_max - lightgbm_min)
         else:
             fi_df['lightgbm_importance_normalized'] = fi_df['lightgbm_importance']
+
+        xgb_min = fi_df['xgboost_importance'].min()
+        xgb_max = fi_df['xgboost_importance'].max()
+        if xgb_max > xgb_min:
+            fi_df['xgboost_importance_normalized'] = (fi_df['xgboost_importance'] - xgb_min) / (xgb_max - xgb_min)
+        else:
+            fi_df['xgboost_importance_normalized'] = fi_df['xgboost_importance']
         
         # Sort by mean_importance_normalized and get top N features
         fi_df = fi_df.sort_values('mean_importance_normalized', ascending=False).head(top_n)
@@ -177,12 +181,12 @@ class BaseModelVisualizer:
             color=colors['lightgbm'],
             edgecolor='white',
             linewidth=0.8,
-            label='LightGBM (Normalized)'
+            label='LightGBM'
         )
         
         ax.barh(
             y_pos,
-            fi_df['xgboost_importance'].values,
+            fi_df['xgboost_importance_normalized'].values,
             height=bar_height,
             color=colors['xgboost'],
             edgecolor='white',
@@ -197,14 +201,28 @@ class BaseModelVisualizer:
             color=colors['mean'],
             edgecolor='white',
             linewidth=0.8,
-            label='Mean (Normalized)'
+            label='Mean'
         )
         
         # Set labels and ticks
         ax.set_yticks(y_pos)
         
-        # Auto-wrap text to prevent overlap
-        labels = [textwrap.fill(text.replace('_', ' '), width=24) for text in fi_df['feature'].values]
+        # Define feature name mapping
+        feature_mapping = {
+            'base_model_answer_token_count': 'base model answer token count',
+            'base_sample_total_entropy': 'base model entropy',
+            'base_sample_token_count': 'base model total token count'
+        }
+        
+        # Auto-wrap text to prevent overlap, applying feature name mapping
+        labels = []
+        for text in fi_df['feature'].values:
+            # Apply feature name mapping if available
+            mapped_text = feature_mapping.get(text, text)
+            # Replace underscores with spaces and wrap text
+            wrapped_text = textwrap.fill(mapped_text.replace('_', ' '), width=20)
+            labels.append(wrapped_text)
+
         ax.set_yticklabels(labels, fontsize=11)
         
         ax.invert_yaxis()
@@ -234,9 +252,9 @@ class BaseModelVisualizer:
         
         # Focus features
         focus_features = [
-            'base_model_answer_token_count',
+            'base_sample_token_count',
             'base_sample_total_entropy',
-            # 'base_sample_token_count'
+            'base_model_answer_token_count',
         ]
         
         # Check if features exist
@@ -250,11 +268,17 @@ class BaseModelVisualizer:
             return
         
         # Plot scatter for each feature
-        colors = ['#D73027', '#4575B4', '#91BFD8']
+        colors = ['#4575B4', '#D73027', '#91BFD8']
         markers = ['o', 's', '^']
         
         for idx, feature in enumerate(available_features):
+
+            if feature == 'base_sample_token_count':
+                x_test_df[feature] /= 50.0
+
             feature_values = x_test_df[feature].values
+
+
             shap_values = shap_df[feature].values
             
             # Calculate correlation
@@ -262,7 +286,8 @@ class BaseModelVisualizer:
             
             feature_map = {
                 'base_model_answer_token_count': 'Base Model Answer Token Count',
-                'base_sample_total_entropy': 'Base Model Entropy'
+                'base_sample_total_entropy': 'Base Model Entropy',
+                'base_sample_token_count': 'Base Model Total Token Count'
             }
 
             # Plot scatter
@@ -299,7 +324,7 @@ class BaseModelVisualizer:
         df = self.load_merged_data()
         
         # Filter for qwen models only
-        qwen_models = ['qwen3_0_6b', 'qwen3_4b', 'qwen3_8b']
+        qwen_models = ['llama_3_1_8b_instruct', 'llama_3_2_3b_instruct']
         df_qwen = df[df['model_name'].isin(qwen_models)]
         
         if len(df_qwen) == 0:
@@ -392,10 +417,9 @@ class BaseModelVisualizer:
 def main():
     """Main function to run the comprehensive visualization."""
     # Define paths
-    feature_importance_dir = "data_mining/results_qwen/results/exclude_base_model_wo_entropy/classification"
-    shap_dir = "data_mining/results_qwen/results/exclude_base_model_wo_entropy/shap"
+    feature_importance_dir = "data_mining/results/exclude_base_model_wo_entropy/classification"
+    shap_dir = "data_mining/results/exclude_base_model_wo_entropy/shap"
     merged_data_path = "data_mining/data/merged_datasets.csv"
-    combined_summary_path = "evaluation/results_qwen/combined_summary_data.csv"
     output_dir = "plot/base_model"
     
     # Initialize visualizer
@@ -403,7 +427,6 @@ def main():
         feature_importance_dir=feature_importance_dir,
         shap_dir=shap_dir,
         merged_data_path=merged_data_path,
-        combined_summary_path=combined_summary_path,
         output_dir=output_dir
     )
     
