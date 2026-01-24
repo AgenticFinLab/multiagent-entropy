@@ -157,7 +157,7 @@ class BaseModelVisualizer:
         
         # Styling
         ax.set_xlabel('Feature Importance', fontsize=14, fontweight='bold')
-        ax.set_title('Top Feature Importance (LightGBM)', fontsize=16, fontweight='bold', pad=15)
+        ax.set_title('Top Feature Importance', fontsize=16, fontweight='bold', pad=15)
         ax.grid(True, axis='x', linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
         ax.set_axisbelow(True)
         sns.despine(ax=ax, top=True, right=True)
@@ -215,8 +215,8 @@ class BaseModelVisualizer:
         # Styling
         ax.set_xlabel('Feature Value', fontsize=14, fontweight='bold')
         ax.set_ylabel('SHAP Value', fontsize=14, fontweight='bold')
-        ax.set_title('SHAP Value vs Feature Value', fontsize=16, fontweight='bold', pad=15)
-        ax.legend(loc='best', frameon=True, fontsize=10)
+        ax.set_title('SHAP Correlation', fontsize=16, fontweight='bold', pad=15)
+        ax.legend(loc='best', frameon=False, fontsize=13)
         ax.grid(True, linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
         ax.set_axisbelow(True)
         sns.despine(ax=ax, top=True, right=True)
@@ -255,7 +255,7 @@ class BaseModelVisualizer:
         available_archs = [a for a in architectures if a in df_qwen['architecture'].unique()]
         
         # Create bins for the feature
-        df_qwen['feature_bin'] = pd.qcut(df_qwen[focus_feature], q=5, duplicates='drop')
+        df_qwen['feature_bin'] = pd.qcut(df_qwen[focus_feature], q=10, duplicates='drop')
         
         # Calculate accuracy for each architecture
         for arch in available_archs:
@@ -280,10 +280,10 @@ class BaseModelVisualizer:
             )
         
         # Styling
-        ax.set_xlabel(f'{focus_feature} (binned)', fontsize=14, fontweight='bold')
+        ax.set_xlabel(f'Base Model Entropy', fontsize=14, fontweight='bold')
         ax.set_ylabel('Accuracy', fontsize=14, fontweight='bold')
-        ax.set_title('Accuracy vs Base Model Entropy', fontsize=16, fontweight='bold', pad=15)
-        ax.legend(loc='best', frameon=True, fontsize=10, ncol=2)
+        ax.set_title('Accuracy with Base Model Entropy', fontsize=16, fontweight='bold', pad=15)
+        ax.legend(loc='best', frameon=False, fontsize=13, ncol=2)
         ax.grid(True, linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
         ax.set_axisbelow(True)
         sns.despine(ax=ax, top=True, right=True)
@@ -308,8 +308,8 @@ class BaseModelVisualizer:
         plt.tight_layout()
         
         # Save figure
-        output_path = self.output_dir / "comprehensive_base_model_analysis.png"
-        plt.savefig(output_path, dpi=600, bbox_inches='tight')
+        output_path = self.output_dir / "base_model_analysis.png"
+        plt.savefig(output_path, dpi=900, bbox_inches='tight')
         print(f"\nComprehensive figure saved to: {output_path}")
         
         plt.close()
