@@ -11,6 +11,7 @@ This script generates a four-subplot figure with ICML-compliant styling:
 import warnings
 from pathlib import Path
 
+import textwrap
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -145,25 +146,41 @@ class BaseModelVisualizer:
         # Sort and get top N features
         fi_df = fi_df.sort_values('Importance', ascending=False).head(top_n)
         
+        # Calculate bar positions (y-axis coordinates)
+        y_pos = range(len(fi_df))
+        
         # Create horizontal bar plot
+        # Reduce 'height' (e.g., from default 0.8 to 0.6) to increase the gap between bars
         ax.barh(
-            range(len(fi_df)),
+            y_pos,
             fi_df['Importance'].values,
+            height=0.6,
             color='#4575B4',
             edgecolor='white',
             linewidth=0.8
         )
         
-        # Set labels
-        ax.set_yticks(range(len(fi_df)))
-        ax.set_yticklabels(fi_df['Feature'].values, fontsize=11)
+        # Set labels and ticks
+        ax.set_yticks(y_pos)
+        
+        # --- Option 1: Basic (Risk of overlap if names are long) ---
+        # ax.set_yticklabels(fi_df['Feature'].values, fontsize=11)
+        
+        # --- Option 2: Recommended (Auto-wrap text to prevent overlap) ---
+        import textwrap
+        # labels = [textwrap.fill(text.replace('_', ' '), width=25) for text in fi_df['Feature'].values]
+        ax.set_yticklabels(fi_df['Feature'].values, fontsize=12)
+        
         ax.invert_yaxis()
         
         # Styling
-        ax.set_xlabel('Feature Importance', fontsize=14, fontweight='bold')
-        ax.set_title('(a)', fontsize=16, fontweight='bold', pad=15)
+        ax.set_xlabel('LightGBM Feature Importance', fontsize=14)
+        ax.text(0.5, -0.15, '(a)', transform=ax.transAxes, 
+                ha='center', va='center', fontsize=16, fontweight='bold')
         ax.grid(True, axis='x', linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
         ax.set_axisbelow(True)
+        
+        # Remove top and right spines for a cleaner look
         sns.despine(ax=ax, top=True, right=True)
     
     def plot_shap_scatter(self, ax):
@@ -178,9 +195,9 @@ class BaseModelVisualizer:
         
         # Focus features
         focus_features = [
-            'base_model_is_finally_correct',
+            'base_model_answer_token_count',
             'base_sample_total_entropy',
-            'base_sample_token_count'
+            # 'base_sample_token_count'
         ]
         
         # Check if features exist
@@ -189,7 +206,8 @@ class BaseModelVisualizer:
         if not available_features:
             ax.text(0.5, 0.5, 'No base model features available in SHAP data',
                    ha='center', va='center', fontsize=12)
-            ax.set_title('(b)', fontsize=16, fontweight='bold', pad=15)
+            ax.text(0.5, -0.15, '(b)', transform=ax.transAxes, 
+                    ha='center', va='center', fontsize=16, fontweight='bold')
             return
         
         # Plot scatter for each feature
@@ -203,6 +221,11 @@ class BaseModelVisualizer:
             # Calculate correlation
             corr, _ = pearsonr(feature_values, shap_values)
             
+            feature_map = {
+                'base_model_answer_token_count': 'Base Model Answer Token Count',
+                'base_sample_total_entropy': 'Base Model Entropy'
+            }
+
             # Plot scatter
             ax.scatter(
                 feature_values,
@@ -211,15 +234,16 @@ class BaseModelVisualizer:
                 s=30,
                 color=colors[idx % len(colors)],
                 marker=markers[idx % len(markers)],
-                label=f'{feature}\n(r={corr:.3f})',
+                label=f'{feature_map.get(feature, feature)}\n(Pearson Correlation ={corr:.3f})',
                 edgecolors='white',
                 linewidth=0.5
             )
         
         # Styling
-        ax.set_xlabel('Feature Value', fontsize=14, fontweight='bold')
-        ax.set_ylabel('SHAP Value', fontsize=14, fontweight='bold')
-        ax.set_title('(b)', fontsize=16, fontweight='bold', pad=15)
+        ax.set_xlabel('Feature Value', fontsize=14)
+        ax.set_ylabel('SHAP Value', fontsize=14)
+        ax.text(0.5, -0.15, '(b)', transform=ax.transAxes, 
+                ha='center', va='center', fontsize=16, fontweight='bold')
         ax.legend(loc='best', frameon=False, fontsize=13)
         ax.grid(True, linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
         ax.set_axisbelow(True)
@@ -242,7 +266,8 @@ class BaseModelVisualizer:
         if len(df_qwen) == 0:
             ax.text(0.5, 0.5, 'No qwen model data available',
                    ha='center', va='center', fontsize=12)
-            ax.set_title('(c)', fontsize=16, fontweight='bold', pad=15)
+            ax.text(0.5, -0.15, '(c)', transform=ax.transAxes, 
+                ha='center', va='center', fontsize=16, fontweight='bold')
             return
         
         # Focus features for x-axis
@@ -251,7 +276,8 @@ class BaseModelVisualizer:
         if focus_feature not in df_qwen.columns or 'is_finally_correct' not in df_qwen.columns:
             ax.text(0.5, 0.5, f'Required columns not found in data',
                    ha='center', va='center', fontsize=12)
-            ax.set_title('(c)', fontsize=16, fontweight='bold', pad=15)
+            ax.text(0.5, -0.15, '(c)', transform=ax.transAxes, 
+                    ha='center', va='center', fontsize=16, fontweight='bold')
             return
         
         # Group by architecture and calculate mean accuracy per feature bin
@@ -284,112 +310,21 @@ class BaseModelVisualizer:
             )
         
         # Styling
-        ax.set_xlabel(f'Base Model Entropy', fontsize=14, fontweight='bold')
-        ax.set_ylabel('Accuracy (%)', fontsize=14, fontweight='bold')
-        ax.set_title('(c)', fontsize=16, fontweight='bold', pad=15)
+        ax.set_xlabel(f'Base Model Entropy', fontsize=14)
+        ax.set_ylabel('Accuracy (%)', fontsize=14)
+        ax.text(0.5, -0.15, '(c)', transform=ax.transAxes, 
+                ha='center', va='center', fontsize=16, fontweight='bold')
         ax.legend(loc='best', frameon=False, fontsize=13, ncol=2)
         ax.grid(True, linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
         ax.set_axisbelow(True)
-        sns.despine(ax=ax, top=True, right=True)
-    
-    def load_combined_summary(self):
-        """
-        Load combined summary data.
-            
-        Returns:
-            DataFrame containing summary data
-        """
-        if not self.combined_summary_path.exists():
-            raise FileNotFoundError(f"Combined summary file not found: {self.combined_summary_path}")
-            
-        df = pd.read_csv(self.combined_summary_path)
-        print(f"Loaded combined summary data: {len(df)} samples")
-        return df
-        
-    def plot_base_model_accuracy_improvement(self, ax):
-        """
-        Plot absolute accuracy of different architectures and base models (Subplot 4).
-        Aggregated across all datasets for each model size.
-        
-        Args:
-            ax: Matplotlib axis object
-        """
-        # Load summary data
-        df = self.load_combined_summary()
-        
-        # Map model names to display names
-        model_name_map = {
-            'qwen3_0_6b': 'Qwen3-0.6B',
-            'qwen3_4b': 'Qwen3-4B',
-            'qwen3_8b': 'Qwen3-8B'
-        }
-        df['model_display'] = df['model'].map(model_name_map)
-        
-        # Ensure we only have the three models we care about
-        df = df[df['model_display'].notna()]
-        
-        # Convert architecture accuracy to 0-100 scale
-        df['arch_accuracy_pct'] = df['accuracy'] * 100
-        
-        # 1. Prepare Base Model data
-        base_df = df.groupby('model_display')['base model accuracy'].mean().reset_index()
-        base_df['architecture'] = 'Base'
-        base_df.rename(columns={'base model accuracy': 'accuracy_value'}, inplace=True)
-        
-        # 2. Prepare Architecture data
-        arch_df = df.groupby(['model_display', 'architecture'])['arch_accuracy_pct'].mean().reset_index()
-        arch_df.rename(columns={'arch_accuracy_pct': 'accuracy_value'}, inplace=True)
-        
-        # 3. Combine for plotting
-        plot_df = pd.concat([base_df, arch_df], ignore_index=True)
-        
-        # Filter for standard architectures + Base
-        architectures = ['Base', 'centralized', 'debate', 'hybrid', 'sequential', 'single']
-        plot_df = plot_df[plot_df['architecture'].isin(architectures)]
-        
-        # Define extended color map
-        full_color_map = self.color_map.copy()
-        full_color_map['Base'] = '#D3D3D3'  # Light Gray for Base
-        
-        # Plotting
-        models_order = ['Qwen3-0.6B', 'Qwen3-4B', 'Qwen3-8B']
-        sns.barplot(
-            data=plot_df,
-            x='model_display',
-            y='accuracy_value',
-            hue='architecture',
-            hue_order=architectures,
-            order=models_order,
-            palette=full_color_map,
-            ax=ax,
-            edgecolor='white',
-            linewidth=0.8
-        )
-        
-        # Styling
-        ax.set_xlabel('Model Size', fontsize=14, fontweight='bold')
-        ax.set_ylabel('Accuracy (%)', fontsize=14, fontweight='bold')
-        ax.set_title('(d)', fontsize=16, fontweight='bold', pad=15)
-        
-        # Legend: No border
-        ax.legend(loc='upper left', frameon=False, fontsize=13, ncol=2)
-        
-        # Set y-axis limits to zoom in on the data range but keep it readable
-        # This satisfies the requirement of not forcing a Y=0 baseline if it squashes things
-        min_acc = plot_df['accuracy_value'].min()
-        max_acc = plot_df['accuracy_value'].max()
-        ax.set_ylim(max(0, min_acc - 10), min(100, max_acc + 15))
-        
-        ax.grid(True, axis='y', linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
-        ax.set_axisbelow(True)
-        sns.despine(ax=ax, top=True, right=True)
+        sns.despine(ax=ax, top=True, right=True)     
 
     def generate_comprehensive_figure(self):
         """
         Generate the comprehensive four-subplot figure.
         """
-        # Create figure with 4 subplots
-        fig, axes = plt.subplots(1, 4, figsize=(24, 6))
+        # Create figure with 3 subplots
+        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
         
         print("Generating subplot 1: Feature Importance...")
         self.plot_feature_importance(axes[0])
@@ -399,9 +334,6 @@ class BaseModelVisualizer:
         
         print("Generating subplot 3: Accuracy Trends...")
         self.plot_accuracy_trends(axes[2])
-        
-        print("Generating subplot 4: Accuracy Improvement...")
-        self.plot_base_model_accuracy_improvement(axes[3])
         
         # Adjust layout
         plt.tight_layout()
