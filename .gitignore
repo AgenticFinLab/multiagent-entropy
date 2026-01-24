@@ -217,11 +217,11 @@ experiments/configs_exp/
 experiments/temp/
 
 # Evaluation results
-evaluation/results
+evaluation/results*
 
 # Data mining results
 entropy_analysis/visualizations
-entropy_analysis/results
+entropy_analysis/results*
 data_mining/data
 data_mining/results*
 data_mining/configs

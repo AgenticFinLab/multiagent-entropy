@@ -185,6 +185,26 @@ class ShapAnalyzer:
             shap_values = explainer.shap_values(X_test_sampled)
             X_test_for_plots = X_test_sampled  # Use the sampled data for plots
 
+        # Save prediction probabilities for classification tasks with XGBoost or LightGBM
+        model_predictions = {}
+        if task_type == "classification" and hasattr(model, "predict_proba"):
+            try:
+                proba = model.predict_proba(X_test)
+                # Create DataFrame with prediction probabilities
+                proba_df = pd.DataFrame(
+                    proba,
+                    columns=[f"prob_class_{i}" for i in range(proba.shape[1])]
+                )
+                proba_df.insert(0, "sample_index", range(len(proba_df)))
+                
+                # Save to CSV
+                csv_path = self.output_dir / f"shap_prediction_probabilities_{model_name}_{task_type}.csv"
+                proba_df.to_csv(csv_path, index=False)
+                logger.info(f"Prediction probabilities for {model_name} saved to: {csv_path}")
+                model_predictions["probabilities"] = proba_df
+            except Exception as e:
+                logger.warning(f"Could not save prediction probabilities for {model_name}: {str(e)}")
+
         # Generate SHAP plots
         plots_info = self._generate_shap_plots(
             shap_values, X_test_for_plots, model_name, task_type
@@ -195,6 +215,7 @@ class ShapAnalyzer:
             "shap_values": shap_values,
             "plots_info": plots_info,
             "feature_names": list(X_test.columns),
+            "model_predictions": model_predictions,
         }
 
     def _generate_shap_plots(

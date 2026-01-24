@@ -197,6 +197,7 @@ class ClassificationAnalyzer:
 
         models = {}
         predictions = {}
+        prediction_probabilities = {}  # Store prediction probabilities
         metrics = {}
 
         # Random Forest Classifier
@@ -204,9 +205,11 @@ class ClassificationAnalyzer:
         rf_model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
         rf_model.fit(X_train, y_train)
         rf_pred = rf_model.predict(X_test)
+        rf_proba = rf_model.predict_proba(X_test)  # Get prediction probabilities
 
         models["RandomForest"] = rf_model
         predictions["RandomForest"] = rf_pred
+        prediction_probabilities["RandomForest"] = rf_proba
         metrics["RandomForest"] = {
             "Accuracy": accuracy_score(y_test, rf_pred),
             "Precision": precision_score(y_test, rf_pred),
@@ -228,9 +231,11 @@ class ClassificationAnalyzer:
             )
             xgb_model.fit(X_train, y_train)
             xgb_pred = xgb_model.predict(X_test)
+            xgb_proba = xgb_model.predict_proba(X_test)  # Get prediction probabilities
 
             models["XGBoost"] = xgb_model
             predictions["XGBoost"] = xgb_pred
+            prediction_probabilities["XGBoost"] = xgb_proba
             metrics["XGBoost"] = {
                 "Accuracy": accuracy_score(y_test, xgb_pred),
                 "Precision": precision_score(y_test, xgb_pred),
@@ -252,9 +257,11 @@ class ClassificationAnalyzer:
             )
             lgb_model.fit(X_train, y_train)
             lgb_pred = lgb_model.predict(X_test)
+            lgb_proba = lgb_model.predict_proba(X_test)  # Get prediction probabilities
 
             models["LightGBM"] = lgb_model
             predictions["LightGBM"] = lgb_pred
+            prediction_probabilities["LightGBM"] = lgb_proba
             metrics["LightGBM"] = {
                 "Accuracy": accuracy_score(y_test, lgb_pred),
                 "Precision": precision_score(y_test, lgb_pred),
@@ -274,6 +281,7 @@ class ClassificationAnalyzer:
         return {
             "models": models,
             "predictions": predictions,
+            "prediction_probabilities": prediction_probabilities,  # Add prediction probabilities
             "metrics": metrics,
             "X_train": X_train,
             "X_test": X_test,
@@ -382,6 +390,30 @@ class ClassificationAnalyzer:
 
         return corr_matrix
 
+    def save_prediction_probabilities(self, classification_results: Dict):
+        """
+        Save prediction probabilities to CSV files.
+        
+        Args:
+            classification_results: Results dictionary containing prediction probabilities
+        """
+        prediction_probabilities = classification_results.get("prediction_probabilities", {})
+        
+        for model_name, probabilities in prediction_probabilities.items():
+            # Create DataFrame with prediction probabilities
+            proba_df = pd.DataFrame(
+                probabilities,
+                columns=[f"prob_class_{i}" for i in range(probabilities.shape[1])]
+            )
+            
+            # Add sample index
+            proba_df.insert(0, "sample_index", range(len(proba_df)))
+            
+            # Save to CSV
+            csv_path = self.output_dir / f"prediction_probabilities_{model_name}.csv"
+            proba_df.to_csv(csv_path, index=False)
+            logger.info(f"Prediction probabilities for {model_name} saved to: {csv_path}")
+
     def run_analysis(self):
         """
         Perform sample-level classification analysis.
@@ -398,6 +430,9 @@ class ClassificationAnalyzer:
         # Train models
         classification_results = self.train_models(X, y)
 
+        # Save prediction probabilities for XGBoost and LightGBM
+        self.save_prediction_probabilities(classification_results)
+        
         # Plot correlation heatmap with is_finally_correct included
         corr_matrix = self.plot_correlation_heatmap(
             X,
