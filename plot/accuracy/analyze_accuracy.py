@@ -99,6 +99,7 @@ def plot_accuracy_icml(csv_path, output_path):
     # --- 1. Define Strict Color Mapping (Dictionary) ---
     # This ensures colors stay fixed for specific architectures regardless of filtering   
     color_map = {
+        'base':        '#D3D3D3', # Light gray for base model
         'centralized': '#D73027', # Red (High Contrast)
         'debate':      '#FC8D59', # Orange
         'hybrid':      '#FEE090', # Yellow
@@ -132,14 +133,30 @@ def plot_accuracy_icml(csv_path, output_path):
         for i, dataset in enumerate(datasets):
             dataset_df = df[df['dataset'] == dataset].sort_values('model')
             
+            # Add base model data as a new row for each model
+            base_df_list = []
+            for model in dataset_df['model'].unique():
+                model_data = dataset_df[dataset_df['model'] == model].iloc[0]
+                base_row = {
+                    'dataset': dataset,
+                    'model': model,
+                    'architecture': 'base',
+                    'accuracy': model_data['base model accuracy'] / 100.0  # Convert percentage to decimal
+                }
+                base_df_list.append(base_row)
+            
+            base_df = pd.DataFrame(base_df_list)
+            combined_df = pd.concat([base_df, dataset_df], ignore_index=True)
+            
             ax = axes[i]
             
             # --- 3. Draw Bar Plot using the Dictionary Palette ---
             sns.barplot(
-                data=dataset_df, 
+                data=combined_df, 
                 x='model', 
                 y='accuracy', 
                 hue='architecture', 
+                hue_order=['base', 'centralized', 'debate', 'hybrid', 'sequential', 'single'],
                 ax=ax, 
                 palette=color_map,       # Use the dictionary mapping
                 edgecolor='white', 
