@@ -132,7 +132,7 @@ class BaseModelVisualizer:
         print(f"Loaded merged data: {len(df)} samples")
         return df
     
-    def plot_feature_importance(self, ax, top_n=20):
+    def plot_feature_importance(self, ax, top_n=10):
         """
         Plot feature importance bar chart (Subplot 1).
         
@@ -154,7 +154,7 @@ class BaseModelVisualizer:
         ax.barh(
             y_pos,
             fi_df['Importance'].values,
-            height=0.6,
+            height=0.5,
             color='#4575B4',
             edgecolor='white',
             linewidth=0.8
@@ -168,14 +168,14 @@ class BaseModelVisualizer:
         
         # --- Option 2: Recommended (Auto-wrap text to prevent overlap) ---
         import textwrap
-        # labels = [textwrap.fill(text.replace('_', ' '), width=25) for text in fi_df['Feature'].values]
-        ax.set_yticklabels(fi_df['Feature'].values, fontsize=12)
+        labels = [textwrap.fill(text.replace('_', ' '), width=24) for text in fi_df['Feature'].values]
+        ax.set_yticklabels(labels, fontsize=11)
         
         ax.invert_yaxis()
         
         # Styling
         ax.set_xlabel('LightGBM Feature Importance', fontsize=14)
-        ax.text(0.5, -0.15, '(a)', transform=ax.transAxes, 
+        ax.text(0.5, -0.2, '(d)', transform=ax.transAxes, 
                 ha='center', va='center', fontsize=16, fontweight='bold')
         ax.grid(True, axis='x', linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
         ax.set_axisbelow(True)
@@ -206,7 +206,7 @@ class BaseModelVisualizer:
         if not available_features:
             ax.text(0.5, 0.5, 'No base model features available in SHAP data',
                    ha='center', va='center', fontsize=12)
-            ax.text(0.5, -0.15, '(b)', transform=ax.transAxes, 
+            ax.text(0.5, -0.2, '(e)', transform=ax.transAxes, 
                     ha='center', va='center', fontsize=16, fontweight='bold')
             return
         
@@ -242,7 +242,7 @@ class BaseModelVisualizer:
         # Styling
         ax.set_xlabel('Feature Value', fontsize=14)
         ax.set_ylabel('SHAP Value', fontsize=14)
-        ax.text(0.5, -0.15, '(b)', transform=ax.transAxes, 
+        ax.text(0.5, -0.2, '(e)', transform=ax.transAxes, 
                 ha='center', va='center', fontsize=16, fontweight='bold')
         ax.legend(loc='best', frameon=False, fontsize=13)
         ax.grid(True, linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
@@ -266,7 +266,7 @@ class BaseModelVisualizer:
         if len(df_qwen) == 0:
             ax.text(0.5, 0.5, 'No qwen model data available',
                    ha='center', va='center', fontsize=12)
-            ax.text(0.5, -0.15, '(c)', transform=ax.transAxes, 
+            ax.text(0.5, -0.2, '(f)', transform=ax.transAxes, 
                 ha='center', va='center', fontsize=16, fontweight='bold')
             return
         
@@ -276,7 +276,7 @@ class BaseModelVisualizer:
         if focus_feature not in df_qwen.columns or 'is_finally_correct' not in df_qwen.columns:
             ax.text(0.5, 0.5, f'Required columns not found in data',
                    ha='center', va='center', fontsize=12)
-            ax.text(0.5, -0.15, '(c)', transform=ax.transAxes, 
+            ax.text(0.5, -0.2, '(f)', transform=ax.transAxes, 
                     ha='center', va='center', fontsize=16, fontweight='bold')
             return
         
@@ -308,23 +308,27 @@ class BaseModelVisualizer:
                 label=arch,
                 alpha=0.8
             )
+
+        ax.set_xscale('symlog', linthresh=100) 
         
         # Styling
         ax.set_xlabel(f'Base Model Entropy', fontsize=14)
         ax.set_ylabel('Accuracy (%)', fontsize=14)
-        ax.text(0.5, -0.15, '(c)', transform=ax.transAxes, 
+        ax.text(0.5, -0.2, '(f)', transform=ax.transAxes, 
                 ha='center', va='center', fontsize=16, fontweight='bold')
         ax.legend(loc='best', frameon=False, fontsize=13, ncol=2)
         ax.grid(True, linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
+        # use both major and minor grids
+        ax.grid(True, which='both', linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
         ax.set_axisbelow(True)
-        sns.despine(ax=ax, top=True, right=True)     
+        sns.despine(ax=ax, top=True, right=True)    
 
     def generate_comprehensive_figure(self):
         """
         Generate the comprehensive four-subplot figure.
         """
         # Create figure with 3 subplots
-        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+        fig, axes = plt.subplots(1, 3, figsize=(18, 5))
         
         print("Generating subplot 1: Feature Importance...")
         self.plot_feature_importance(axes[0])
@@ -339,8 +343,8 @@ class BaseModelVisualizer:
         plt.tight_layout()
         
         # Save figure
-        output_path = self.output_dir / "base_model_analysis.png"
-        plt.savefig(output_path, dpi=900, bbox_inches='tight')
+        output_path = self.output_dir / "base_model_analysis.pdf"
+        plt.savefig(output_path, dpi=1800, bbox_inches='tight', format='pdf')
         print(f"\nComprehensive figure saved to: {output_path}")
         
         plt.close()

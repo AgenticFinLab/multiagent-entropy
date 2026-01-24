@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 import numpy as np
+import math
 
 def analyze_accuracy(csv_path):
     """
@@ -89,46 +90,67 @@ def analyze_accuracy(csv_path):
         print(win_df['model'].value_counts())
 
 
-def plot_accuracy_icml(csv_path, output_path):
+def plot_accuracy(csv_path, output_path, num_rows=1):
     """
-    Generates an ICML-style accuracy bar plot with strict color mapping and specific legend placement.
+    Generates an ICML-style accuracy bar plot.
+    
+    Args:
+        csv_path: Path to the CSV data file.
+        output_path: Path to save the figure.
+        num_rows: Number of rows for the subplot grid (default: 1).
     """
     # Read data
     df = pd.read_csv(csv_path)
         
     # --- 1. Define Strict Color Mapping (Dictionary) ---
-    # This ensures colors stay fixed for specific architectures regardless of filtering   
     color_map = {
         'base':        '#D3D3D3', # Light gray for base model
-        'centralized': '#D73027', # Red (High Contrast)
+        'centralized': '#D73027', # Red
         'debate':      '#FC8D59', # Orange
         'hybrid':      '#FEE090', # Yellow
         'sequential':  '#4575B4', # Deep Blue
         'single':      '#91BFD8'  # Sky Blue
     }
 
-    # --- 2. Global Font and Style Settings (Further Increased Sizes) ---
+    # --- 2. Global Font and Style Settings ---
     plt.rcParams['font.family'] = 'sans-serif'
     plt.rcParams['font.sans-serif'] = ['Arial', 'DejaVu Sans']
-    plt.rcParams['font.size'] = 16         # Base font size (increased)
+    plt.rcParams['font.size'] = 16         # Base font size
     plt.rcParams['axes.linewidth'] = 1.2
-    plt.rcParams['xtick.labelsize'] = 16    # X-axis tick labels (increased)
-    plt.rcParams['ytick.labelsize'] = 16    # Y-axis tick labels (increased)
-    plt.rcParams['axes.labelsize'] = 18    # Axis labels (increased)
-    plt.rcParams['legend.title_fontsize'] = 18 # Legend title (increased)
-    plt.rcParams['legend.fontsize'] = 16   # Legend text (increased)
+    plt.rcParams['xtick.labelsize'] = 16    
+    plt.rcParams['ytick.labelsize'] = 16    
+    plt.rcParams['axes.labelsize'] = 18    
+    plt.rcParams['legend.title_fontsize'] = 18 
+    plt.rcParams['legend.fontsize'] = 16   
     
-    # Get unique datasets and sort them
+    # Get unique datasets
     datasets = sorted(df['dataset'].unique())
     n_datasets = len(datasets)
     
+    # Calculate number of columns
+    n_cols = math.ceil(n_datasets / num_rows)
+    
+    # Dynamic Figure Sizing
+    fig_width = 4.5 * n_cols
+    # Adjust height per subplot when there are 2 rows
+    if num_rows == 2:
+        fig_height = 4 * num_rows  # Reduced from 5 to 4 per row
+    else:
+        fig_height = 5 * num_rows
+    
     # Create subplots
-    fig, axes = plt.subplots(1, n_datasets, figsize=(4.5 * n_datasets, 5))
-    if n_datasets == 1:
-        axes = [axes]
+    fig, axes = plt.subplots(num_rows, n_cols, figsize=(fig_width, fig_height))
+    
+    # Handle axes flattening for consistent iteration
+    if num_rows == 1 and n_cols == 1:
+        axes = np.array([axes])
+    elif num_rows == 1 or n_cols == 1:
+        axes = axes.flatten()
+    else:
+        axes = axes.flatten()
     
     # Use seaborn context manager
-    with sns.plotting_context("paper", font_scale=1.4): # Further increased font_scale
+    with sns.plotting_context("paper", font_scale=1.4):
         
         for i, dataset in enumerate(datasets):
             dataset_df = df[df['dataset'] == dataset].sort_values('model')
@@ -141,7 +163,7 @@ def plot_accuracy_icml(csv_path, output_path):
                     'dataset': dataset,
                     'model': model,
                     'architecture': 'base',
-                    'accuracy': model_data['base model accuracy'] / 100.0  # Convert percentage to decimal
+                    'accuracy': model_data['base model accuracy'] / 100.0
                 }
                 base_df_list.append(base_row)
             
@@ -150,7 +172,7 @@ def plot_accuracy_icml(csv_path, output_path):
             
             ax = axes[i]
             
-            # --- 3. Draw Bar Plot using the Dictionary Palette ---
+            # --- 3. Draw Bar Plot ---
             sns.barplot(
                 data=combined_df, 
                 x='model', 
@@ -158,22 +180,28 @@ def plot_accuracy_icml(csv_path, output_path):
                 hue='architecture', 
                 hue_order=['base', 'centralized', 'debate', 'hybrid', 'sequential', 'single'],
                 ax=ax, 
-                palette=color_map,       # Use the dictionary mapping
+                palette=color_map,       
                 edgecolor='white', 
                 linewidth=0.8, 
                 saturation=0.9
             )
             
             # --- 4. Axes and Grid Optimization ---
-            ax.set_title(dataset, fontsize=20, fontweight='bold', pad=15) # Increased title size
+            ax.set_title(dataset, fontsize=20, pad=15)
             
-            if i == 0:
-                ax.set_ylabel('Accuracy', fontsize=18) # Increased ylabel
+            # Only set Y-label for the first column
+            if i % n_cols == 0:
+                ax.set_ylabel('Accuracy', fontsize=18)
             else:
                 ax.set_ylabel('')
             
-            ax.set_xlabel('Model', fontsize=18) # Increased xlabel
-            ax.tick_params(axis='x')
+            # Only set X-label for the last row
+            last_row_start_index = n_cols * (num_rows - 1)
+            if i >= last_row_start_index:
+                ax.set_xlabel('Model', fontsize=18)
+            else:
+                ax.set_xlabel('')
+            
             ax.grid(True, axis='y', linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
             ax.set_axisbelow(True)
             sns.despine(ax=ax, top=True, right=True)
@@ -182,31 +210,32 @@ def plot_accuracy_icml(csv_path, output_path):
             # Remove individual legend from all subplots first
             ax.get_legend().remove()
 
-    # --- 5. Unified Legend Settings (Inside First Subplot) ---
+    # Hide any unused axes
+    for j in range(i + 1, len(axes)):
+        fig.delaxes(axes[j])
+
+    # --- 5. Unified Legend Settings ---
     handles, labels = axes[0].get_legend_handles_labels()
     
-    # Place legend inside the first subplot
     axes[0].legend(
         handles, 
         labels, 
         loc='center left',       
-        bbox_to_anchor=(0.02, 0.7), 
+        bbox_to_anchor=(0.02, 0.6), 
         title='',                 
         frameon=False,           
-        fontsize=16               # Further increased legend font size
+        fontsize=16               
     )
-    
-    # Adjust layout to ensure nothing is cut off
-    plt.tight_layout(rect=[0, 0, 1, 1]) 
+    plt.tight_layout(rect=[0, 0, 1, 1], pad=1.5)
     
     # Save figure
-    plt.savefig(output_path, dpi=900, bbox_inches='tight')
+    plt.savefig(output_path, dpi=1200, bbox_inches='tight', format='pdf')
     print(f"Plot saved to: {output_path}")
     plt.close()
 
 if __name__ == "__main__":
     csv_file = "plot/accuracy/accuracy.csv"
-    plt_file = "plot/accuracy/accuracy_comparison.png"
+    plt_file = "plot/accuracy/accuracy_comparison.pdf"
     
     analyze_accuracy(csv_file)
-    plot_accuracy_icml(csv_file, plt_file)
+    plot_accuracy(csv_file, plt_file, num_rows=1) # Change to 2 for 2 rows
