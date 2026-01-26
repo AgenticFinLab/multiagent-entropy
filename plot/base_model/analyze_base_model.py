@@ -229,7 +229,7 @@ class BaseModelVisualizer:
         
         # Styling
         ax.set_xlabel('Feature Importance', fontsize=14)
-        ax.text(0.5, -0.2, '(c)', transform=ax.transAxes, 
+        ax.text(0.5, -0.15, '(c)', transform=ax.transAxes, 
                 ha='center', va='center', fontsize=16, fontweight='bold')
         ax.grid(True, axis='x', linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
         ax.set_axisbelow(True)
@@ -263,7 +263,7 @@ class BaseModelVisualizer:
         if not available_features:
             ax.text(0.5, 0.5, 'No base model features available in SHAP data',
                    ha='center', va='center', fontsize=12)
-            ax.text(0.5, -0.2, '(c)', transform=ax.transAxes, 
+            ax.text(0.5, -0.15, '(c)', transform=ax.transAxes, 
                     ha='center', va='center', fontsize=16, fontweight='bold')
             return
         
@@ -307,7 +307,7 @@ class BaseModelVisualizer:
         # Main plot styling
         ax.set_xlabel('Normalized Feature Value', fontsize=14)
         ax.set_ylabel('SHAP Value', fontsize=14)
-        ax.text(0.5, -0.2, '(c)', transform=ax.transAxes, 
+        ax.text(0.5, -0.15, '(c)', transform=ax.transAxes, 
                 ha='center', va='center', fontsize=16, fontweight='bold')
         ax.legend(loc='lower right', frameon=False, fontsize=11)
         ax.grid(True, linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
@@ -424,7 +424,7 @@ class BaseModelVisualizer:
         if len(df_qwen) == 0:
             ax.text(0.5, 0.5, 'No qwen model data available',
                    ha='center', va='center', fontsize=12)
-            ax.text(0.5, -0.2, '(f)', transform=ax.transAxes, 
+            ax.text(0.5, -0.15, '(f)', transform=ax.transAxes, 
                 ha='center', va='center', fontsize=16, fontweight='bold')
             return
         
@@ -434,7 +434,7 @@ class BaseModelVisualizer:
         if focus_feature not in df_qwen.columns or 'is_finally_correct' not in df_qwen.columns:
             ax.text(0.5, 0.5, f'Required columns not found in data',
                    ha='center', va='center', fontsize=12)
-            ax.text(0.5, -0.2, '(f)', transform=ax.transAxes, 
+            ax.text(0.5, -0.15, '(f)', transform=ax.transAxes, 
                     ha='center', va='center', fontsize=16, fontweight='bold')
             return
         
@@ -502,7 +502,7 @@ class BaseModelVisualizer:
         # Styling
         ax.set_xlabel(f'Base Model Entropy', fontsize=14)
         ax.set_ylabel('Accuracy (%)', fontsize=14)
-        ax.text(0.5, -0.2, '(d)', transform=ax.transAxes, 
+        ax.text(0.5, -0.15, '(d)', transform=ax.transAxes, 
                 ha='center', va='center', fontsize=16, fontweight='bold')
         ax.legend(loc='best', frameon=False, fontsize=11, ncol=2)
         ax.grid(True, linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)

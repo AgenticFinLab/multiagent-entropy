@@ -215,7 +215,7 @@ class MASVisualizer:
         
         # Styling
         ax.set_xlabel('Feature Importance', fontsize=14)
-        ax.text(0.5, -0.2, '(d)', transform=ax.transAxes, 
+        ax.text(0.5, -0.15, '(c)', transform=ax.transAxes, 
                 ha='center', va='center', fontsize=16, fontweight='bold')
         ax.grid(True, axis='x', linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
         ax.set_axisbelow(True)
@@ -225,6 +225,172 @@ class MASVisualizer:
         
         # Remove top and right spines for a cleaner look
         sns.despine(ax=ax, top=True, right=True)
+    
+    def plot_shap_with_importance_inset(self, ax):
+        """
+        Plot SHAP value scatter plots with embedded feature importance inset.
+        Combines original subplot 1 (feature importance) and subplot 2 (SHAP scatter).
+        
+        Args:
+            ax: Matplotlib axis object
+        """
+
+        
+        # Load SHAP data
+        shap_df, x_test_df = self.load_shap_data()
+        
+        # Check if features exist in the loaded data
+        available_features = [f for f in self.focus_features if f in shap_df.columns and f in x_test_df.columns]
+        
+        if not available_features:
+            ax.text(0.5, 0.5, 'No specified features available in SHAP data',
+                   ha='center', va='center', fontsize=12)
+            ax.text(0.5, -0.15, '(c)', transform=ax.transAxes, 
+                    ha='center', va='center', fontsize=16, fontweight='bold')
+            return
+        
+        # Plot scatter for each feature
+        colors = ['#4575B4', '#D73027', '#91BFD8']
+        markers = ['o', 's', '^']
+        
+        feature_map = {
+            'sample_variance_entropy': 'Variance Entropy',
+            'sample_round_1_q3_agent_variance_entropy': 'Round 1 Q3 Var Entropy',
+            'sample_answer_token_count': 'Answer Token Count',
+        }
+        
+        for idx, feature in enumerate(available_features):
+            feature_values = x_test_df[feature].values.copy()
+            shap_values = shap_df[feature].values
+            
+            # Normalize feature values to [0, 1] for consistent scale
+            fv_min, fv_max = np.nanmin(feature_values), np.nanmax(feature_values)
+            if fv_max > fv_min:
+                feature_values_norm = (feature_values - fv_min) / (fv_max - fv_min)
+            else:
+                feature_values_norm = np.full_like(feature_values, 0.5)
+            
+            # Calculate correlation using original values
+            corr, _ = pearsonr(feature_values, shap_values)
+            
+            # Get display name
+            display_name = feature_map.get(feature, feature.replace('_', ' ').title())
+
+            # Plot scatter with normalized feature values
+            ax.scatter(
+                feature_values_norm,
+                shap_values,
+                alpha=0.6,
+                s=30,
+                color=colors[idx % len(colors)],
+                marker=markers[idx % len(markers)],
+                label=f'{display_name}\n(Pearson Correlation {corr:.3f})',
+                edgecolors='white',
+                linewidth=0.5
+            )
+        
+        # Main plot styling
+        ax.set_xlabel('Normalized Feature Value', fontsize=14)
+        ax.set_ylabel('SHAP Value', fontsize=14)
+        ax.text(0.5, -0.15, '(c)', transform=ax.transAxes, 
+                ha='center', va='center', fontsize=16, fontweight='bold')
+        ax.legend(loc='lower left', frameon=False, fontsize=11)
+        ax.grid(True, linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
+        ax.set_axisbelow(True)
+        sns.despine(ax=ax, top=True, right=True)
+        
+        # ========== Add inset axes for feature importance ==========
+        inset_ax = ax.inset_axes([0.6, 0.72, 0.35, 0.25])  # [x, y, width, height]
+        self._plot_importance_inset(inset_ax)
+    
+    def _plot_importance_inset(self, ax, top_n=5):
+        """
+        Plot simplified feature importance bar chart as inset.
+        
+        Args:
+            ax: Matplotlib axis object (inset)
+            top_n: Number of top features to display
+        """
+        # Load feature importance data
+        if not self.feature_importance_path.exists():
+            ax.text(0.5, 0.5, 'No data', ha='center', va='center', fontsize=8)
+            return
+        
+        fi_df = pd.read_csv(self.feature_importance_path)
+        
+        # Apply min-max normalization
+        lightgbm_min = fi_df['lightgbm_importance'].min()
+        lightgbm_max = fi_df['lightgbm_importance'].max()
+        if lightgbm_max > lightgbm_min:
+            fi_df['lightgbm_importance_normalized'] = (fi_df['lightgbm_importance'] - lightgbm_min) / (lightgbm_max - lightgbm_min)
+        else:
+            fi_df['lightgbm_importance_normalized'] = fi_df['lightgbm_importance']
+
+        xgb_min = fi_df['xgboost_importance'].min()
+        xgb_max = fi_df['xgboost_importance'].max()
+        if xgb_max > xgb_min:
+            fi_df['xgboost_importance_normalized'] = (fi_df['xgboost_importance'] - xgb_min) / (xgb_max - xgb_min)
+        else:
+            fi_df['xgboost_importance_normalized'] = fi_df['xgboost_importance']
+        
+        # Sort and get top N features
+        fi_df = fi_df.sort_values('mean_importance_normalized', ascending=False).head(top_n)
+        
+        # Calculate bar positions
+        y_pos = np.arange(len(fi_df))
+        bar_height = 0.25
+        
+        # Colors
+        colors = {
+            'lightgbm': '#91BFD8',
+            'xgboost': '#4575B4',
+            'mean': '#D73027'
+        }
+        
+        # Create horizontal bars
+        ax.barh(y_pos - bar_height, fi_df['lightgbm_importance_normalized'].values,
+               height=bar_height, color=colors['lightgbm'], edgecolor='white',
+               linewidth=0.5, label='LightGBM')
+        ax.barh(y_pos, fi_df['xgboost_importance_normalized'].values,
+               height=bar_height, color=colors['xgboost'], edgecolor='white',
+               linewidth=0.5, label='XGBoost')
+        ax.barh(y_pos + bar_height, fi_df['mean_importance_normalized'].values,
+               height=bar_height, color=colors['mean'], edgecolor='white',
+               linewidth=0.5, label='Mean')
+        
+        # Feature name mapping (shortened)
+        feature_mapping = {
+            'sample_variance_entropy': 'var entropy',
+            'sample_round_1_q3_agent_variance_entropy': 'r1 q3 var entropy',
+            'sample_answer_token_count': 'answer token',
+            'sample_total_entropy': 'total entropy',
+            'sample_mean_entropy': 'mean entropy'
+        }
+        
+        # Set labels
+        ax.set_yticks(y_pos)
+        labels = []
+        for f in fi_df['feature'].values:
+            label = feature_mapping.get(f, f.replace('sample_', '').replace('_', ' '))
+            if len(label) > 18:
+                label = label[:18] + '...'
+            labels.append(label)
+        ax.set_yticklabels(labels, fontsize=8)
+        ax.invert_yaxis()
+        
+        # Styling for inset
+        ax.set_xlabel('Importance', fontsize=9)
+        ax.tick_params(axis='x', labelsize=8)
+        ax.legend(loc='lower right', frameon=False, fontsize=7, ncol=1)
+        ax.set_facecolor('white')
+        ax.patch.set_alpha(0.9)
+        
+        # Add border
+        for spine in ax.spines.values():
+            spine.set_edgecolor('#888888')
+            spine.set_linewidth(0.8)
+        
+        ax.grid(True, axis='x', linestyle='--', linewidth=0.5, alpha=0.4)
     
     def plot_shap_scatter(self, ax):
         """
@@ -243,7 +409,7 @@ class MASVisualizer:
         if not available_features:
             ax.text(0.5, 0.5, 'No specified features available in SHAP data',
                    ha='center', va='center', fontsize=12)
-            ax.text(0.5, -0.2, '(e)', transform=ax.transAxes, 
+            ax.text(0.5, -0.15, '(d)', transform=ax.transAxes, 
                     ha='center', va='center', fontsize=16, fontweight='bold')
             return
         
@@ -252,9 +418,6 @@ class MASVisualizer:
         markers = ['o', 's', '^']
         
         for idx, feature in enumerate(available_features):
-            # Retain specific preprocessing logic if it matches specific known features
-            if feature == 'sample_answer_token_count':
-                x_test_df[feature] /= 100.0
 
             feature_values = x_test_df[feature].values
             shap_values = shap_df[feature].values
@@ -287,7 +450,7 @@ class MASVisualizer:
         # Styling
         ax.set_xlabel('Feature Value', fontsize=14)
         ax.set_ylabel('SHAP Value', fontsize=14)
-        ax.text(0.5, -0.2, '(e)', transform=ax.transAxes, 
+        ax.text(0.5, -0.15, '(d)', transform=ax.transAxes, 
                 ha='center', va='center', fontsize=16, fontweight='bold')
         ax.legend(loc='upper right', frameon=False, fontsize=13)
         ax.grid(True, linestyle='--', linewidth=0.8, alpha=0.4, zorder=0)
@@ -298,6 +461,7 @@ class MASVisualizer:
         """
         Plot scatter of two entropy features with prediction probability encoding (Subplot 3).
         Uses feature1 and feature2 defined in __init__.
+        Distinguishes between SAS (Single Agent System) and MAS (Multi-Agent System) using different markers.
         """
         # Load feature values from X_test
         x_test = pd.read_csv(self.shap_x_test_path)
@@ -310,6 +474,11 @@ class MASVisualizer:
             print(f"Warning: Required features not found ({f1}, {f2}). Available features: {list(x_test.columns[:10])}...")
             return
         
+        # Check if architecture column exists
+        if 'architecture' not in x_test.columns:
+            print(f"Warning: 'architecture' column not found in X_test data")
+            return
+        
         # Load prediction probabilities for both classes
         lightgbm_df = pd.read_csv(self.lightgbm_pred_path)
         xgboost_df = pd.read_csv(self.xgboost_pred_path)
@@ -320,15 +489,16 @@ class MASVisualizer:
         xgb_prob0 = pd.to_numeric(xgboost_df['prob_class_0'].values, errors='coerce')
         xgb_prob1 = pd.to_numeric(xgboost_df['prob_class_1'].values, errors='coerce')
         
-        # Get feature values
+        # Get feature values and architecture
         x1 = x_test[f1].values
         x2 = x_test[f2].values
+        architecture = x_test['architecture'].values
         
         # Align dimensions
-        min_len = min(len(lgbm_prob0), len(xgb_prob0), len(x1), len(x2))
+        min_len = min(len(lgbm_prob0), len(xgb_prob0), len(x1), len(x2), len(architecture))
         lgbm_prob0, lgbm_prob1 = lgbm_prob0[:min_len], lgbm_prob1[:min_len]
         xgb_prob0, xgb_prob1 = xgb_prob0[:min_len], xgb_prob1[:min_len]
-        x1, x2 = x1[:min_len], x2[:min_len]
+        x1, x2, architecture = x1[:min_len], x2[:min_len], architecture[:min_len]
         
         # Calculate average prediction probabilities for each class
         mean_prob0 = (lgbm_prob0 + xgb_prob0) / 2.0
@@ -338,10 +508,17 @@ class MASVisualizer:
         mask_valid = ~(np.isnan(mean_prob0) | np.isnan(mean_prob1) | np.isnan(x1) | np.isnan(x2))
         x1, x2 = x1[mask_valid], x2[mask_valid]
         mean_prob0, mean_prob1 = mean_prob0[mask_valid], mean_prob1[mask_valid]
+        architecture = architecture[mask_valid]
         
         # Separate positive and negative samples by comparing probabilities
         positive_mask = mean_prob1 > mean_prob0
         negative_mask = mean_prob0 >= mean_prob1
+        
+        # Separate SAS and MAS
+        # SAS: architecture == 4 (single)
+        # MAS: architecture in [0, 1, 2, 3] (centralized, debate, hybrid, sequential)
+        sas_mask = architecture == 4
+        mas_mask = architecture < 4
         
         # Scale point sizes based on the respective class probability
         size_scale = 100
@@ -350,18 +527,38 @@ class MASVisualizer:
         sizes_neg = mean_prob0 * size_scale + base_size
         
         # Plot negative samples (class 0)
-        if np.any(negative_mask):
-            ax.scatter(x1[negative_mask], x2[negative_mask],
-                      s=sizes_neg[negative_mask], c='#4575B4', alpha=0.6,
+        # SAS negative samples (blue circles)
+        mask_sas_neg = negative_mask & sas_mask
+        if np.any(mask_sas_neg):
+            ax.scatter(x1[mask_sas_neg], x2[mask_sas_neg],
+                      s=sizes_neg[mask_sas_neg], c='#4575B4', alpha=0.6,
                       edgecolors='white', linewidths=0.5,
-                      label=f'Negative (prob0 > prob1)', marker='o')
+                      label='SAS Negative', marker='s')
+        
+        # MAS negative samples (blue triangles)
+        mask_mas_neg = negative_mask & mas_mask
+        if np.any(mask_mas_neg):
+            ax.scatter(x1[mask_mas_neg], x2[mask_mas_neg],
+                      s=sizes_neg[mask_mas_neg], c='#91BFD8', alpha=0.6,
+                      edgecolors='white', linewidths=0.5,
+                      label='MAS Negative', marker='^')
         
         # Plot positive samples (class 1)
-        if np.any(positive_mask):
-            ax.scatter(x1[positive_mask], x2[positive_mask],
-                      s=sizes_pos[positive_mask], c='#D73027', alpha=0.6,
-                      edgecolors='white',
-                      label=f'Positive (prob1 > prob0)', marker='^')
+        # SAS positive samples (red circles)
+        mask_sas_pos = positive_mask & sas_mask
+        if np.any(mask_sas_pos):
+            ax.scatter(x1[mask_sas_pos], x2[mask_sas_pos],
+                      s=sizes_pos[mask_sas_pos], c='#D73027', alpha=0.6,
+                      edgecolors='white', linewidths=0.5,
+                      label='SAS Positive', marker='o')
+        
+        # MAS positive samples (red triangles)
+        mask_mas_pos = positive_mask & mas_mask
+        if np.any(mask_mas_pos):
+            ax.scatter(x1[mask_mas_pos], x2[mask_mas_pos],
+                      s=sizes_pos[mask_mas_pos], c='#FC8D59', alpha=0.6,
+                      edgecolors='white', linewidths=0.5,
+                      label='MAS Positive', marker='*')
         
         # Format labels for display
         def format_label(name):
@@ -369,7 +566,7 @@ class MASVisualizer:
 
         ax.set_xlabel(format_label(f1), fontsize=15)
         ax.set_ylabel("Round 1 Q3 Variance Entropy", fontsize=15)
-        ax.text(0.5, -0.2, '(f)', transform=ax.transAxes, 
+        ax.text(0.5, -0.15, '(d)', transform=ax.transAxes, 
                 ha='center', va='center', fontsize=16, fontweight='bold')
         
         # Add grid
@@ -385,25 +582,24 @@ class MASVisualizer:
         ax.spines['right'].set_visible(False)
         
         # Add size legend annotation
-        ax.text(0.02, 0.98, 'Point size ∝ Class Probability',
-               transform=ax.transAxes, fontsize=11,
-               verticalalignment='top')
+        # ax.text(0.02, 0.98, 'Point size ∝ Class Probability',
+        #        transform=ax.transAxes, fontsize=11,
+        #        verticalalignment='top')
 
     def generate_comprehensive_figure(self):
         """
-        Generate the comprehensive three-subplot figure.
+        Generate the comprehensive two-subplot figure.
+        Subplot 1: SHAP scatter with embedded feature importance inset
+        Subplot 2: Top 2 Entropy Features Scatter
         """
-        # Create figure with 3 subplots
-        fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+        # Create figure with 2 subplots
+        fig, axes = plt.subplots(1, 2, figsize=(12, 6))
         
-        print("Generating subplot 1: Feature Importance...")
-        self.plot_feature_importance(axes[0])
+        print("Generating subplot 1: SHAP Scatter with Feature Importance Inset...")
+        self.plot_shap_with_importance_inset(axes[0])
         
-        print("Generating subplot 2: SHAP Value Scatter...")
-        self.plot_shap_scatter(axes[1])
-        
-        print("Generating subplot 3: Top 2 Entropy Features Scatter...")
-        self.plot_top2_entropy_scatter(axes[2])
+        print("Generating subplot 2: Top 2 Entropy Features Scatter...")
+        self.plot_top2_entropy_scatter(axes[1])
         
         # Adjust layout
         plt.tight_layout()
@@ -421,11 +617,11 @@ def main():
     
     # Define paths
     base_dir = '/home/yuxuanzhao/multiagent-entropy'
-    feature_importance_path = f"{base_dir}/data_mining/results_aggregated/exclude_base_model_all_metrics.csv"
-    shap_x_test_path = f"{base_dir}/data_mining/results/exclude_base_model_all_metrics/shap/X_test_LightGBM_classification.csv"
-    shap_values_path = f"{base_dir}/data_mining/results/exclude_base_model_all_metrics/shap/shap_values_LightGBM_classification.csv"
-    lightgbm_pred_path = f"{base_dir}/data_mining/results/exclude_base_model_all_metrics/shap/shap_prediction_probabilities_LightGBM_classification.csv"
-    xgboost_pred_path = f"{base_dir}/data_mining/results/exclude_base_model_all_metrics/shap/shap_prediction_probabilities_XGBoost_classification.csv"
+    feature_importance_path = f"{base_dir}/data_mining/results_exclue_all_metrics/results_aggregated/exclude_base_model_all_metrics.csv"
+    shap_x_test_path = f"{base_dir}/data_mining/results_exclue_all_metrics/results/exclude_base_model_all_metrics/shap/X_test_LightGBM_classification.csv"
+    shap_values_path = f"{base_dir}/data_mining/results_exclue_all_metrics/results/exclude_base_model_all_metrics/shap/shap_values_LightGBM_classification.csv"
+    lightgbm_pred_path = f"{base_dir}/data_mining/results_exclue_all_metrics/results/exclude_base_model_all_metrics/shap/shap_prediction_probabilities_LightGBM_classification.csv"
+    xgboost_pred_path = f"{base_dir}/data_mining/results_exclue_all_metrics/results/exclude_base_model_all_metrics/shap/shap_prediction_probabilities_XGBoost_classification.csv"
     output_dir = f"{base_dir}/plot/mas"
     
     # Define the top features here to easily change them
