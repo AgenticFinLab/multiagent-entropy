@@ -326,19 +326,19 @@ class EntropyVisualizer:
                     # Validate data before fitting
                     x_vals = model_data[feature].values
                     y_vals = model_data["exp_accuracy"].values
-                    
+
                     # Check for finite values and remove non-finite entries
                     mask = np.isfinite(x_vals) & np.isfinite(y_vals)
                     if mask.sum() < 2:
                         continue
-                        
+
                     x_clean = x_vals[mask]
                     y_clean = y_vals[mask]
-                    
+
                     # Check if x values have sufficient variance
                     if np.var(x_clean) == 0:
                         continue
-                    
+
                     # Perform polynomial fitting
                     z = np.polyfit(x_clean, y_clean, 1)
                     p = np.poly1d(z)
@@ -388,19 +388,19 @@ class EntropyVisualizer:
                     # Validate data before fitting
                     x_vals = x.values
                     y_vals = y.values
-                    
+
                     # Check for finite values and remove non-finite entries
                     mask = np.isfinite(x_vals) & np.isfinite(y_vals)
                     if mask.sum() < 2:
                         continue
-                        
+
                     x_clean = x_vals[mask]
                     y_clean = y_vals[mask]
-                    
+
                     # Check if x values have sufficient variance
                     if np.var(x_clean) == 0:
                         continue
-                    
+
                     # Perform polynomial fitting
                     z = np.polyfit(x_clean, y_clean, 1)
                     p = np.poly1d(z)
@@ -1526,14 +1526,19 @@ class EntropyVisualizer:
 
         # Check if base model columns exist in the data
         base_model_cols = [
-            "base_model_accuracy", "base_model_format_compliance_rate", 
-            "base_model_is_finally_correct"
+            "base_model_accuracy",
+            "base_model_format_compliance_rate",
+            "base_model_is_finally_correct",
         ]
-        
-        available_base_cols = [col for col in base_model_cols if col in self.data.columns]
-        
+
+        available_base_cols = [
+            col for col in base_model_cols if col in self.data.columns
+        ]
+
         if not available_base_cols:
-            print("No base model columns found in data. Skipping base model comparison.")
+            print(
+                "No base model columns found in data. Skipping base model comparison."
+            )
             return
 
         # Create comparison plots
@@ -1546,20 +1551,36 @@ class EntropyVisualizer:
 
         # Accuracy comparison
         ax = axes[0, 0]
-        if "base_model_accuracy" in self.data.columns and "exp_accuracy" in self.data.columns:
+        if (
+            "base_model_accuracy" in self.data.columns
+            and "exp_accuracy" in self.data.columns
+        ):
             # For dataset level, compare model averages
             if self.analysis_level == "dataset" and "model_name" in self.data.columns:
-                model_comparison = self.data.groupby("model_name").agg({
-                    "exp_accuracy": "mean",
-                    "base_model_accuracy": "mean"
-                }).reset_index()
-                
+                model_comparison = (
+                    self.data.groupby("model_name")
+                    .agg({"exp_accuracy": "mean", "base_model_accuracy": "mean"})
+                    .reset_index()
+                )
+
                 x = np.arange(len(model_comparison))
                 width = 0.35
-                
-                ax.bar(x - width/2, model_comparison["exp_accuracy"], width, label="Multi-Agent Accuracy", alpha=0.8)
-                ax.bar(x + width/2, model_comparison["base_model_accuracy"], width, label="Base Model Accuracy", alpha=0.8)
-                
+
+                ax.bar(
+                    x - width / 2,
+                    model_comparison["exp_accuracy"],
+                    width,
+                    label="Multi-Agent Accuracy",
+                    alpha=0.8,
+                )
+                ax.bar(
+                    x + width / 2,
+                    model_comparison["base_model_accuracy"],
+                    width,
+                    label="Base Model Accuracy",
+                    alpha=0.8,
+                )
+
                 ax.set_xlabel("Model")
                 ax.set_ylabel("Accuracy")
                 ax.set_title("Accuracy: Multi-Agent vs Base Model by Model")
@@ -1569,11 +1590,27 @@ class EntropyVisualizer:
                 ax.grid(True, alpha=0.3, axis="y")
             else:
                 # For model level, create a scatter plot
-                ax.scatter(self.data["base_model_accuracy"], self.data["exp_accuracy"], alpha=0.6)
+                ax.scatter(
+                    self.data["base_model_accuracy"],
+                    self.data["exp_accuracy"],
+                    alpha=0.6,
+                )
                 # Add diagonal line for reference
-                min_val = min(self.data["base_model_accuracy"].min(), self.data["exp_accuracy"].min())
-                max_val = max(self.data["base_model_accuracy"].max(), self.data["exp_accuracy"].max())
-                ax.plot([min_val, max_val], [min_val, max_val], 'r--', alpha=0.8, label='Equal Performance')
+                min_val = min(
+                    self.data["base_model_accuracy"].min(),
+                    self.data["exp_accuracy"].min(),
+                )
+                max_val = max(
+                    self.data["base_model_accuracy"].max(),
+                    self.data["exp_accuracy"].max(),
+                )
+                ax.plot(
+                    [min_val, max_val],
+                    [min_val, max_val],
+                    "r--",
+                    alpha=0.8,
+                    label="Equal Performance",
+                )
                 ax.set_xlabel("Base Model Accuracy")
                 ax.set_ylabel("Multi-Agent Accuracy")
                 ax.set_title("Multi-Agent vs Base Model Accuracy")
@@ -1584,17 +1621,35 @@ class EntropyVisualizer:
         ax = axes[0, 1]
         if "base_model_format_compliance_rate" in self.data.columns:
             if self.analysis_level == "dataset" and "model_name" in self.data.columns:
-                model_comparison = self.data.groupby("model_name").agg({
-                    "exp_format_compliance_rate": "mean",
-                    "base_model_format_compliance_rate": "mean"
-                }).reset_index()
-                
+                model_comparison = (
+                    self.data.groupby("model_name")
+                    .agg(
+                        {
+                            "exp_format_compliance_rate": "mean",
+                            "base_model_format_compliance_rate": "mean",
+                        }
+                    )
+                    .reset_index()
+                )
+
                 x = np.arange(len(model_comparison))
                 width = 0.35
-                
-                ax.bar(x - width/2, model_comparison["exp_format_compliance_rate"], width, label="Multi-Agent Format Compliance", alpha=0.8)
-                ax.bar(x + width/2, model_comparison["base_model_format_compliance_rate"], width, label="Base Model Format Compliance", alpha=0.8)
-                
+
+                ax.bar(
+                    x - width / 2,
+                    model_comparison["exp_format_compliance_rate"],
+                    width,
+                    label="Multi-Agent Format Compliance",
+                    alpha=0.8,
+                )
+                ax.bar(
+                    x + width / 2,
+                    model_comparison["base_model_format_compliance_rate"],
+                    width,
+                    label="Base Model Format Compliance",
+                    alpha=0.8,
+                )
+
                 ax.set_xlabel("Model")
                 ax.set_ylabel("Format Compliance Rate")
                 ax.set_title("Format Compliance: Multi-Agent vs Base Model")
@@ -1605,38 +1660,68 @@ class EntropyVisualizer:
 
         # Performance improvement heatmap
         ax = axes[1, 0]
-        if "base_model_accuracy" in self.data.columns and "exp_accuracy" in self.data.columns:
+        if (
+            "base_model_accuracy" in self.data.columns
+            and "exp_accuracy" in self.data.columns
+        ):
             # Calculate improvement over base model
             improvement_data = self.data.copy()
-            improvement_data["accuracy_improvement"] = improvement_data["exp_accuracy"] - improvement_data["base_model_accuracy"]
-            
+            improvement_data["accuracy_improvement"] = (
+                improvement_data["exp_accuracy"]
+                - improvement_data["base_model_accuracy"]
+            )
+
             if "model_name" in self.data.columns:
-                improvement_by_model = improvement_data.groupby("model_name")["accuracy_improvement"].mean().reset_index()
-                
-                ax.bar(improvement_by_model["model_name"], improvement_by_model["accuracy_improvement"])
+                improvement_by_model = (
+                    improvement_data.groupby("model_name")["accuracy_improvement"]
+                    .mean()
+                    .reset_index()
+                )
+
+                ax.bar(
+                    improvement_by_model["model_name"],
+                    improvement_by_model["accuracy_improvement"],
+                )
                 ax.set_xlabel("Model")
                 ax.set_ylabel("Accuracy Improvement")
                 ax.set_title("Accuracy Improvement Over Base Model by Model")
                 ax.tick_params(axis="x", rotation=45)
                 ax.grid(True, alpha=0.3, axis="y")
-                
+
                 # Add horizontal line at y=0 to show baseline
-                ax.axhline(y=0, color='r', linestyle='--', alpha=0.7)
+                ax.axhline(y=0, color="r", linestyle="--", alpha=0.7)
 
         # Architecture-level comparison
         ax = axes[1, 1]
-        if "base_model_accuracy" in self.data.columns and "exp_accuracy" in self.data.columns and "architecture" in self.data.columns:
-            arch_comparison = self.data.groupby("architecture").agg({
-                "exp_accuracy": "mean",
-                "base_model_accuracy": "mean"
-            }).reset_index()
-            
+        if (
+            "base_model_accuracy" in self.data.columns
+            and "exp_accuracy" in self.data.columns
+            and "architecture" in self.data.columns
+        ):
+            arch_comparison = (
+                self.data.groupby("architecture")
+                .agg({"exp_accuracy": "mean", "base_model_accuracy": "mean"})
+                .reset_index()
+            )
+
             x = np.arange(len(arch_comparison))
             width = 0.35
-            
-            ax.bar(x - width/2, arch_comparison["exp_accuracy"], width, label="Multi-Agent Accuracy", alpha=0.8)
-            ax.bar(x + width/2, arch_comparison["base_model_accuracy"], width, label="Base Model Accuracy", alpha=0.8)
-            
+
+            ax.bar(
+                x - width / 2,
+                arch_comparison["exp_accuracy"],
+                width,
+                label="Multi-Agent Accuracy",
+                alpha=0.8,
+            )
+            ax.bar(
+                x + width / 2,
+                arch_comparison["base_model_accuracy"],
+                width,
+                label="Base Model Accuracy",
+                alpha=0.8,
+            )
+
             ax.set_xlabel("Architecture")
             ax.set_ylabel("Accuracy")
             ax.set_title("Accuracy by Architecture: Multi-Agent vs Base Model")

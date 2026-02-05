@@ -81,17 +81,19 @@ class DataMiningAnalyzer:
                 architectures=architectures,
                 datasets=datasets,
             )
-            
+
             # Generate exclude_features suffix
-            exclude_features_suffix = self._generate_exclude_features_suffix(exclude_features)
-            
+            exclude_features_suffix = self._generate_exclude_features_suffix(
+                exclude_features
+            )
+
             # Combine all suffixes
             all_suffixes = []
             if filter_suffix:
                 all_suffixes.append(filter_suffix)
             if exclude_features_suffix:
                 all_suffixes.append(exclude_features_suffix)
-            
+
             if all_suffixes:
                 output_dir = f"{base_output_dir}/{'_'.join(all_suffixes)}"
             else:
@@ -148,23 +150,28 @@ class DataMiningAnalyzer:
     def _generate_exclude_features_suffix(self, exclude_features: str) -> str:
         """
         Generate a suffix for output directory based on exclude_features parameter.
-        
+
         Args:
             exclude_features: Feature exclusion configuration ('all', 'default', or feature group names)
-            
+
         Returns:
             Directory suffix string (e.g., "exclude_default", "exclude_base_model_metrics")
         """
         if not exclude_features:
             return ""
-        
+
         # Normalize the exclude_features string to create a clean suffix
-        suffix = exclude_features.replace("+", "_").replace(",", "_").replace(" ", "_").strip()
-        
+        suffix = (
+            exclude_features.replace("+", "_")
+            .replace(",", "_")
+            .replace(" ", "_")
+            .strip()
+        )
+
         # Ensure the suffix doesn't start with underscore if it's empty after processing
         if suffix:
             return f"exclude_{suffix}"
-        
+
         return ""
 
     def run_experiment_level_analysis(self):

@@ -209,7 +209,7 @@ To run a single experiment, use the `run_experiment.py` script with the followin
 
 #### Single Agent Mode
 ```bash
-cd /home/yuxuanzhao/multiagent-entropy
+cd multiagent-entropy
 python experiments/scripts/run_experiment.py \
   --experiment-name qwen3-4b_aime2025_single_agent \
   --base-config "experiments/configs/base_config.yml" \
@@ -220,7 +220,7 @@ python experiments/scripts/run_experiment.py \
 
 #### Sequential Agent Mode
 ```bash
-cd /home/yuxuanzhao/multiagent-entropy
+cd multiagent-entropy
 python experiments/scripts/run_experiment.py \
   --experiment-name "qwen3-4b_aime2025_sequential_agent" \
   --base-config "experiments/configs/base_config.yml" \
@@ -231,7 +231,7 @@ python experiments/scripts/run_experiment.py \
 
 #### Centralized Agent Mode
 ```bash
-cd /home/yuxuanzhao/multiagent-entropy
+cd multiagent-entropy
 python experiments/scripts/run_experiment.py \
   --experiment-name "qwen3-4b_aime2025_centralized_agent" \
   --base-config "experiments/configs/base_config.yml" \
@@ -242,7 +242,7 @@ python experiments/scripts/run_experiment.py \
 
 #### Decentralized Agent Mode
 ```bash
-cd /home/yuxuanzhao/multiagent-entropy
+cd multiagent-entropy
 python experiments/scripts/run_experiment.py \
   --experiment-name "qwen3-4b_aime2025_decentralized_agent" \
   --base-config "experiments/configs/base_config.yml" \
@@ -253,7 +253,7 @@ python experiments/scripts/run_experiment.py \
 
 #### Full Decentralized Agent Mode
 ```bash
-cd /home/yuxuanzhao/multiagent-entropy
+cd multiagent-entropy
 python experiments/scripts/run_experiment.py \
   --experiment-name "qwen3-4b_aime2025_full_decentralized_agent" \
   --base-config "experiments/configs/base_config.yml" \
@@ -264,7 +264,7 @@ python experiments/scripts/run_experiment.py \
 
 #### Debate Agent Mode
 ```bash
-cd /home/yuxuanzhao/multiagent-entropy
+cd multiagent-entropy
 python experiments/scripts/run_experiment.py \
   --experiment-name "qwen3-4b_aime2025_debate_agent" \
   --base-config "experiments/configs/base_config.yml" \
@@ -276,7 +276,7 @@ python experiments/scripts/run_experiment.py \
 #### Hybrid Agent Mode
 ```bash
 conda activate maep
-cd /home/yuxuanzhao/multiagent-entropy
+cd multiagent-entropy
 python experiments/scripts/run_experiment.py \
   --experiment-name "qwen3-4b_aime2025_hybrid_agent" \
   --base-config "experiments/configs/base_config.yml" \
@@ -290,7 +290,7 @@ python experiments/scripts/run_experiment.py \
 To run multiple experiments in batch mode, create a batch configuration file and use:
 
 ```bash
-cd /home/yuxuanzhao/multiagent-entropy
+cd multiagent-entropy
 python experiments/scripts/run_experiment.py \
   --batch-config experiments/configs/batch_example_qwen3_4b_gsm8k.yml
 ```

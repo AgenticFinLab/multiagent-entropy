@@ -378,16 +378,16 @@ def prepare_aime25_merged_dataset(dataset_config: Dict[str, Any]) -> str:
 
     # Merge the two subsets
     merged_samples = []
-    
+
     # Add samples from AIME2025-I
     for i in range(len(ds_i)):
         merged_samples.append(ds_i[i])
-    
+
     # Find the last main_id from AIME2025-I
     last_main_id = None
     if len(merged_samples) > 0:
         last_main_id = merged_samples[-1].get("main_id", "")
-    
+
     # Extract the numeric part from the last main_id
     last_id_num = 0
     if last_main_id and last_main_id.startswith("ID"):
@@ -395,7 +395,7 @@ def prepare_aime25_merged_dataset(dataset_config: Dict[str, Any]) -> str:
             last_id_num = int(last_main_id[2:])
         except ValueError:
             last_id_num = len(merged_samples)
-    
+
     # Add samples from AIME2025-II with renumbered main_id
     for i in range(len(ds_ii)):
         sample = ds_ii[i]
@@ -406,11 +406,16 @@ def prepare_aime25_merged_dataset(dataset_config: Dict[str, Any]) -> str:
     logger.info(
         f"Merged {len(ds_i)} samples from AIME2025-I and {len(ds_ii)} samples from AIME2025-II"
     )
-    logger.info(f"Renumbered AIME2025-II samples starting from ID{last_id_num - len(ds_ii) + 1}")
+    logger.info(
+        f"Renumbered AIME2025-II samples starting from ID{last_id_num - len(ds_ii) + 1}"
+    )
 
     # Convert list of dicts to dict of lists for consistency with HuggingFace Dataset format
     if len(merged_samples) > 0:
-        merged_samples_dict = {key: [sample[key] for sample in merged_samples] for key in merged_samples[0].keys()}
+        merged_samples_dict = {
+            key: [sample[key] for sample in merged_samples]
+            for key in merged_samples[0].keys()
+        }
     else:
         merged_samples_dict = {}
 

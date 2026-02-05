@@ -18,7 +18,11 @@ from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-from constants import ARCHITECTURES, MULTI_AGENT_ARCHITECTURES, SINGLE_AGENT_ARCHITECTURES
+from constants import (
+    ARCHITECTURES,
+    MULTI_AGENT_ARCHITECTURES,
+    SINGLE_AGENT_ARCHITECTURES,
+)
 
 warnings.filterwarnings("ignore")
 
@@ -206,8 +210,12 @@ class EntropyAnalyzer:
         """
         print("Comparing entropy characteristics across collaboration patterns...")
 
-        multi_agent_data = self.data[self.data["architecture"].isin(MULTI_AGENT_ARCHITECTURES)]
-        single_agent_data = self.data[self.data["architecture"].isin(SINGLE_AGENT_ARCHITECTURES)]
+        multi_agent_data = self.data[
+            self.data["architecture"].isin(MULTI_AGENT_ARCHITECTURES)
+        ]
+        single_agent_data = self.data[
+            self.data["architecture"].isin(SINGLE_AGENT_ARCHITECTURES)
+        ]
 
         entropy_features = [
             col for col in self.data.columns if "entropy" in col.lower()

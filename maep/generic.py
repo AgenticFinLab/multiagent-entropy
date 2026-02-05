@@ -202,12 +202,12 @@ class BaseAgents(ABC):
     def _validate_task_type(self):
         """
         Validate the task_type parameter.
-        
+
         Raises:
             ValueError: If task_type is not supported.
         """
         from maep.prompts import validate_task_type
-        
+
         if not validate_task_type(self.task_type):
             raise ValueError(
                 f"Unsupported task_type: {self.task_type}. "

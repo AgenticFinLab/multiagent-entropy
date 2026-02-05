@@ -20,11 +20,7 @@ EXPERIMENT_METRICS = [
 
 # Exclude identifiers and statistics that would leak target information
 # ALL experiment will exclude this feature group
-DEFAULT_EXCLUDE_COLUMNS = (
-    EXPERIMENT_IDENTIFIER 
-    + SAMPLE_IDENTIFIER 
-    + EXPERIMENT_METRICS
-)
+DEFAULT_EXCLUDE_COLUMNS = EXPERIMENT_IDENTIFIER + SAMPLE_IDENTIFIER + EXPERIMENT_METRICS
 
 # Base model metrics
 BASE_MODEL_METRICS_EXPERIMENT_LEVEL = [

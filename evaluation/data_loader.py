@@ -84,7 +84,11 @@ class DataLoader:
             # Iterate through samples and create ground truth entries
             for i in range(num_samples):
                 # Create item dictionary with all fields for this sample
-                item = {key: data[key][i] for key in data if isinstance(data[key], list) and i < len(data[key])}
+                item = {
+                    key: data[key][i]
+                    for key in data
+                    if isinstance(data[key], list) and i < len(data[key])
+                }
                 # Store item in dictionary keyed by main_id
                 ground_truth_dict[str(item["main_id"])] = item
             return ground_truth_dict
@@ -115,14 +119,14 @@ class DataLoader:
         # If standard location doesn't exist, search for config file
         if not config_file.exists():
             config_file = None
-            
+
             # Initialize list of search paths
             search_paths = []
-            
+
             # Add model-specific path if model name is provided
             if model_name:
                 search_paths.append(self.configs_path / f"{dataset}" / model_name)
-            
+
             # Add dataset-specific path
             search_paths.append(self.configs_path / f"{dataset}")
             # Add base configs path
@@ -133,7 +137,7 @@ class DataLoader:
                 # Stop if config file was already found
                 if config_file is not None:
                     break
-                    
+
                 # Check if search path exists and is a directory
                 if search_path.exists() and search_path.is_dir():
                     # Iterate through all YAML files in the path
@@ -173,7 +177,7 @@ class DataLoader:
 
         # Initialize dictionary to store experiments by model
         experiments_by_model = {}
-        
+
         # Iterate through model directories
         for model_dir in dataset_path.iterdir():
             # Process only directories
@@ -211,7 +215,13 @@ class DataLoader:
             FileNotFoundError: If result store info is not found.
         """
         # Construct path to traces directory
-        traces_path = self.results_path / dataset.lower() / model_name / experiment_name / "traces"
+        traces_path = (
+            self.results_path
+            / dataset.lower()
+            / model_name
+            / experiment_name
+            / "traces"
+        )
         # Construct path to result store information file
         info_file = traces_path / "Result-store-information.json"
 
@@ -243,7 +253,13 @@ class DataLoader:
             FileNotFoundError: If result block is not found.
         """
         # Construct path to traces directory
-        traces_path = self.results_path / dataset.lower() / model_name / experiment_name / "traces"
+        traces_path = (
+            self.results_path
+            / dataset.lower()
+            / model_name
+            / experiment_name
+            / "traces"
+        )
         # Construct path to result block file
         block_file = traces_path / block_name
 
@@ -272,7 +288,13 @@ class DataLoader:
             Entropy tensor or None if not found.
         """
         # Construct path to traces directory
-        traces_path = self.results_path / dataset.lower() / model_name / experiment_name / "traces"
+        traces_path = (
+            self.results_path
+            / dataset.lower()
+            / model_name
+            / experiment_name
+            / "traces"
+        )
         # Construct path to entropy tensor file
         tensor_path = traces_path / "tensors" / f"{result_id}_extras_entropy.pt"
 
@@ -283,7 +305,9 @@ class DataLoader:
         # Load and return the entropy tensor
         return torch.load(tensor_path)
 
-    def load_all_results(self, dataset: str, model_name: str, experiment_name: str) -> Dict[str, Any]:
+    def load_all_results(
+        self, dataset: str, model_name: str, experiment_name: str
+    ) -> Dict[str, Any]:
         """Load all results for an experiment.
 
         Args:
@@ -302,7 +326,9 @@ class DataLoader:
         # Iterate through all result blocks
         for block_name, block_info in info.items():
             # Load data for each block
-            block_data = self.load_result_block(dataset, model_name, experiment_name, block_name)
+            block_data = self.load_result_block(
+                dataset, model_name, experiment_name, block_name
+            )
             # Merge block data into all results dictionary
             all_results.update(block_data)
 

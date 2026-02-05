@@ -200,14 +200,15 @@ def run_single_experiment(
                 data_cfg["data_path"], f"{data_cfg['split']}-all-samples.json"
             )
             if os.path.exists(merged_dataset_path):
-                logger.info(
-                    f"Loading merged dataset from: {merged_dataset_path}"
-                )
+                logger.info(f"Loading merged dataset from: {merged_dataset_path}")
                 with open(merged_dataset_path, "r", encoding="utf-8") as f:
                     all_samples = json.load(f)
                 # Convert list of dicts to dict of lists for consistency
                 if isinstance(all_samples, list) and len(all_samples) > 0:
-                    dataset = {key: [sample[key] for sample in all_samples] for key in all_samples[0].keys()}
+                    dataset = {
+                        key: [sample[key] for sample in all_samples]
+                        for key in all_samples[0].keys()
+                    }
                 else:
                     dataset = all_samples
             else:
@@ -221,7 +222,9 @@ def run_single_experiment(
                 original_subset = data_cfg.get("subset", "")
                 mapped_subset = map_aime25_subset(original_subset)
                 if mapped_subset != original_subset:
-                    logger.info(f"Mapped subset '{original_subset}' to '{mapped_subset}'")
+                    logger.info(
+                        f"Mapped subset '{original_subset}' to '{mapped_subset}'"
+                    )
                     data_cfg["subset"] = mapped_subset
             dataset = data_registry.get(config=data_cfg, split=data_cfg["split"])
 
@@ -251,7 +254,7 @@ def run_single_experiment(
         else:
             # For HuggingFace Dataset objects
             dataset_len = len(dataset)
-        
+
         total_samples = (
             dataset_len
             if data_cfg["data_num"] == -1
@@ -272,7 +275,9 @@ def run_single_experiment(
             # Handle both HuggingFace Dataset objects and dict-of-lists format
             if isinstance(dataset, dict):
                 # For dict-of-lists format, extract the slice manually
-                batch_samples = {key: values[start_idx:end_idx] for key, values in dataset.items()}
+                batch_samples = {
+                    key: values[start_idx:end_idx] for key, values in dataset.items()
+                }
             else:
                 # For HuggingFace Dataset objects, use direct slicing
                 batch_samples = dataset[start_idx:end_idx]

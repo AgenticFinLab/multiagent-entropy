@@ -213,8 +213,6 @@ experiments/data/
 experiments/results/
 experiments/logs/
 experiments/configs_exp/
-# temporary files
-experiments/temp/
 
 # Evaluation results
 evaluation/results*
@@ -227,7 +225,3 @@ data_mining/results*
 data_mining/configs
 data_mining/experiment_reports
 
-# Plot
-plot/*/*.csv
-plot/*/*.png
-plot/*/*.pdf

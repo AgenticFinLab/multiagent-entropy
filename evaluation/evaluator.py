@@ -53,7 +53,7 @@ def main():
         "--model",
         type=str,
         nargs="*",
-        default=["qwen3_0_6b","qwen3_4b","qwen3_8b"],
+        default=["qwen3_0_6b", "qwen3_4b", "qwen3_8b"],
         help="Model names. If not provided, analyze all models",
     )
     # Add task type argument with choices for auto-detection
@@ -143,7 +143,11 @@ def main():
                 try:
                     # Analyze the specified experiment
                     metrics = analyzer.analyze_experiment(
-                        dataset, model_name, args.experiment, args.task_type, args.timeout
+                        dataset,
+                        model_name,
+                        args.experiment,
+                        args.task_type,
+                        args.timeout,
                     )
 
                     # Determine output path for results

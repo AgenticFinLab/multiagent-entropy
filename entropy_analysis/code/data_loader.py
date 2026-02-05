@@ -851,10 +851,14 @@ class DataLoader:
                 }
 
                 if "base_model_accuracy" in arch_data.columns:
-                    arch_stats["base_model_accuracy"] = arch_data["base_model_accuracy"].mean()
+                    arch_stats["base_model_accuracy"] = arch_data[
+                        "base_model_accuracy"
+                    ].mean()
 
                 if "base_model_format_compliance_rate" in arch_data.columns:
-                    arch_stats["base_model_format_compliance_rate"] = arch_data["base_model_format_compliance_rate"].mean()
+                    arch_stats["base_model_format_compliance_rate"] = arch_data[
+                        "base_model_format_compliance_rate"
+                    ].mean()
 
                 comparison.append(arch_stats)
 
@@ -888,11 +892,17 @@ class DataLoader:
             }
 
             if "base_model_accuracy" in model_data.columns:
-                model_stats["base_model_accuracy"] = model_data["base_model_accuracy"].mean()
-                model_stats["base_model_std_accuracy"] = model_data["base_model_accuracy"].std()
+                model_stats["base_model_accuracy"] = model_data[
+                    "base_model_accuracy"
+                ].mean()
+                model_stats["base_model_std_accuracy"] = model_data[
+                    "base_model_accuracy"
+                ].std()
 
             if "base_model_format_compliance_rate" in model_data.columns:
-                model_stats["base_model_format_compliance_rate"] = model_data["base_model_format_compliance_rate"].mean()
+                model_stats["base_model_format_compliance_rate"] = model_data[
+                    "base_model_format_compliance_rate"
+                ].mean()
 
             comparison.append(model_stats)
 

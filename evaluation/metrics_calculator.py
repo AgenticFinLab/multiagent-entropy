@@ -15,6 +15,7 @@ from math_verify import parse, verify
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+
 class TimeoutError(Exception):
     pass
 
@@ -195,51 +196,51 @@ class MetricsCalculator:
             """Execute code in a separate process and put result in queue."""
             import sys
             import io
-            
+
             # Capture stdout to suppress print statements from predicted code
             old_stdout = sys.stdout
             captured_output = io.StringIO()
             sys.stdout = captured_output
-            
+
             try:
                 # Execute predicted code in isolated namespace with restricted builtins
                 local_namespace = {}
                 restricted_builtins = {
-                    'len': len,
-                    'range': range,
-                    'enumerate': enumerate,
-                    'zip': zip,
-                    'min': min,
-                    'max': max,
-                    'sum': sum,
-                    'abs': abs,
-                    'round': round,
-                    'int': int,
-                    'float': float,
-                    'str': str,
-                    'bool': bool,
-                    'list': list,
-                    'dict': dict,
-                    'set': set,
-                    'tuple': tuple,
-                    'sorted': sorted,
-                    'reversed': reversed,
-                    'map': map,
-                    'filter': filter,
-                    'any': any,
-                    'all': all,
-                    'isinstance': isinstance,
-                    'type': type,
-                    'Exception': Exception,
-                    'ValueError': ValueError,
-                    'TypeError': TypeError,
-                    'IndexError': IndexError,
-                    'KeyError': KeyError,
-                    'AttributeError': AttributeError,
-                    'AssertionError': AssertionError,
-                    'RuntimeError': RuntimeError,
+                    "len": len,
+                    "range": range,
+                    "enumerate": enumerate,
+                    "zip": zip,
+                    "min": min,
+                    "max": max,
+                    "sum": sum,
+                    "abs": abs,
+                    "round": round,
+                    "int": int,
+                    "float": float,
+                    "str": str,
+                    "bool": bool,
+                    "list": list,
+                    "dict": dict,
+                    "set": set,
+                    "tuple": tuple,
+                    "sorted": sorted,
+                    "reversed": reversed,
+                    "map": map,
+                    "filter": filter,
+                    "any": any,
+                    "all": all,
+                    "isinstance": isinstance,
+                    "type": type,
+                    "Exception": Exception,
+                    "ValueError": ValueError,
+                    "TypeError": TypeError,
+                    "IndexError": IndexError,
+                    "KeyError": KeyError,
+                    "AttributeError": AttributeError,
+                    "AssertionError": AssertionError,
+                    "RuntimeError": RuntimeError,
                 }
-                safe_globals = {'__builtins__': restricted_builtins}
+                safe_globals = {"__builtins__": restricted_builtins}
                 exec(predicted_code, safe_globals, local_namespace)
 
                 # Execute test cases in copy of local namespace
@@ -253,7 +254,7 @@ class MetricsCalculator:
             finally:
                 # Restore original stdout
                 sys.stdout = old_stdout
-            
+
             # Check if test cases define a check function
             success = True
             if "check" in test_namespace:
@@ -276,23 +277,25 @@ class MetricsCalculator:
 
         # Create a queue to get the result from the subprocess
         result_queue = multiprocessing.Queue()
-        
+
         # Create and start the process
-        process = multiprocessing.Process(target=execute_code_in_process, args=(result_queue,))
+        process = multiprocessing.Process(
+            target=execute_code_in_process, args=(result_queue,)
+        )
         process.start()
         try:
             # Wait for the result with timeout
             result = result_queue.get(timeout=timeout)
             process.join(timeout=timeout)
-            
+
             # If process is still alive after timeout, terminate it
             if process.is_alive():
                 process.terminate()
                 process.join()
                 return False
-            
+
             return result
-            
+
         except:
             # If anything goes wrong, make sure to terminate the process
             if process.is_alive():

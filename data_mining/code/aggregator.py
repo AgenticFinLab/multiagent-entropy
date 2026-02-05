@@ -101,12 +101,8 @@ class ExperimentAggregator:
             "xgboost_shap_values": exp_path
             / "shap"
             / "shap_values_XGBoost_classification.csv",
-            "lightgbm_x_test": exp_path
-            / "shap"
-            / "X_test_LightGBM_classification.csv",
-            "xgboost_x_test": exp_path
-            / "shap"
-            / "X_test_XGBoost_classification.csv",
+            "lightgbm_x_test": exp_path / "shap" / "X_test_LightGBM_classification.csv",
+            "xgboost_x_test": exp_path / "shap" / "X_test_XGBoost_classification.csv",
         }
 
         # Check if files exist
@@ -181,11 +177,25 @@ class ExperimentAggregator:
         ) / 2
 
         # Normalize importance values (Min-Max normalization to 0-1 range)
-        lgb_min, lgb_max = summary["lightgbm_importance"].min(), summary["lightgbm_importance"].max()
-        xgb_min, xgb_max = summary["xgboost_importance"].min(), summary["xgboost_importance"].max()
+        lgb_min, lgb_max = (
+            summary["lightgbm_importance"].min(),
+            summary["lightgbm_importance"].max(),
+        )
+        xgb_min, xgb_max = (
+            summary["xgboost_importance"].min(),
+            summary["xgboost_importance"].max(),
+        )
 
-        lgb_norm = (summary["lightgbm_importance"] - lgb_min) / (lgb_max - lgb_min) if lgb_max > lgb_min else summary["lightgbm_importance"] * 0
-        xgb_norm = (summary["xgboost_importance"] - xgb_min) / (xgb_max - xgb_min) if xgb_max > xgb_min else summary["xgboost_importance"] * 0
+        lgb_norm = (
+            (summary["lightgbm_importance"] - lgb_min) / (lgb_max - lgb_min)
+            if lgb_max > lgb_min
+            else summary["lightgbm_importance"] * 0
+        )
+        xgb_norm = (
+            (summary["xgboost_importance"] - xgb_min) / (xgb_max - xgb_min)
+            if xgb_max > xgb_min
+            else summary["xgboost_importance"] * 0
+        )
 
         summary["mean_importance_normalized"] = (lgb_norm + xgb_norm) / 2
 
@@ -238,7 +248,7 @@ class ExperimentAggregator:
             xgb_corr_stats = self._calculate_feature_shap_correlation(
                 xgb_x_test, xgb_shap_values, "xgboost"
             )
-            
+
             # Merge correlation statistics
             summary_df = summary_df.merge(lgb_corr_stats, on="feature", how="left")
             summary_df = summary_df.merge(xgb_corr_stats, on="feature", how="left")
@@ -266,34 +276,33 @@ class ExperimentAggregator:
             DataFrame containing correlation coefficients
         """
         correlations = []
-        
+
         # Get common features between X_test and SHAP data
         x_test_features = set(x_test_df.columns)
         shap_features = set(shap_df.columns)
         common_features = x_test_features.intersection(shap_features)
-        
+
         for feature in common_features:
             # Get feature values and corresponding SHAP values
             feature_values = x_test_df[feature].values
             shap_values = shap_df[feature].values
-            
+
             # Ensure arrays have the same length
             min_length = min(len(feature_values), len(shap_values))
             feature_values = feature_values[:min_length]
             shap_values = shap_values[:min_length]
-            
+
             # Calculate Pearson correlation coefficient
             correlation = np.corrcoef(feature_values, shap_values)[0, 1]
-            
+
             # If correlation is NaN (e.g., due to constant values), set to 0
             if np.isnan(correlation):
                 correlation = 0.0
-            
-            correlations.append({
-                "feature": feature,
-                f"{model_name}_shap_correlation": correlation
-            })
-        
+
+            correlations.append(
+                {"feature": feature, f"{model_name}_shap_correlation": correlation}
+            )
+
         return pd.DataFrame(correlations)
 
     def _calculate_shap_stats(
@@ -403,7 +412,8 @@ class ExperimentAggregator:
 
         # Average SHAP correlation between feature values and SHAP values
         df["mean_shap_correlation"] = (
-            df.get("lightgbm_shap_correlation", 0) + df.get("xgboost_shap_correlation", 0)
+            df.get("lightgbm_shap_correlation", 0)
+            + df.get("xgboost_shap_correlation", 0)
         ) / 2
 
         # Impact strength (considering both importance and direction consistency)

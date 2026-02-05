@@ -45,7 +45,9 @@ class HFEntropyInference(BaseEntropyInference):
         device_map = self.inference_config.get("device_map", None)
 
         # Enable gradient checkpointing for memory optimization
-        use_gradient_checkpointing = self.inference_config.get("use_gradient_checkpointing", True)
+        use_gradient_checkpointing = self.inference_config.get(
+            "use_gradient_checkpointing", True
+        )
 
         if device_map:
             # Multi-GPU mode: use device_map for parallel inference
@@ -241,16 +243,16 @@ class HFEntropyInference(BaseEntropyInference):
             # to avoid stacking all logits at once which causes OOM
             # scores: tuple of [B, V] tensors
             entropy_list = []
-            
+
             for score in outputs.scores:
                 # score shape: [B, V]
                 # Compute entropy for this token position using calculate_entropy
                 entropy = self.calculate_entropy(score)
                 entropy_list.append(entropy)
-            
+
             # Stack entropy tensors: [L_g, B] -> [B, L_g]
             entropy = torch.stack(entropy_list, dim=1)
-            
+
             # Clear the entropy_list to free memory
             del entropy_list
 

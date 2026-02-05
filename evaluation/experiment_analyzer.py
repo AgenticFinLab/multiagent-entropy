@@ -237,7 +237,11 @@ class ExperimentAnalyzer:
             if ground_truth and predicted_answer and format_compliance:
                 test_cases = ground_truth.get("test_cases") if ground_truth else None
                 is_correct = self.metrics_calculator.is_answer_correct_by_task_type(
-                    predicted_answer, ground_truth["groundtruth"], task_type, test_cases, timeout
+                    predicted_answer,
+                    ground_truth["groundtruth"],
+                    task_type,
+                    test_cases,
+                    timeout,
                 )
 
             # Generate agent key based on architecture and execution order

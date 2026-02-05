@@ -313,7 +313,7 @@ class ClassificationAnalyzer:
         ).sort_values("Importance", ascending=False)
 
         # Save feature importance data to CSV
-        csv_path = Path(str(save_path).replace('.png', '.csv'))
+        csv_path = Path(str(save_path).replace(".png", ".csv"))
         importance_df.to_csv(csv_path, index=False)
         logger.info(f"Feature importance data saved to CSV: {csv_path}")
 
@@ -360,7 +360,7 @@ class ClassificationAnalyzer:
             corr_matrix = X.corr()
 
         # Save correlation matrix to CSV
-        csv_path = Path(str(save_path).replace('.png', '.csv'))
+        csv_path = Path(str(save_path).replace(".png", ".csv"))
         corr_matrix.to_csv(csv_path)
         logger.info(f"Correlation matrix saved to CSV: {csv_path}")
 
@@ -393,26 +393,30 @@ class ClassificationAnalyzer:
     def save_prediction_probabilities(self, classification_results: Dict):
         """
         Save prediction probabilities to CSV files.
-        
+
         Args:
             classification_results: Results dictionary containing prediction probabilities
         """
-        prediction_probabilities = classification_results.get("prediction_probabilities", {})
-        
+        prediction_probabilities = classification_results.get(
+            "prediction_probabilities", {}
+        )
+
         for model_name, probabilities in prediction_probabilities.items():
             # Create DataFrame with prediction probabilities
             proba_df = pd.DataFrame(
                 probabilities,
-                columns=[f"prob_class_{i}" for i in range(probabilities.shape[1])]
+                columns=[f"prob_class_{i}" for i in range(probabilities.shape[1])],
             )
-            
+
             # Add sample index
             proba_df.insert(0, "sample_index", range(len(proba_df)))
-            
+
             # Save to CSV
             csv_path = self.output_dir / f"prediction_probabilities_{model_name}.csv"
             proba_df.to_csv(csv_path, index=False)
-            logger.info(f"Prediction probabilities for {model_name} saved to: {csv_path}")
+            logger.info(
+                f"Prediction probabilities for {model_name} saved to: {csv_path}"
+            )
 
     def run_analysis(self):
         """
@@ -423,16 +427,14 @@ class ClassificationAnalyzer:
         logger.info("=" * 80)
 
         # Prepare features for classification
-        X, y = self.prepare_features(
-            target_column="is_finally_correct"
-        )
+        X, y = self.prepare_features(target_column="is_finally_correct")
 
         # Train models
         classification_results = self.train_models(X, y)
 
         # Save prediction probabilities for XGBoost and LightGBM
         self.save_prediction_probabilities(classification_results)
-        
+
         # Plot correlation heatmap with is_finally_correct included
         corr_matrix = self.plot_correlation_heatmap(
             X,

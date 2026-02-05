@@ -148,14 +148,10 @@ def get_architecture_comparison(data: pd.DataFrame) -> pd.DataFrame:
                 ].mean()
 
             if "exp_total_token" in arch_data.columns:
-                comparison[arch]["avg_exp_token"] = arch_data[
-                    "exp_total_token"
-                ].mean()
+                comparison[arch]["avg_exp_token"] = arch_data["exp_total_token"].mean()
 
             if "exp_total_time" in arch_data.columns:
-                comparison[arch]["avg_exp_time"] = arch_data[
-                    "exp_total_time"
-                ].mean()
+                comparison[arch]["avg_exp_time"] = arch_data["exp_total_time"].mean()
 
     return pd.DataFrame(comparison).T
 

@@ -297,7 +297,7 @@ class RegressionAnalyzer:
         ).sort_values("Importance", ascending=False)
 
         # Save feature importance data to CSV
-        csv_path = Path(str(save_path).replace('.png', '.csv'))
+        csv_path = Path(str(save_path).replace(".png", ".csv"))
         importance_df.to_csv(csv_path, index=False)
         logger.info(f"Feature importance data saved to CSV: {csv_path}")
 
@@ -344,7 +344,7 @@ class RegressionAnalyzer:
             corr_matrix = X.corr()
 
         # Save correlation matrix to CSV
-        csv_path = Path(str(save_path).replace('.png', '.csv'))
+        csv_path = Path(str(save_path).replace(".png", ".csv"))
         corr_matrix.to_csv(csv_path)
         logger.info(f"Correlation matrix saved to CSV: {csv_path}")
 
@@ -384,9 +384,7 @@ class RegressionAnalyzer:
 
         # Prepare features for regression
         # Exclude is_finally_correct as it's used to calculate exp_accuracy
-        X, y = self.prepare_features(
-            target_column="exp_accuracy"
-        )
+        X, y = self.prepare_features(target_column="exp_accuracy")
 
         # Train models
         regression_results = self.train_models(X, y)
