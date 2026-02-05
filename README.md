@@ -5,8 +5,8 @@
 
 Yuxuan Zhao<sup>1,2</sup>,  Sijia Chen<sup>2</sup>†,  Ningxin Su<sup>2</sup>
 
-<sup>1</sup> Yantai Research Institute of Harbin Engineering University 
-<sup>2</sup> Hong Kong University of Science and Technology (Guangzhou)
+<sup>1</sup> Yantai Research Institute of Harbin Engineering University <sup>2</sup> Hong Kong University of Science and Technology (Guangzhou)
+
 <sup>†</sup> Corresponding Author  
 
 
