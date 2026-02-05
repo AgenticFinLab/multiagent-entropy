@@ -1,4 +1,4 @@
-# MultiAgent-Entropy Experiments
+# Multi-Agent Entropy Experiments
 
 This directory contains the organized structure for running large-scale experiments with the MultiAgent-Entropy framework.
 
@@ -71,19 +71,58 @@ Dataset-specific configurations (`dataset_specific/`) define settings for each d
 - Batch size
 - Optional generation_config overrides (can override base_config's generation_config)
 
-### Configuration Priority and Override Mechanism
-The configuration system supports a hierarchical priority mechanism that allows dataset-specific configurations to override base configuration settings. This enables flexible customization for different datasets while maintaining a common baseline.
+### Configuration System
 
-#### Priority Order (Highest to Lowest)
-1. **Dataset-specific configuration** (`dataset_specific/*.yml`)
-2. **Base configuration** (`base_config.yml`)
+The configuration system is implemented in [config_loader.py](file:///d:/GitHub/multiagent-entropy/experiments/scripts/config_loader.py) and supports hierarchical configuration merging with priority-based overrides.
 
-#### Generation Configuration Override
-The `generation_config` section supports parameter-level overrides. When a dataset-specific configuration defines `generation_config`, it is merged with the base configuration using the following rules:
+#### Configuration Priority Order (Highest to Lowest)
 
-- **Override**: Parameters defined in the dataset-specific configuration replace those in the base configuration
-- **Inheritance**: Parameters not defined in the dataset-specific configuration are inherited from the base configuration
-- **Supported parameters**: `max_new_tokens`, `do_sample`, `temperature`, `top_p`
+1. **Agent-specific configuration** (`agent_specific/{type}_agents.yml`)
+2. **Experiment configuration** (auto-generated with save_folder, experiment_name, agent_type)
+3. **Dataset-specific configuration** (`dataset_specific/*.yml`)
+4. **Model-specific configuration** (`model_specific/*.yml`)
+5. **Base configuration** (`base_config.yml`)
+
+#### ConfigLoader Functions
+
+| Function | Description |
+|----------|-------------|
+| `load_config(config_path)` | Load a YAML configuration file |
+| `merge_dicts(dict1, dict2)` | Recursively merge two dictionaries |
+| `merge_configs(configs)` | Merge multiple configuration dictionaries |
+| `resolve_agent_placeholders()` | Resolve placeholders in agent templates with actual values |
+| `load_experiment_config()` | Load and merge all configuration files for an experiment |
+| `generate_batch_configs()` | Generate multiple experiment configurations from batch file |
+| `save_config()` | Save configuration dictionary to YAML file |
+| `is_aime25_all_subset()` | Check if dataset is AIME2025 with subset='all' |
+| `map_aime25_subset()` | Map AIME2025 subset values to expected format |
+| `prepare_aime25_merged_dataset()` | Merge AIME2025-I and AIME2025-II subsets |
+
+#### Configuration Override Rules
+
+**Generation Configuration** (`generation_config`):
+- Priority: `dataset_config` > `base_config`
+- Uses `merge_dicts()` for deep merging
+- Supported parameters: `max_new_tokens`, `do_sample`, `temperature`, `top_p`
+
+**Inference Configuration** (`inference_config`):
+- Priority: `model_config` > `base_config`
+- Falls back to defaults if not found: `device: cuda`, `torch_dtype: float16`, `device_map: auto`
+
+**Agent Configuration**:
+- Placeholders resolved in `resolve_agent_placeholders()`:
+  - `lm_name`: Replaced with model_config's lm_name
+  - `inference_config`: From model_config or base_config
+  - `generation_config`: Merged from dataset_config and base_config
+
+#### AIME2025 Special Handling
+
+When `subset: all` is specified for AIME2025 dataset:
+1. `is_aime25_all_subset()` detects this configuration
+2. `prepare_aime25_merged_dataset()` is called to merge AIME2025-I and AIME2025-II
+3. Samples from AIME2025-II are renumbered (ID{last_id_num + 1}, etc.)
+4. Merged dataset is saved to `experiments/data/AIME2025/{split}-all-samples.json`
+5. `map_aime25_subset()` handles subset value mapping ('i' → 'AIME2025-I', 'ii' → 'AIME2025-II')
 
 #### Example: max_new_tokens Override
 
@@ -96,44 +135,27 @@ generation_config:
   top_p: 0.95
 ```
 
-**Dataset-Specific Configuration** (`dataset_specific/aime2024.yml`):
-```yaml
-generation_config:
-  max_new_tokens: 8192
-```
-
 **Dataset-Specific Configuration** (`dataset_specific/aime2025.yml`):
 ```yaml
 data:
   data_name: AIME2025
   data_path: experiments/data/AIME2025
-  subset: all  # 'all' for both AIME2025-I and AIME2025-II, 'i' for AIME2025-I, 'ii' for AIME2025-II
+  subset: all  # 'all' for both AIME2025-I and AIME2025-II
   split: test
-  data_num: -1  # -1 for all (30 test samples)
+  data_num: -1
   batch_size: 1
 
 task_type: "math"
 
 generation_config:
-  max_new_tokens: 8192  # AIME2025 problems require longer reasoning chains
+  max_new_tokens: 8192  # Override for longer reasoning chains
 ```
 
-**Result**: When running experiments with AIME2024 dataset:
+**Result**: When running experiments with AIME2025 dataset:
 - `max_new_tokens`: 8192 (overridden from dataset config)
 - `do_sample`: true (inherited from base config)
 - `temperature`: 0.6 (inherited from base config)
 - `top_p`: 0.95 (inherited from base config)
-
-#### Implementation Details
-The override mechanism is implemented in `experiments/scripts/config_loader.py` in the `resolve_agent_placeholders()` function. The function:
-1. Checks if `dataset_config` contains a `generation_config` section
-2. If present, merges it with `base_config["generation_config"]` using `merge_dicts()`
-3. The merged configuration ensures all required parameters are present while respecting dataset-specific overrides
-
-This design ensures that:
-- New datasets can easily customize generation parameters without modifying the base configuration
-- Missing parameters in dataset-specific configurations are safely inherited from the base configuration
-- The system remains flexible and maintainable as new datasets are added
 
 ### Agent-Specific Configuration
 Agent-specific configurations (`agent_specific/`) define the structure and parameters for each agent mode:
@@ -264,7 +286,8 @@ python experiments/scripts/run_experiment.py \
 ```
 
 ### Batch Experiments
-To run multiple experiments in batch mode, create a batch configuration file like `batch_example_qwen3_4b_gsm8k.yml` and use:
+
+To run multiple experiments in batch mode, create a batch configuration file and use:
 
 ```bash
 cd /home/yuxuanzhao/multiagent-entropy
@@ -272,31 +295,98 @@ python experiments/scripts/run_experiment.py \
   --batch-config experiments/configs/batch_example_qwen3_4b_gsm8k.yml
 ```
 
+#### Batch Configuration Format
+
+```yaml
+experiments:
+  - name: experiment_name_1
+    base_config: experiments/configs/base_config.yml
+    model_config: experiments/configs/model_specific/qwen3-4b.yml
+    dataset_config: experiments/configs/dataset_specific/gsm8k.yml
+    agent_type: centralized
+  
+  - name: experiment_name_2
+    base_config: experiments/configs/base_config.yml
+    model_config: experiments/configs/model_specific/qwen3-4b.yml
+    dataset_config: experiments/configs/dataset_specific/gsm8k.yml
+    agent_type: debate
+  
+  - name: experiment_name_3
+    base_config: experiments/configs/base_config.yml
+    model_config: experiments/configs/model_specific/qwen3-8b.yml
+    dataset_config: experiments/configs/dataset_specific/aime2025.yml
+    agent_type: hybrid
+```
+
+#### Running Specific Experiment from Batch
+
+To run only a specific experiment from a batch configuration:
+
+```bash
+python experiments/scripts/run_experiment.py \
+  --batch-config experiments/configs/batch_example.yml \
+  --experiment-name experiment_name_1
+```
+
 ### Command-Line Options
 
-- `-b, --base-config`: Path to base configuration file (default: experiments/configs/base_config.yml)
-- `-m, --model-config`: Path to model-specific configuration file (required for single experiment)
-- `-d, --dataset-config`: Path to dataset-specific configuration file (required for single experiment)
-- `-n, --experiment-name`: Name of the experiment (required for single experiment)
-- `--agent-type`: Type of agent configuration to use (single, sequential, centralized, decentralized, full_decentralized, debate, hybrid)
-- `--batch-config`: Path to batch configuration file (for batch experiments)
-- `--dry-run`: Only prepare configurations without running experiments
-- `--save-config`: Save merged configuration to file (default: True)
+| Option | Short | Required | Default | Description |
+|--------|-------|----------|---------|-------------|
+| `--base-config` | `-b` | No | `experiments/configs/base_config.yml` | Path to base configuration file |
+| `--model-config` | `-m` | Yes (single mode) | None | Path to model-specific configuration file |
+| `--dataset-config` | `-d` | Yes (single mode) | None | Path to dataset-specific configuration file |
+| `--experiment-name` | `-n` | Yes (single mode) | None | Name of the experiment |
+| `--agent-type` | - | Yes (single mode) | None | Agent type: single, sequential, centralized, decentralized, full_decentralized, debate, hybrid |
+| `--batch-config` | `-bc` | Yes (batch mode) | None | Path to batch configuration file |
+| `--dry-run` | - | No | False | Only prepare configurations without running experiments |
+| `--save-config` | - | No | True | Save merged configuration to file |
 
-## Results Management
+#### Supported Agent Types
 
-### Raw Results
-Raw experiment results are saved in `experiments/results/raw/<dataset_name>/<model_name>/<experiment_name>_<timestamp>/` directory, including:
-- Individual batch results (JSON format)
-- Combined final results (JSON format)
-- Tensor files (in traces/tensors directory)
+The experiment runner supports all seven multi-agent system architectures:
+
+| Agent Type | Description |
+|------------|-------------|
+| `single` | Single solver agent baseline |
+| `sequential` | Sequential pipeline with planner → solver → critic → judger |
+| `centralized` | Two-layer: domain agents (Math/Science/Code) → central orchestrator |
+| `decentralized` | Sequential agents with loopback before orchestration |
+| `full_decentralized` | Each agent can communicate with all other agents |
+| `debate` | Multi-agent debate with majority voting (no LLM orchestrator) |
+| `hybrid` | Two-layer with enhanced context sharing and feedback |
+
+### Results Management
+
+#### Raw Results
+
+Raw experiment results are saved in:
+```
+experiments/results/raw/<dataset_name>/<model_name>/<experiment_name>_<timestamp>_<ms>_<pid>/
+```
+
+Contents:
+- `Batch_{N}_State.json`: Individual batch results
+- `Combined_FinalState.json`: Combined final results
+- `traces/tensors/`: Tensor files with entropy data
 - Configuration files
 
-### Aggregated Results
-Aggregated results are saved in `experiments/results/aggregated/<dataset_name>/<model_name>/` directory, including:
-- Experiment summaries (CSV/JSON format)
-- Batch results summaries (CSV/JSON format)
-- Visualizations (PNG files) with timestamps in filenames
+#### Aggregated Results
+
+Aggregated results are saved in:
+```
+experiments/results/aggregated/<dataset_name>/<model_name>/
+```
+
+Contents:
+- `{experiment_name}_results_{timestamp}.yml`: Individual experiment summaries
+- `batch_results_{timestamp}.yml`: Batch experiment summaries
+
+#### Generated Configurations
+
+Merged configurations are saved to:
+```
+experiments/configs_exp/<dataset_name>/<model_name>/<experiment_name>_<timestamp>_<ms>_<pid>.yml
+```
 
 ## Adding New Configurations
 

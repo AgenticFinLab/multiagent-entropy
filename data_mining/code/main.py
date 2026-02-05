@@ -83,12 +83,6 @@ def main():
         help="Run SHAP analysis (default: True)",
     )
     parser.add_argument(
-        "--no-shap",
-        dest="run_shap",
-        action="store_false",
-        help="Skip SHAP analysis",
-    )
-    parser.add_argument(
         "--exclude-features",
         type=str,
         default="default",

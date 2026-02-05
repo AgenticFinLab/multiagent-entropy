@@ -31,18 +31,29 @@ python -m evaluation.evaluator --dataset aime2025 --task-type math
 
 | Argument              | Type | Default | Description                                 |
 | --------------------- | ---- | ------- | ------------------------------------------- |
-| `--dataset`           | str  | aime2025| Dataset to analyze (gsm8k, humaneval, mmlu, aime2024, aime2025, math500) |
-| `--model`             | str  | qwen3_4b| Model name (required when analyzing specific experiment) |
+| `--datasets`          | str  | All datasets | Datasets to analyze (space-separated list). Choices: gsm8k, humaneval, mmlu, math500, aime2024_16384, aime2025_16384 |
+| `--all-datasets`      | flag | False   | Analyze all available datasets             |
+| `--model`             | str  | qwen3_0_6b, qwen3_4b, qwen3_8b | Model names (space-separated list). If not provided, analyze all models |
 | `--task-type`         | str  | auto    | Task type (math, code, option, auto to infer from dataset) |
 | `--experiment`        | str  | None    | Specific experiment to analyze (if not provided, analyze all) |
 | `--output`            | str  | None    | Output file path (if not provided, save to evaluation/results/) |
-| `--analyze-entropy`   | bool | True    | Perform entropy statistical analysis       |
-| `--save-entropy-json` | bool | True    | Save detailed entropy results to JSON file |
-| `--aggregate`         | bool | True    | Aggregate results from metrics files        |
-| `--analyze-trends`    | bool | True    | Analyze entropy change trends between agents across rounds |
-| `--save-trends-json`  | bool | True    | Save detailed trend results to JSON file    |
 | `--run-aggregator`    | bool | True    | Run results aggregator to combine metrics and entropy for data mining |
 | `--aggregate-all`     | bool | False   | Aggregate results from all datasets        |
+| `--generate-summary`  | bool | True    | Generate summary CSV from aggregated data  |
+| `--timeout`           | int  | 10      | Maximum time in seconds to execute code for code tasks |
+
+#### Supported Datasets
+
+The evaluation module supports the following datasets defined in [evaluator.py](../evaluation/evaluator.py):
+
+| Dataset | Description |
+|---------|-------------|
+| `gsm8k` | GSM8K math dataset |
+| `humaneval` | HumanEval code generation dataset |
+| `mmlu` | Massive Multitask Language Understanding dataset |
+| `math500` | MATH-500 dataset |
+| `aime2024_16384` | AIME 2024 competition problems (16384 token context) |
+| `aime2025_16384` | AIME 2025 competition problems (16384 token context) |
 
 #### Examples
 
@@ -337,12 +348,21 @@ These features are generated for all valid round pairs within each experiment, e
 
 ### Agent Architectures
 
-Supported architectures:
-- **single**: Single solver agent
-- **sequential**: Sequential multi-agent system
-- **centralized**: Centralized orchestration
-- **debate**: Debate-based multi-agent system
-- **hybrid**: Hybrid multi-agent system
+The evaluation module supports all seven multi-agent system architectures:
+
+| Architecture | Type | Description |
+|--------------|------|-------------|
+| **single** | Single-agent | Single solver agent baseline |
+| **sequential** | Multi-agent | Sequential multi-agent system with pipeline processing |
+| **centralized** | Multi-agent | Centralized orchestration with domain agents and central coordinator |
+| **decentralized** | Multi-agent | Decentralized architecture with loopback mechanism |
+| **full_decentralized** | Multi-agent | Fully decentralized where each agent can communicate with all others |
+| **debate** | Multi-agent | Debate-based multi-agent system with majority voting |
+| **hybrid** | Multi-agent | Hybrid multi-agent system with enhanced context sharing |
+
+**Special Handling:**
+- **Code tasks** (`task_type == "code"`): Debate architecture is automatically excluded from aggregation since it doesn't support code generation
+- **Debate architecture**: Orchestrator agent data is excluded from entropy analysis (uses voting mechanism, not LLM)
 
 ### Output Structure
 
@@ -841,13 +861,37 @@ The results aggregator provides functionality to aggregate metrics and entropy d
 #### Core Components
 
 - **[Aggregator](../evaluation/aggregator.py)**: Main aggregation module
+- **[FeatureEnhancer](../evaluation/feature_enhancer.py)**: Advanced feature engineering for entropy-related features
+
+#### Aggregator Class Methods
+
+| Method | Description |
+|--------|-------------|
+| `load_json_files()` | Load entropy and metrics JSON files |
+| `extract_sample_level_data()` | Extract sample-level data using FeatureEnhancer |
+| `extract_round_level_data()` | Extract round-level statistics with task type filtering |
+| `extract_agent_level_data()` | Extract agent-level statistics |
+| `extract_experiment_level_data()` | Extract experiment-level statistics with base model comparison |
+| `merge_all_data()` | Merge all levels of data into comprehensive records |
+| `add_dynamic_round_features()` | Add dynamic round comparison features (delegates to FeatureEnhancer) |
+| `generate_exclude_agent_csv()` | Generate CSV excluding agent-specific columns, merging by sample |
+| `generate_aggregated_csvs()` | Main method to generate all aggregated CSV files |
+
+#### FeatureEnhancer Class Methods
+
+| Method | Description |
+|--------|-------------|
+| `build_sample_records()` | Build enriched sample-level records with advanced entropy features |
+| `add_dynamic_round_features()` | Add experiment-level dynamic round comparison features |
+| `_extract_base_model_data()` | Extract base model data from single agent architecture |
+| `_extract_base_model_entropy()` | Extract base model entropy statistics |
 
 #### Usage
 
 Run the aggregator from the project root:
 
 ```bash
-python -m evaluation.evaluator --dataset gsm8k --run-aggregator True
+python -m evaluation.evaluator --dataset gsm8k --run-aggregator
 ```
 
 Or aggregate all datasets:
@@ -867,8 +911,10 @@ The aggregator:
    - Extracts predicted answer, correctness, and format compliance
    - Calculates base model accuracy and format compliance rate
    - Base model data is shared across all architectures for the same dataset and model
-4. Merges metrics and entropy data for each sample
-5. Generates unified CSV file with comprehensive features including base model metrics
+4. Delegates sample-level feature enhancement to `FeatureEnhancer.build_sample_records()`
+5. Merges metrics and entropy data at multiple levels (sample, round, agent, experiment)
+6. Adds dynamic round comparison features
+7. Generates unified CSV files with comprehensive features
 
 #### Output File
 
