@@ -44,13 +44,8 @@ finagent_config:
   # SERPER_API_KEY: Fallback web search provider (https://serper.dev)
   # If SerpAPI fails or is not configured, Serper will be used as fallback
   serpapi_api_key: ""       # Optional: set via env var SERPAPI_API_KEY
-  serper_api_key: "5adf9b4f2de167feac1d9dd2719fe96ba4e1bc6a"        # Optional: set via env var SERPER_API_KEY (fallback)
+  serper_api_key: ""        # Optional: set via env var SERPER_API_KEY (fallback)
   
   # SEC EDGAR API Key
   # SEC_EDGAR_API_KEY: For SEC EDGAR database search (https://sec-api.io)
-  sec_api_key: "538b62018cb00b1b816cd6be624d3251ad9a3b3304931e04a70079420fc68310"
-
-# additional api keys (because `too many requests` error)
-# "8f106b69a18cf50072d8b9ef09835a6831fafd8857c0241e54eb4c6ec90ae372"
-# "657553be79003cdcfd2cc55419bbf1908904ba6645396148d9eb0a85c5420c32"
-# "538b62018cb00b1b816cd6be624d3251ad9a3b3304931e04a70079420fc68310"
+  sec_api_key: ""
