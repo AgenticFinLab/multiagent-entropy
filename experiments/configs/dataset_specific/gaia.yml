@@ -1,0 +1,37 @@
+# Dataset-specific configuration for GAIA benchmark
+
+data:
+  data_name: GAIA
+  data_path: experiments/data/GAIA
+  split: validation
+  # -1 for all 165 validation samples
+  data_num: -1
+  batch_size: 1
+
+task_type: "gaia"
+
+generation_config:
+  max_new_tokens: 8192
+
+# GAIA-specific options
+gaia_config:
+  # Filter by difficulty level; null = run all levels
+  # Example: [1] for Level 1 only, [1, 2] for Level 1 and 2
+  level_filter: null
+
+  # Root directory of locally downloaded attachments.
+  # Run experiments/scripts/download_gaia_attachments.py to fetch them.
+  # Attachment path inside this root mirrors file_path from sample_info
+  # (e.g. 2023/validation/xxx.xlsx).
+  # null = use default: experiments/data/GAIA/attachments
+  attachments_root: null
+
+  # --- Web search API keys (override env vars SERPAPI_API_KEY / SERPER_API_KEY) ---
+  serpapi_api_key: null
+  serper_api_key: null
+
+  # --- Doubao multimodal API (image / audio / video analysis) ---
+  # API key for ByteDance ARK platform (override env var ARK_API_KEY)
+  ark_api_key: null
+  # Doubao model to use for multimodal analysis
+  doubao_model: "doubao-seed-2-0-lite-260215"
