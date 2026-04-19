@@ -25,3 +25,9 @@ scikit-learn
 xgboost
 lightgbm
 shap
+# GAIA tool dependencies
+openpyxl
+pdfplumber
+python-docx
+python-pptx
+openai

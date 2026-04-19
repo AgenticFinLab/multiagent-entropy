@@ -210,7 +210,7 @@ __marimo__/
 # Experiment directory
 EXPERIMENT/
 experiments/data/
-experiments/results/
+experiments/results*/
 experiments/logs/
 experiments/configs_exp/
 
