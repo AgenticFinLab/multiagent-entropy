@@ -1,0 +1,2 @@
+MAX_END_DATE = "2025-04-07"
+FINAGENT_TASK_TYPE = "finance"

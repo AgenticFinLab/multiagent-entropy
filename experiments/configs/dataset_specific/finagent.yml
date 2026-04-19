@@ -1,0 +1,56 @@
+# Dataset-specific configuration for FinAgent (Finance Agent Benchmark)
+# Dataset: vals-ai/finance_agent_benchmark
+# Description: 537 expert-authored financial research questions across 9 task categories
+
+data:
+  data_name: finagent
+  data_path: experiments/data/finagent
+  split: train
+  # The number of samples to be tested, -1 for all (537 total samples)
+  data_num: 50
+  # The number of samples for one inference (recommend 1 for complex financial tasks)
+  batch_size: 1
+
+# Task type for financial reasoning
+task_type: "finance"
+
+# Generation configuration (overrides base_config.yml)
+# Financial analysis requires longer context for detailed reasoning
+generation_config:
+  max_new_tokens: 8192
+  do_sample: true
+  temperature: 0.6
+  top_p: 0.95
+
+# FinAgent-specific evaluation settings
+finagent_config:
+  # Use rubric-based evaluation (official evaluation method)
+  use_rubric_evaluation: true
+  # Save detailed trajectory logs for analysis
+  save_trajectories: true
+  # Maximum tool uses per question (aligned with official implementation)
+  max_tool_uses: 5
+  # Enable tools context enhancement in prompts
+  use_tools_context: true
+  # Maximum turns for tool execution loop
+  max_tool_turns: 20
+  
+  # ============================================================================
+  # API Keys Configuration (can also be set via environment variables)
+  # ============================================================================
+  
+  # Web Search API Keys (Priority: SerpAPI > Serper)
+  # SERPAPI_API_KEY: Primary web search provider (https://serpapi.com)
+  # SERPER_API_KEY: Fallback web search provider (https://serper.dev)
+  # If SerpAPI fails or is not configured, Serper will be used as fallback
+  serpapi_api_key: ""       # Optional: set via env var SERPAPI_API_KEY
+  serper_api_key: "5adf9b4f2de167feac1d9dd2719fe96ba4e1bc6a"        # Optional: set via env var SERPER_API_KEY (fallback)
+  
+  # SEC EDGAR API Key
+  # SEC_EDGAR_API_KEY: For SEC EDGAR database search (https://sec-api.io)
+  sec_api_key: "538b62018cb00b1b816cd6be624d3251ad9a3b3304931e04a70079420fc68310"
+
+# additional api keys (because `too many requests` error)
+# "8f106b69a18cf50072d8b9ef09835a6831fafd8857c0241e54eb4c6ec90ae372"
+# "657553be79003cdcfd2cc55419bbf1908904ba6645396148d9eb0a85c5420c32"
+# "538b62018cb00b1b816cd6be624d3251ad9a3b3304931e04a70079420fc68310"
