@@ -157,7 +157,7 @@ class OrchestratorFullDecentralized(OrchestratorCentralized):
             infer_inputs.append(InferInput(system_msg=system_msg, user_msg=user_prompt))
 
         # Batch inference
-        out_list: List[InferOutput] = self.agents_lm.infer_batch(infer_inputs)
+        out_list: List[InferOutput] = self.react_infer_batch(infer_inputs)
         latency = time.time() - t0
 
         # Process results
@@ -226,7 +226,7 @@ class OrchestratorFullDecentralized(OrchestratorCentralized):
             infer_inputs.append(InferInput(system_msg=system_msg, user_msg=user_prompt))
 
         # Batch inference
-        out_list: List[InferOutput] = self.agents_lm.infer_batch(infer_inputs)
+        out_list: List[InferOutput] = self.react_infer_batch(infer_inputs)
         latency = time.time() - t0
 
         # Process results

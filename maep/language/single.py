@@ -178,7 +178,7 @@ class SingleAgent(BaseAgents):
             infer_inputs.append(infer_input)
 
         # Forward the model to obtain the output for all samples
-        out_list: List[InferOutput] = self.agents_lm.infer_batch(infer_inputs)
+        out_list: List[InferOutput] = self.react_infer_batch(infer_inputs)
 
         # Process results for each sample
         responses = []

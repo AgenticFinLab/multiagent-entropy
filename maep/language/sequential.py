@@ -239,7 +239,7 @@ class SequentialAgents(BaseAgents):
             infer_input = InferInput(system_msg=system_msg, user_msg=formatted_user_msg)
             infer_inputs.append(infer_input)
 
-        out_list: List[InferOutput] = self.agents_lm.infer_batch(infer_inputs)
+        out_list: List[InferOutput] = self.react_infer_batch(infer_inputs)
 
         # Process results for each sample
         responses = []
