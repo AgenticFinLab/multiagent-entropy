@@ -181,7 +181,7 @@ class GoogleWebSearch(FinancialTool):
         raise ValueError("No search API key available. Please set SERPAPI_API_KEY or SERPER_API_KEY")
 
     async def call_tool(self, arguments: dict, **kwargs) -> List[Dict]:
-        search_query = arguments.get("search_query", "")
+        search_query = arguments.get("search_query") or arguments.get("query", "")
         if not ASYNC_TOOLS_AVAILABLE:
             logger.warning("aiohttp not available, returning mock results")
             return self._mock_search_results(search_query)
