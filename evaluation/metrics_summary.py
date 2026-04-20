@@ -99,7 +99,7 @@ def extract_summary_fields(
 
     # Create output directory if it doesn't exist
     output_csv_path.parent.mkdir(parents=True, exist_ok=True)
-
+    
     # Define the desired column names in the final output for single dataset
     output_summary_fields = [
         "dataset",  # Add dataset field to the beginning
@@ -112,7 +112,7 @@ def extract_summary_fields(
         "base_model_accuracy",  # base model accuracy
         "base_model_mean_answer_token_entropy",  # base model entropy
     ]
-
+    
     # Map the internal field names to the desired column names in output
     field_mapping = {
         "sample_mean_answer_token_entropy": "entropy",
@@ -121,14 +121,14 @@ def extract_summary_fields(
         "exp_total_time": "time",
         "base_model_accuracy": "base model accuracy",
         "base_model_mean_answer_token_entropy": "base model entropy",
-        "model_name": "model",
+        "model_name": "model"
     }
-
+    
     # Remap field names for the output
     output_fieldnames = []
     for field in output_summary_fields:
         output_fieldnames.append(field_mapping.get(field, field))
-
+    
     # Transform records to use new field names
     transformed_records = []
     for record in summary_records:
@@ -139,12 +139,10 @@ def extract_summary_fields(
             new_field_name = field_mapping.get(field, field)
             transformed_record[new_field_name] = record.get(field, "")
         transformed_records.append(transformed_record)
-
+    
     # Sort the records by model, then by architecture for consistent ordering
-    transformed_records.sort(
-        key=lambda x: (x.get("model", ""), x.get("architecture", ""))
-    )
-
+    transformed_records.sort(key=lambda x: (x.get('model', ''), x.get('architecture', '')))
+    
     # Write summary records to output CSV file
     with open(output_csv_path, "w", newline="", encoding="utf-8") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=output_fieldnames)
@@ -154,9 +152,7 @@ def extract_summary_fields(
         writer.writerows(transformed_records)
 
     # Print success message
-    print(
-        f"Successfully wrote {len(summary_records)} summary records to {output_csv_path}"
-    )
+    print(f"Successfully wrote {len(summary_records)} summary records to {output_csv_path}")
 
     return summary_records
 
@@ -174,32 +170,28 @@ def extract_summary_fields_for_multiple_datasets(
         List of combined summary records
     """
     all_summary_records = []
-
+    
     # Process each dataset in the list
     for dataset in datasets:
         print(f"Processing dataset: {dataset}")
-
+        
         # Construct paths for this dataset
-        base_path = Path(__file__).parent.parent / "evaluation" / "results"
+        base_path = Path(__file__).parent.parent / "evaluation" / "results_R_2"
         input_path = base_path / dataset / "all_aggregated_data.csv"
-
+        
         # Process the individual dataset
         if input_path.exists():
-            dataset_records = extract_summary_fields(
-                input_path, base_path / dataset / "all_summary_data.csv"
-            )
-
+            dataset_records = extract_summary_fields(input_path, base_path / dataset / "all_summary_data.csv")
+            
             # Add dataset information to each record
             for record in dataset_records:
                 record["dataset"] = dataset  # Add dataset name to each record
-
+                
             # Append to the combined list
             all_summary_records.extend(dataset_records)
         else:
-            print(
-                f"Warning: Input file does not exist for dataset {dataset}: {input_path}"
-            )
-
+            print(f"Warning: Input file does not exist for dataset {dataset}: {input_path}")
+    
     # Create output directory if it doesn't exist
     output_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -215,7 +207,7 @@ def extract_summary_fields_for_multiple_datasets(
         "base_model_accuracy",  # base model accuracy
         "base_model_mean_answer_token_entropy",  # base model entropy
     ]
-
+    
     # Map the internal field names to the desired column names in output
     field_mapping = {
         "sample_mean_answer_token_entropy": "entropy",
@@ -224,7 +216,7 @@ def extract_summary_fields_for_multiple_datasets(
         "exp_total_time": "time",
         "base_model_accuracy": "base model accuracy",
         "base_model_mean_answer_token_entropy": "base model entropy",
-        "model_name": "model",
+        "model_name": "model"
     }
 
     # Write combined summary records to output CSV file
@@ -232,7 +224,7 @@ def extract_summary_fields_for_multiple_datasets(
     output_fieldnames = []
     for field in summary_fields:
         output_fieldnames.append(field_mapping.get(field, field))
-
+    
     # Transform records to use new field names
     transformed_records = []
     for record in all_summary_records:
@@ -241,16 +233,10 @@ def extract_summary_fields_for_multiple_datasets(
             new_field_name = field_mapping.get(field, field)
             transformed_record[new_field_name] = record.get(field, "")
         transformed_records.append(transformed_record)
-
+    
     # Sort the records by dataset, model, then by architecture for consistent ordering
-    transformed_records.sort(
-        key=lambda x: (
-            x.get("dataset", ""),
-            x.get("model", ""),
-            x.get("architecture", ""),
-        )
-    )
-
+    transformed_records.sort(key=lambda x: (x.get('dataset', ''), x.get('model', ''), x.get('architecture', '')))
+    
     with open(output_csv_path, "w", newline="", encoding="utf-8") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=output_fieldnames)
         # Write CSV header
@@ -259,9 +245,7 @@ def extract_summary_fields_for_multiple_datasets(
         writer.writerows(transformed_records)
 
     # Print success message
-    print(
-        f"Successfully wrote {len(all_summary_records)} combined summary records from {len(datasets)} datasets to {output_csv_path}"
-    )
+    print(f"Successfully wrote {len(all_summary_records)} combined summary records from {len(datasets)} datasets to {output_csv_path}")
 
     return all_summary_records
 
@@ -277,20 +261,20 @@ def main():
         "--input",
         type=str,
         default=None,
-        help="Path to the input aggregated CSV file. If not provided, uses evaluation/results/{dataset}/all_aggregated_data.csv",
+        help="Path to the input aggregated CSV file. If not provided, uses evaluation/results_R_2/{dataset}/all_aggregated_data.csv",
     )
     # Add output argument for specifying custom output CSV path
     parser.add_argument(
         "--output",
         type=str,
         default=None,
-        help="Path to the output summary CSV file. If not provided, uses evaluation/results/{dataset}/all_summary_data.csv",
+        help="Path to the output summary CSV file. If not provided, uses evaluation/results_R_2/{dataset}/all_summary_data.csv",
     )
     # Add dataset argument for default path construction - now accepts single dataset or comma-separated list
     parser.add_argument(
         "--dataset",
         type=str,
-        default="gsm8k,humaneval,mmlu,math500,aime2024_16384,aime2025_16384",
+        default="math500,aime2025_16384",
         help="Dataset name or comma-separated list of dataset names to process",
     )
     # Add argument to control whether to generate architecture analysis CSV
@@ -304,15 +288,11 @@ def main():
     args = parser.parse_args()
 
     # Construct base path for evaluation results
-    base_path = Path(__file__).parent.parent / "evaluation" / "results"
+    base_path = Path(__file__).parent.parent / "evaluation" / "results_R_2"
 
     # Determine datasets to process - support both single dataset and multiple datasets
-    datasets = (
-        [ds.strip() for ds in args.dataset.split(",")]
-        if "," in args.dataset
-        else [args.dataset]
-    )
-
+    datasets = [ds.strip() for ds in args.dataset.split(',')] if ',' in args.dataset else [args.dataset]
+    
     # Determine output path from argument or default
     if args.output:
         output_path = Path(args.output)
@@ -333,14 +313,12 @@ def main():
 
     # Extract summary fields - use different method based on whether we have multiple datasets
     if len(datasets) > 1:
-        summary_records = extract_summary_fields_for_multiple_datasets(
-            datasets, output_path
-        )
+        summary_records = extract_summary_fields_for_multiple_datasets(datasets, output_path)
     else:
         input_path = base_path / datasets[0] / "all_aggregated_data.csv"
         summary_records = extract_summary_fields(input_path, output_path)
 
-
+    
 if __name__ == "__main__":
     # Execute main function when script is run directly
     main()

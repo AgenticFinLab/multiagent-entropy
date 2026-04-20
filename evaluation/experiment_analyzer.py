@@ -49,6 +49,7 @@ class ExperimentAnalyzer:
             "math500": "math",
             "aime2024_8192": "math",
             "aime2025_8192": "math",
+            "finagent": "finance",
         }
         # Return task type or default to "math" if dataset not found
         return dataset_task_map.get(dataset.lower(), "math")
@@ -102,8 +103,23 @@ class ExperimentAnalyzer:
         # Extract number of rounds from configuration
         num_rounds = config.get("round", 1)
 
-        # Load ground truth data for the dataset
-        ground_truths = self.data_loader.load_ground_truth(dataset)
+        # Load finagent pre-computed evaluation results if applicable
+        finagent_eval_results = None
+        if dataset.lower() == "finagent":
+            try:
+                finagent_eval_results = (
+                    self.data_loader.load_finagent_evaluation_results(
+                        model_name, experiment_name
+                    )
+                )
+            except FileNotFoundError as e:
+                print(f"Warning: {e}")
+
+        # Load ground truth data for the dataset (skip for finagent)
+        if dataset.lower() == "finagent":
+            ground_truths = {}
+        else:
+            ground_truths = self.data_loader.load_ground_truth(dataset)
         # Load all results for the experiment
         all_results = self.data_loader.load_all_results(
             dataset, model_name, experiment_name
@@ -146,6 +162,7 @@ class ExperimentAnalyzer:
                 model_name,
                 experiment_name,
                 task_type,
+                finagent_eval_results=finagent_eval_results,
             )
             metrics["samples"][main_id] = sample_metrics
 
@@ -162,6 +179,7 @@ class ExperimentAnalyzer:
         experiment_name: str,
         task_type: str,
         timeout: int = 10,
+        finagent_eval_results: Optional[Dict] = None,
     ) -> Dict[str, Any]:
         """Analyze metrics for a single sample.
 
@@ -185,6 +203,19 @@ class ExperimentAnalyzer:
             "ground_truth": ground_truth["groundtruth"] if ground_truth else None,
         }
 
+        # For finagent, set ground truth and question type from eval results
+        if (
+            task_type == "finance"
+            and finagent_eval_results
+            and main_id in finagent_eval_results
+        ):
+            sample_metrics["ground_truth"] = finagent_eval_results[main_id].get(
+                "expected_answer", ""
+            )
+            sample_metrics["question_type"] = finagent_eval_results[main_id].get(
+                "question_type", ""
+            )
+
         # Process each agent result for this sample
         for result_info in sample_results:
             result_id = result_info["result_id"]
@@ -206,7 +237,18 @@ class ExperimentAnalyzer:
             )
 
             # Extract predicted answer based on task type
-            if task_type == "code":
+            if task_type == "finance":
+                # For finagent, use pre-computed evaluation results
+                response = result_data.get("response", "")
+                predicted_answer = response[:200] if response else ""
+                format_compliance = True
+                is_correct = False
+                evaluation_score = 0.0
+                if finagent_eval_results and main_id in finagent_eval_results:
+                    eval_data = finagent_eval_results[main_id]
+                    is_correct = eval_data.get("evaluation_result", False)
+                    evaluation_score = eval_data.get("evaluation_score", 0.0)
+            elif task_type == "code":
                 if "final_answer" in result_data:
                     response = result_data["final_answer"]
                     response_formatted = "```python\n" + response + "\n```"
@@ -217,6 +259,19 @@ class ExperimentAnalyzer:
                     response = result_data.get("response", "")
                     predicted_answer, format_compliance = (
                         self.metrics_calculator.extract_code_answer(response)
+                    )
+                # Determine if answer is correct
+                is_correct = False
+                if ground_truth and predicted_answer and format_compliance:
+                    test_cases = (
+                        ground_truth.get("test_cases") if ground_truth else None
+                    )
+                    is_correct = self.metrics_calculator.is_answer_correct_by_task_type(
+                        predicted_answer,
+                        ground_truth["groundtruth"],
+                        task_type,
+                        test_cases,
+                        timeout,
                     )
             else:
                 if "final_answer" in result_data:
@@ -231,18 +286,19 @@ class ExperimentAnalyzer:
                     predicted_answer, format_compliance = (
                         self.metrics_calculator.extract_boxed_answer(response)
                     )
-
-            # Determine if answer is correct
-            is_correct = False
-            if ground_truth and predicted_answer and format_compliance:
-                test_cases = ground_truth.get("test_cases") if ground_truth else None
-                is_correct = self.metrics_calculator.is_answer_correct_by_task_type(
-                    predicted_answer,
-                    ground_truth["groundtruth"],
-                    task_type,
-                    test_cases,
-                    timeout,
-                )
+                # Determine if answer is correct
+                is_correct = False
+                if ground_truth and predicted_answer and format_compliance:
+                    test_cases = (
+                        ground_truth.get("test_cases") if ground_truth else None
+                    )
+                    is_correct = self.metrics_calculator.is_answer_correct_by_task_type(
+                        predicted_answer,
+                        ground_truth["groundtruth"],
+                        task_type,
+                        test_cases,
+                        timeout,
+                    )
 
             # Generate agent key based on architecture and execution order
             if agent_architecture == "single":
@@ -260,7 +316,7 @@ class ExperimentAnalyzer:
 
             # Store agent metrics
             sample_metrics["agents"] = sample_metrics.get("agents", {})
-            sample_metrics["agents"][agent_key] = {
+            agent_metrics = {
                 "agent_type": agent_type,
                 "execution_order": execution_order,
                 "agent_time_cost": agent_time_cost,
@@ -270,6 +326,9 @@ class ExperimentAnalyzer:
                 "response": response,
                 "format_compliance": format_compliance,
             }
+            if task_type == "finance":
+                agent_metrics["evaluation_score"] = evaluation_score
+            sample_metrics["agents"][agent_key] = agent_metrics
 
         # Determine final agent key based on architecture
         final_agent_key = self._get_final_agent_key(

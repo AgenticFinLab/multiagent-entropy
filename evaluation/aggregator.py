@@ -85,6 +85,11 @@ class Aggregator:
                                         "format_compliance"
                                     ],
                                 }
+                                # If evaluation_score exists (finagent), add to base model data
+                                if "evaluation_score" in agent_data:
+                                    model_base_data[sample_id]["evaluation_score"] = (
+                                        agent_data["evaluation_score"]
+                                    )
                                 break
             base_model_data[model_name] = model_base_data
 
@@ -137,11 +142,15 @@ class Aggregator:
                     agents_entropy = sample_entropy.get("agents", {})
 
                     # Reuse the same base agent selection rule: first agent in round 1
-                    for agent_key, agent_data in sample_metrics.get("agents", {}).items():
+                    for agent_key, agent_data in sample_metrics.get(
+                        "agents", {}
+                    ).items():
                         if agent_key.endswith("_round_1"):
                             agent_entropy_data = agents_entropy.get(agent_key, {})
                             if agent_entropy_data:
-                                total_entropy = agent_entropy_data.get("total_entropy", 0.0)
+                                total_entropy = agent_entropy_data.get(
+                                    "total_entropy", 0.0
+                                )
                                 token_count = agent_entropy_data.get("token_count", 0)
                                 avg_entropy_per_token = agent_entropy_data.get(
                                     "average_entropy_per_token", 0.0
@@ -149,8 +158,27 @@ class Aggregator:
                                 model_base_entropy[sample_id] = {
                                     "total_entropy": float(total_entropy),
                                     "token_count": int(token_count),
-                                    "avg_entropy_per_token": float(avg_entropy_per_token),
+                                    "avg_entropy_per_token": float(
+                                        avg_entropy_per_token
+                                    ),
                                 }
+                                # If step_entropy_dynamics exists (finagent), add to base model entropy
+                                if "step_entropy_dynamics" in agent_entropy_data:
+                                    dynamics = agent_entropy_data[
+                                        "step_entropy_dynamics"
+                                    ]
+                                    model_base_entropy[sample_id]["step_num_steps"] = (
+                                        dynamics.get("num_steps", 0)
+                                    )
+                                    model_base_entropy[sample_id][
+                                        "step_entropy_decay_rate"
+                                    ] = dynamics.get("entropy_decay_rate", 0.0)
+                                    model_base_entropy[sample_id][
+                                        "step_first_step_mean_entropy"
+                                    ] = dynamics.get("first_step_mean_entropy", 0.0)
+                                    model_base_entropy[sample_id][
+                                        "step_last_step_mean_entropy"
+                                    ] = dynamics.get("last_step_mean_entropy", 0.0)
                             break
 
             base_model_entropy[model_name] = model_base_entropy
@@ -227,18 +255,21 @@ class Aggregator:
         Returns:
             List of dictionaries containing sample-level data
         """
-        sample_records = FeatureEnhancer.build_sample_records(entropy_data, metrics_data)
-        
+        sample_records = FeatureEnhancer.build_sample_records(
+            entropy_data, metrics_data
+        )
+
         # Get task_type from metrics_data
         task_type = metrics_data.get("task_type", "")
-        
+
         # If task_type is "code", remove all debate architecture records
         if task_type == "code":
             sample_records = [
-                record for record in sample_records 
+                record
+                for record in sample_records
                 if record.get("architecture", "") != "debate"
             ]
-        
+
         return sample_records
 
     def extract_round_level_data(
@@ -255,7 +286,7 @@ class Aggregator:
         """
         # Get task_type from metrics_data
         task_type = metrics_data.get("task_type", "")
-        
+
         round_stats = {}
 
         # Iterate through models and experiments to extract round-level data
@@ -263,7 +294,7 @@ class Aggregator:
             for exp_name, exp_entropy in model_entropy.get("experiments", {}).items():
                 # Get architecture type for filtering
                 architecture = exp_entropy.get("agent_architecture", "unknown")
-                
+
                 # If task_type is "code" and architecture is "debate", skip this experiment
                 if task_type == "code" and architecture == "debate":
                     continue
@@ -400,7 +431,7 @@ class Aggregator:
         """
         # Get task_type from metrics_data
         task_type = metrics_data.get("task_type", "")
-        
+
         agent_stats = {}
 
         # Iterate through models and experiments to extract agent-level data
@@ -408,7 +439,7 @@ class Aggregator:
             for exp_name, exp_entropy in model_entropy.get("experiments", {}).items():
                 # Get architecture type for filtering
                 architecture = exp_entropy.get("agent_architecture", "unknown")
-                
+
                 # If task_type is "code" and architecture is "debate", skip this experiment
                 if task_type == "code" and architecture == "debate":
                     continue
@@ -456,7 +487,7 @@ class Aggregator:
         """
         # Get task_type from metrics_data
         task_type = metrics_data.get("task_type", "")
-        
+
         exp_stats = {}
 
         # Calculate base model statistics for comparison
@@ -467,7 +498,7 @@ class Aggregator:
             for exp_name, exp_entropy in model_entropy.get("experiments", {}).items():
                 # Get architecture type for filtering
                 architecture = exp_entropy.get("agent_architecture", "unknown")
-                
+
                 # If task_type is "code" and architecture is "debate", skip this experiment
                 if task_type == "code" and architecture == "debate":
                     continue
@@ -675,8 +706,30 @@ class Aggregator:
 
         # Construct full output path
         output_path = self.output_dir / filename
-        # Extract field names from first record
-        fieldnames = list(records[0].keys())
+
+        # Collect all unique field names from all records while preserving order
+        # This is necessary because different records may have different dynamic fields
+        # (e.g., step_0_mean_entropy, step_1_mean_entropy, etc.)
+        all_fieldnames = []
+        seen = set()
+        for record in records:
+            for key in record.keys():
+                if key not in seen:
+                    all_fieldnames.append(key)
+                    seen.add(key)
+
+        # Sort dynamic step fields to ensure consistent ordering
+        # Separate core fields from dynamic step_N_mean_entropy fields
+        step_fields = sorted(
+            [
+                f
+                for f in all_fieldnames
+                if f.startswith("step_") and "_mean_entropy" in f
+            ],
+            key=lambda x: int(x.split("_")[1]) if x.split("_")[1].isdigit() else 999,
+        )
+        other_fields = [f for f in all_fieldnames if f not in step_fields]
+        fieldnames = other_fields + step_fields
 
         # Write records to CSV file
         with open(output_path, "w", newline="", encoding="utf-8") as csvfile:

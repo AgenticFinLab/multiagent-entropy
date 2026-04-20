@@ -5,11 +5,28 @@ configurations, ground truths, and entropy tensors from storage.
 """
 
 import json
+import re
 import yaml
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
 import torch
+
+
+def _extract_experiment_base(name: str) -> str:
+    """Extract base experiment type by removing trailing timestamp/ID parts.
+
+    Examples:
+        'qwen3-4b_finagent_hybrid_agent_20260329_013001_650_2311995' -> 'qwen3-4b_finagent_hybrid_agent'
+        'qwen3-4b_finagent_hybrid_agent_20260329_094434' -> 'qwen3-4b_finagent_hybrid_agent'
+        'qwen3-14b_gsm8k_single_agent_20260121_105052_19_467337' -> 'qwen3-14b_gsm8k_single_agent'
+    """
+    # Remove trailing numeric segments separated by underscores
+    # Pattern: remove _YYYYMMDD_HHMMSS[_extra_id] from the end
+    match = re.match(r"^(.+?)_\d{8}_\d+", name)
+    if match:
+        return match.group(1)
+    return name
 
 
 class DataLoader:
@@ -33,6 +50,40 @@ class DataLoader:
         self.configs_path = self.base_path / "experiments" / "configs_exp"
         # Set path to dataset data files
         self.data_path = self.base_path / "experiments" / "data"
+        # Set path to finagent experiment results
+        self.results_finagent_path = (
+            self.base_path / "experiments" / "results_finagent" / "raw"
+        )
+
+    def _get_traces_path(
+        self, dataset: str, model_name: str, experiment_name: str
+    ) -> Path:
+        """Get traces path for an experiment, handling finagent separately.
+
+        Args:
+            dataset: Dataset name.
+            model_name: Model name.
+            experiment_name: Experiment name.
+
+        Returns:
+            Path to the traces directory.
+        """
+        if dataset.lower() == "finagent":
+            return (
+                self.results_finagent_path
+                / "finagent"
+                / model_name
+                / experiment_name
+                / "traces"
+            )
+        else:
+            return (
+                self.results_path
+                / dataset.lower()
+                / model_name
+                / experiment_name
+                / "traces"
+            )
 
     def load_ground_truth(self, dataset: str) -> Dict[str, Any]:
         """Load ground truth data for a given dataset.
@@ -146,6 +197,14 @@ class DataLoader:
                         if experiment_name.startswith(f.stem):
                             config_file = f
                             break
+                        # Enhanced matching: compare base experiment type
+                        # This handles cases where timestamps differ between
+                        # experiment name and config file name
+                        exp_base = _extract_experiment_base(experiment_name)
+                        config_base = _extract_experiment_base(f.stem)
+                        if exp_base and config_base and exp_base == config_base:
+                            config_file = f
+                            break
 
             # Raise error if no config file was found
             if config_file is None:
@@ -169,7 +228,10 @@ class DataLoader:
             Dictionary mapping model names to sorted lists of experiment names.
         """
         # Construct path to dataset directory
-        dataset_path = self.results_path / dataset.lower()
+        if dataset.lower() == "finagent":
+            dataset_path = self.results_finagent_path / "finagent"
+        else:
+            dataset_path = self.results_path / dataset.lower()
 
         # Return empty dictionary if dataset path doesn't exist
         if not dataset_path.exists():
@@ -215,13 +277,7 @@ class DataLoader:
             FileNotFoundError: If result store info is not found.
         """
         # Construct path to traces directory
-        traces_path = (
-            self.results_path
-            / dataset.lower()
-            / model_name
-            / experiment_name
-            / "traces"
-        )
+        traces_path = self._get_traces_path(dataset, model_name, experiment_name)
         # Construct path to result store information file
         info_file = traces_path / "Result-store-information.json"
 
@@ -253,13 +309,7 @@ class DataLoader:
             FileNotFoundError: If result block is not found.
         """
         # Construct path to traces directory
-        traces_path = (
-            self.results_path
-            / dataset.lower()
-            / model_name
-            / experiment_name
-            / "traces"
-        )
+        traces_path = self._get_traces_path(dataset, model_name, experiment_name)
         # Construct path to result block file
         block_file = traces_path / block_name
 
@@ -288,22 +338,19 @@ class DataLoader:
             Entropy tensor or None if not found.
         """
         # Construct path to traces directory
-        traces_path = (
-            self.results_path
-            / dataset.lower()
-            / model_name
-            / experiment_name
-            / "traces"
-        )
-        # Construct path to entropy tensor file
-        tensor_path = traces_path / "tensors" / f"{result_id}_extras_entropy.pt"
+        traces_path = self._get_traces_path(dataset, model_name, experiment_name)
 
-        # Return None if tensor file doesn't exist
-        if not tensor_path.exists():
-            return None
+        # Try subdirectory format (finagent): tensors/{result_id}/extras_entropy.pt
+        subdir_path = traces_path / "tensors" / result_id / "extras_entropy.pt"
+        if subdir_path.exists():
+            return torch.load(subdir_path, weights_only=True)
 
-        # Load and return the entropy tensor
-        return torch.load(tensor_path)
+        # Fallback to flat format (standard): tensors/{result_id}_extras_entropy.pt
+        flat_path = traces_path / "tensors" / f"{result_id}_extras_entropy.pt"
+        if flat_path.exists():
+            return torch.load(flat_path, weights_only=True)
+
+        return None
 
     def load_all_results(
         self, dataset: str, model_name: str, experiment_name: str
@@ -368,3 +415,85 @@ class DataLoader:
             "execution_order": execution_order,
             "sample_number": sample_number,
         }
+
+    def load_step_entropy_tensors(
+        self, dataset: str, model_name: str, experiment_name: str, result_id: str
+    ) -> List[Tuple[int, torch.Tensor]]:
+        """Load step-level entropy tensors for a specific result (finagent ReAct steps).
+
+        Args:
+            dataset: Dataset name.
+            model_name: Model name.
+            experiment_name: Experiment name.
+            result_id: Result ID.
+
+        Returns:
+            List of (step_index, tensor) tuples sorted by step_index.
+            Empty list if no step tensors found.
+        """
+        traces_path = self._get_traces_path(dataset, model_name, experiment_name)
+        tensor_dir = traces_path / "tensors" / result_id
+
+        if not tensor_dir.exists() or not tensor_dir.is_dir():
+            return []
+
+        step_tensors = []
+        pattern = re.compile(r"extras_react_steps_(\d+)__entropy\.pt")
+
+        for pt_file in tensor_dir.iterdir():
+            match = pattern.match(pt_file.name)
+            if match:
+                step_idx = int(match.group(1))
+                tensor = torch.load(pt_file, weights_only=True)
+                step_tensors.append((step_idx, tensor))
+
+        # Sort by step index
+        step_tensors.sort(key=lambda x: x[0])
+        return step_tensors
+
+    def load_finagent_evaluation_results(
+        self, model_name: str, experiment_name: str
+    ) -> Dict[str, Any]:
+        """Load pre-computed finagent evaluation results.
+
+        Args:
+            model_name: Model name (e.g., "qwen3_4b").
+            experiment_name: Experiment name.
+
+        Returns:
+            Dictionary containing evaluation results, keyed by question_id.
+
+        Raises:
+            FileNotFoundError: If evaluation results file not found.
+        """
+        eval_file = (
+            self.results_finagent_path
+            / "finagent"
+            / model_name
+            / experiment_name
+            / "finagent_evaluation_results.json"
+        )
+
+        if not eval_file.exists():
+            raise FileNotFoundError(
+                f"FinAgent evaluation results not found: {eval_file}"
+            )
+
+        with open(eval_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        # Build a dict keyed by question_id for easy lookup
+        results_by_id = {}
+        for item in data.get("individual_results", []):
+            qid = item.get("question_id", "")
+            results_by_id[qid] = {
+                "question_type": item.get("question_type", ""),
+                "evaluation_result": item.get("evaluation_result", False),
+                "evaluation_score": item.get("evaluation_score", 0.0),
+                "expected_answer": item.get("expected_answer", ""),
+            }
+
+        # Also include aggregate metrics
+        results_by_id["_aggregate"] = data.get("aggregate_metrics", {})
+
+        return results_by_id

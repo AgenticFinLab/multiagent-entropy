@@ -18,7 +18,7 @@ class FeatureEnhancer:
 
     @staticmethod
     def _extract_base_model_data(
-        metrics_data: Dict[str, Any]
+        metrics_data: Dict[str, Any],
     ) -> Dict[str, Dict[str, Any]]:
         """Extract base model data from metrics for each model.
 
@@ -55,6 +55,11 @@ class FeatureEnhancer:
                                         "format_compliance"
                                     ],
                                 }
+                                # If evaluation_score exists (finagent), add to base model data
+                                if "evaluation_score" in agent_data:
+                                    model_base_data[sample_id]["evaluation_score"] = (
+                                        agent_data["evaluation_score"]
+                                    )
                                 break
             base_model_data[model_name] = model_base_data
 
@@ -108,11 +113,15 @@ class FeatureEnhancer:
                     agents_entropy = sample_entropy.get("agents", {})
 
                     # Reuse the same base agent selection rule: first agent in round 1
-                    for agent_key, agent_data in sample_metrics.get("agents", {}).items():
+                    for agent_key, agent_data in sample_metrics.get(
+                        "agents", {}
+                    ).items():
                         if agent_key.endswith("_round_1"):
                             agent_entropy_data = agents_entropy.get(agent_key, {})
                             if agent_entropy_data:
-                                total_entropy = agent_entropy_data.get("total_entropy", 0.0)
+                                total_entropy = agent_entropy_data.get(
+                                    "total_entropy", 0.0
+                                )
                                 token_count = agent_entropy_data.get("token_count", 0)
                                 avg_entropy_per_token = agent_entropy_data.get(
                                     "average_entropy_per_token", 0.0
@@ -120,11 +129,30 @@ class FeatureEnhancer:
                                 model_base_entropy[sample_id] = {
                                     "total_entropy": float(total_entropy),
                                     "token_count": int(token_count),
-                                    "avg_entropy_per_token": float(avg_entropy_per_token),
+                                    "avg_entropy_per_token": float(
+                                        avg_entropy_per_token
+                                    ),
                                     "final_predicted_answer_entropy": agent_entropy_data.get(
                                         "predicted_answer_entropy"
                                     ),
                                 }
+                                # If step_entropy_dynamics exists (finagent), add to base model entropy
+                                if "step_entropy_dynamics" in agent_entropy_data:
+                                    dynamics = agent_entropy_data[
+                                        "step_entropy_dynamics"
+                                    ]
+                                    model_base_entropy[sample_id]["step_num_steps"] = (
+                                        dynamics.get("num_steps", 0)
+                                    )
+                                    model_base_entropy[sample_id][
+                                        "step_entropy_decay_rate"
+                                    ] = dynamics.get("entropy_decay_rate", 0.0)
+                                    model_base_entropy[sample_id][
+                                        "step_first_step_mean_entropy"
+                                    ] = dynamics.get("first_step_mean_entropy", 0.0)
+                                    model_base_entropy[sample_id][
+                                        "step_last_step_mean_entropy"
+                                    ] = dynamics.get("last_step_mean_entropy", 0.0)
                             break
 
             base_model_entropy[model_name] = model_base_entropy
@@ -184,16 +212,18 @@ class FeatureEnhancer:
                     sample_mean_entropy = sample_entropy.get("mean_entropy", 0) or 0
                     sample_median_entropy = sample_entropy.get("median_entropy", 0) or 0
                     sample_std_entropy = sample_entropy.get("std_entropy", 0) or 0
-                    sample_variance_entropy = sample_entropy.get("variance_entropy", 0) or 0
+                    sample_variance_entropy = (
+                        sample_entropy.get("variance_entropy", 0) or 0
+                    )
                     sample_q1_entropy = sample_entropy.get("q1_entropy", 0) or 0
                     sample_q3_entropy = sample_entropy.get("q3_entropy", 0) or 0
                     sample_num_agents = sample_entropy.get("num_agents", 0) or 0
-                    sample_all_agents_token_count = sample_entropy.get(
-                        "all_agents_token_count", 0
-                    ) or 0
-                    sample_avg_entropy_per_token = sample_entropy.get(
-                        "average_entropy_per_token", 0
-                    ) or 0
+                    sample_all_agents_token_count = (
+                        sample_entropy.get("all_agents_token_count", 0) or 0
+                    )
+                    sample_avg_entropy_per_token = (
+                        sample_entropy.get("average_entropy_per_token", 0) or 0
+                    )
 
                     # Extract sample_final_predicted_answer_entropy if it exists
                     sample_final_predicted_answer_entropy = sample_entropy.get(
@@ -203,9 +233,9 @@ class FeatureEnhancer:
                     # Sample-level distribution shape features
                     sample_shape_features: Dict[str, Any] = {}
                     # Range and IQR
-                    sample_shape_features["sample_entropy_range"] = (
-                        float(sample_max_entropy) - float(sample_min_entropy)
-                    )
+                    sample_shape_features["sample_entropy_range"] = float(
+                        sample_max_entropy
+                    ) - float(sample_min_entropy)
                     sample_iqr = float(sample_q3_entropy) - float(sample_q1_entropy)
                     sample_shape_features["sample_entropy_iqr"] = sample_iqr
 
@@ -221,14 +251,16 @@ class FeatureEnhancer:
                         sample_min_entropy
                     )
                     if range_denominator != 0:
-                        sample_shape_features[
-                            "sample_entropy_relative_iqr_range"
-                        ] = sample_iqr / range_denominator
+                        sample_shape_features["sample_entropy_relative_iqr_range"] = (
+                            sample_iqr / range_denominator
+                        )
                     else:
                         sample_shape_features["sample_entropy_relative_iqr_range"] = 0.0
 
                     # Bowley skewness based on quartiles
-                    iqr_denominator = float(sample_q3_entropy) - float(sample_q1_entropy)
+                    iqr_denominator = float(sample_q3_entropy) - float(
+                        sample_q1_entropy
+                    )
                     if iqr_denominator != 0:
                         sample_shape_features["sample_entropy_bowley_skewness"] = (
                             float(sample_q3_entropy)
@@ -256,9 +288,9 @@ class FeatureEnhancer:
 
                     # Coefficient of variation: std / mean
                     if sample_mean_entropy > 0:
-                        sample_shape_features["sample_entropy_cv"] = (
-                            float(sample_std_entropy) / float(sample_mean_entropy)
-                        )
+                        sample_shape_features["sample_entropy_cv"] = float(
+                            sample_std_entropy
+                        ) / float(sample_mean_entropy)
                     else:
                         sample_shape_features["sample_entropy_cv"] = 0.0
 
@@ -287,9 +319,9 @@ class FeatureEnhancer:
                     )
 
                     # Extract base model entropy data for this sample (single-agent baseline)
-                    base_sample_entropy_data = base_model_entropy.get(model_name, {}).get(
-                        sample_id, {}
-                    )
+                    base_sample_entropy_data = base_model_entropy.get(
+                        model_name, {}
+                    ).get(sample_id, {})
                     base_sample_total_entropy = float(
                         base_sample_entropy_data.get("total_entropy", 0.0)
                     )
@@ -299,8 +331,8 @@ class FeatureEnhancer:
                     base_sample_avg_entropy_per_token = float(
                         base_sample_entropy_data.get("avg_entropy_per_token", 0.0)
                     )
-                    base_model_final_predicted_answer_entropy = base_sample_entropy_data.get(
-                        "final_predicted_answer_entropy"
+                    base_model_final_predicted_answer_entropy = (
+                        base_sample_entropy_data.get("final_predicted_answer_entropy")
                     )
 
                     sample_base_entropy_features: Dict[str, Any] = {
@@ -308,124 +340,179 @@ class FeatureEnhancer:
                         "base_sample_token_count": base_sample_token_count,
                         "base_sample_avg_entropy_per_token": base_sample_avg_entropy_per_token,
                     }
-                    
+
                     # Add base model answer entropy statistics if available
                     if base_model_final_predicted_answer_entropy is not None:
                         if isinstance(base_model_final_predicted_answer_entropy, dict):
                             # New format: dict with statistics
-                            sample_base_entropy_features.update({
-                                "base_model_answer_token_count": base_model_final_predicted_answer_entropy.get("answer_token_count", 0),
-                                "base_model_max_answer_token_entropy": base_model_final_predicted_answer_entropy.get("max_answer_token_entropy", 0.0),
-                                "base_model_mean_answer_token_entropy": base_model_final_predicted_answer_entropy.get("mean_answer_token_entropy", 0.0),
-                                "base_model_min_answer_token_entropy": base_model_final_predicted_answer_entropy.get("min_answer_token_entropy", 0.0),
-                                "base_model_std_answer_token_entropy": base_model_final_predicted_answer_entropy.get("std_answer_token_entropy", 0.0),
-                                "base_model_median_answer_token_entropy": base_model_final_predicted_answer_entropy.get("median_answer_token_entropy", 0.0),
-                            })
+                            sample_base_entropy_features.update(
+                                {
+                                    "base_model_answer_token_count": base_model_final_predicted_answer_entropy.get(
+                                        "answer_token_count", 0
+                                    ),
+                                    "base_model_max_answer_token_entropy": base_model_final_predicted_answer_entropy.get(
+                                        "max_answer_token_entropy", 0.0
+                                    ),
+                                    "base_model_mean_answer_token_entropy": base_model_final_predicted_answer_entropy.get(
+                                        "mean_answer_token_entropy", 0.0
+                                    ),
+                                    "base_model_min_answer_token_entropy": base_model_final_predicted_answer_entropy.get(
+                                        "min_answer_token_entropy", 0.0
+                                    ),
+                                    "base_model_std_answer_token_entropy": base_model_final_predicted_answer_entropy.get(
+                                        "std_answer_token_entropy", 0.0
+                                    ),
+                                    "base_model_median_answer_token_entropy": base_model_final_predicted_answer_entropy.get(
+                                        "median_answer_token_entropy", 0.0
+                                    ),
+                                }
+                            )
                         else:
                             # Old format: single float value (backward compatibility)
-                            sample_base_entropy_features.update({
-                                "base_model_answer_token_count": 1,
-                                "base_model_max_answer_token_entropy": float(base_model_final_predicted_answer_entropy),
-                                "base_model_mean_answer_token_entropy": float(base_model_final_predicted_answer_entropy),
-                                "base_model_min_answer_token_entropy": float(base_model_final_predicted_answer_entropy),
-                                "base_model_std_answer_token_entropy": 0.0,
-                                "base_model_median_answer_token_entropy": float(base_model_final_predicted_answer_entropy),
-                            })
+                            sample_base_entropy_features.update(
+                                {
+                                    "base_model_answer_token_count": 1,
+                                    "base_model_max_answer_token_entropy": float(
+                                        base_model_final_predicted_answer_entropy
+                                    ),
+                                    "base_model_mean_answer_token_entropy": float(
+                                        base_model_final_predicted_answer_entropy
+                                    ),
+                                    "base_model_min_answer_token_entropy": float(
+                                        base_model_final_predicted_answer_entropy
+                                    ),
+                                    "base_model_std_answer_token_entropy": 0.0,
+                                    "base_model_median_answer_token_entropy": float(
+                                        base_model_final_predicted_answer_entropy
+                                    ),
+                                }
+                            )
                     else:
                         # No data available
-                        sample_base_entropy_features.update({
-                            "base_model_answer_token_count": 0,
-                            "base_model_max_answer_token_entropy": 0.0,
-                            "base_model_mean_answer_token_entropy": 0.0,
-                            "base_model_min_answer_token_entropy": 0.0,
-                            "base_model_std_answer_token_entropy": 0.0,
-                            "base_model_median_answer_token_entropy": 0.0,
-                        })
+                        sample_base_entropy_features.update(
+                            {
+                                "base_model_answer_token_count": 0,
+                                "base_model_max_answer_token_entropy": 0.0,
+                                "base_model_mean_answer_token_entropy": 0.0,
+                                "base_model_min_answer_token_entropy": 0.0,
+                                "base_model_std_answer_token_entropy": 0.0,
+                                "base_model_median_answer_token_entropy": 0.0,
+                            }
+                        )
 
                     # Add sample answer entropy statistics if available
                     if sample_final_predicted_answer_entropy is not None:
                         if isinstance(sample_final_predicted_answer_entropy, dict):
                             # New format: dict with statistics
-                            sample_base_entropy_features.update({
-                                "sample_answer_token_count": sample_final_predicted_answer_entropy.get("answer_token_count", 0),
-                                "sample_max_answer_token_entropy": sample_final_predicted_answer_entropy.get("max_answer_token_entropy", 0.0),
-                                "sample_mean_answer_token_entropy": sample_final_predicted_answer_entropy.get("mean_answer_token_entropy", 0.0),
-                                "sample_min_answer_token_entropy": sample_final_predicted_answer_entropy.get("min_answer_token_entropy", 0.0),
-                                "sample_std_answer_token_entropy": sample_final_predicted_answer_entropy.get("std_answer_token_entropy", 0.0),
-                                "sample_median_answer_token_entropy": sample_final_predicted_answer_entropy.get("median_answer_token_entropy", 0.0),
-                            })
+                            sample_base_entropy_features.update(
+                                {
+                                    "sample_answer_token_count": sample_final_predicted_answer_entropy.get(
+                                        "answer_token_count", 0
+                                    ),
+                                    "sample_max_answer_token_entropy": sample_final_predicted_answer_entropy.get(
+                                        "max_answer_token_entropy", 0.0
+                                    ),
+                                    "sample_mean_answer_token_entropy": sample_final_predicted_answer_entropy.get(
+                                        "mean_answer_token_entropy", 0.0
+                                    ),
+                                    "sample_min_answer_token_entropy": sample_final_predicted_answer_entropy.get(
+                                        "min_answer_token_entropy", 0.0
+                                    ),
+                                    "sample_std_answer_token_entropy": sample_final_predicted_answer_entropy.get(
+                                        "std_answer_token_entropy", 0.0
+                                    ),
+                                    "sample_median_answer_token_entropy": sample_final_predicted_answer_entropy.get(
+                                        "median_answer_token_entropy", 0.0
+                                    ),
+                                }
+                            )
                         else:
                             # Old format: single float value (backward compatibility)
-                            sample_base_entropy_features.update({
-                                "sample_answer_token_count": 1,
-                                "sample_max_answer_token_entropy": float(sample_final_predicted_answer_entropy),
-                                "sample_mean_answer_token_entropy": float(sample_final_predicted_answer_entropy),
-                                "sample_min_answer_token_entropy": float(sample_final_predicted_answer_entropy),
-                                "sample_std_answer_token_entropy": 0.0,
-                                "sample_median_answer_token_entropy": float(sample_final_predicted_answer_entropy),
-                            })
+                            sample_base_entropy_features.update(
+                                {
+                                    "sample_answer_token_count": 1,
+                                    "sample_max_answer_token_entropy": float(
+                                        sample_final_predicted_answer_entropy
+                                    ),
+                                    "sample_mean_answer_token_entropy": float(
+                                        sample_final_predicted_answer_entropy
+                                    ),
+                                    "sample_min_answer_token_entropy": float(
+                                        sample_final_predicted_answer_entropy
+                                    ),
+                                    "sample_std_answer_token_entropy": 0.0,
+                                    "sample_median_answer_token_entropy": float(
+                                        sample_final_predicted_answer_entropy
+                                    ),
+                                }
+                            )
                     else:
                         # No data available
-                        sample_base_entropy_features.update({
-                            "sample_answer_token_count": 0,
-                            "sample_max_answer_token_entropy": 0.0,
-                            "sample_mean_answer_token_entropy": 0.0,
-                            "sample_min_answer_token_entropy": 0.0,
-                            "sample_std_answer_token_entropy": 0.0,
-                            "sample_median_answer_token_entropy": 0.0,
-                        })
+                        sample_base_entropy_features.update(
+                            {
+                                "sample_answer_token_count": 0,
+                                "sample_max_answer_token_entropy": 0.0,
+                                "sample_mean_answer_token_entropy": 0.0,
+                                "sample_min_answer_token_entropy": 0.0,
+                                "sample_std_answer_token_entropy": 0.0,
+                                "sample_median_answer_token_entropy": 0.0,
+                            }
+                        )
 
                     # Calculate statistics comparing base model and sample final predicted answer entropy
                     # Use mean_answer_token_entropy for comparison if available
                     base_answer_mean_entropy = None
                     sample_answer_mean_entropy = None
-                    
+
                     if base_model_final_predicted_answer_entropy is not None:
                         if isinstance(base_model_final_predicted_answer_entropy, dict):
-                            base_answer_mean_entropy = base_model_final_predicted_answer_entropy.get("mean_answer_token_entropy")
+                            base_answer_mean_entropy = (
+                                base_model_final_predicted_answer_entropy.get(
+                                    "mean_answer_token_entropy"
+                                )
+                            )
                         else:
-                            base_answer_mean_entropy = float(base_model_final_predicted_answer_entropy)
-                    
+                            base_answer_mean_entropy = float(
+                                base_model_final_predicted_answer_entropy
+                            )
+
                     if sample_final_predicted_answer_entropy is not None:
                         if isinstance(sample_final_predicted_answer_entropy, dict):
-                            sample_answer_mean_entropy = sample_final_predicted_answer_entropy.get("mean_answer_token_entropy")
+                            sample_answer_mean_entropy = (
+                                sample_final_predicted_answer_entropy.get(
+                                    "mean_answer_token_entropy"
+                                )
+                            )
                         else:
-                            sample_answer_mean_entropy = float(sample_final_predicted_answer_entropy)
-                    
-                    if base_answer_mean_entropy is not None and sample_answer_mean_entropy is not None:
+                            sample_answer_mean_entropy = float(
+                                sample_final_predicted_answer_entropy
+                            )
+
+                    if (
+                        base_answer_mean_entropy is not None
+                        and sample_answer_mean_entropy is not None
+                    ):
                         sample_base_entropy_features[
                             "base_model_vs_sample_final_answer_entropy_diff"
-                        ] = (
-                            base_answer_mean_entropy
-                            - sample_answer_mean_entropy
-                        )
-                        
+                        ] = (base_answer_mean_entropy - sample_answer_mean_entropy)
+
                         if sample_answer_mean_entropy != 0:
                             sample_base_entropy_features[
                                 "base_model_vs_sample_final_answer_entropy_ratio"
-                            ] = (
-                                base_answer_mean_entropy
-                                / sample_answer_mean_entropy
-                            )
+                            ] = (base_answer_mean_entropy / sample_answer_mean_entropy)
                         else:
                             sample_base_entropy_features[
                                 "base_model_vs_sample_final_answer_entropy_ratio"
                             ] = 0.0
-                        
-                        sample_base_entropy_features[
-                            "answer_token_entropy_change"
-                        ] = abs(
-                            base_answer_mean_entropy
-                            - sample_answer_mean_entropy
+
+                        sample_base_entropy_features["answer_token_entropy_change"] = (
+                            abs(base_answer_mean_entropy - sample_answer_mean_entropy)
                         )
-                        
+
                         # Direction of change: positive if base model entropy is higher, negative if sample entropy is higher
                         sample_base_entropy_features[
                             "answer_token_entropy_change_direction"
-                        ] = (
-                            base_answer_mean_entropy
-                            - sample_answer_mean_entropy
-                        )
+                        ] = (base_answer_mean_entropy - sample_answer_mean_entropy)
                     elif base_answer_mean_entropy is not None:
                         # If only base model entropy is available
                         sample_base_entropy_features[
@@ -434,9 +521,9 @@ class FeatureEnhancer:
                         sample_base_entropy_features[
                             "base_model_vs_sample_final_answer_entropy_ratio"
                         ] = 0.0
-                        sample_base_entropy_features[
-                            "answer_token_entropy_change"
-                        ] = abs(base_answer_mean_entropy)
+                        sample_base_entropy_features["answer_token_entropy_change"] = (
+                            abs(base_answer_mean_entropy)
+                        )
                         sample_base_entropy_features[
                             "answer_token_entropy_change_direction"
                         ] = base_answer_mean_entropy
@@ -448,9 +535,9 @@ class FeatureEnhancer:
                         sample_base_entropy_features[
                             "base_model_vs_sample_final_answer_entropy_ratio"
                         ] = 0.0
-                        sample_base_entropy_features[
-                            "answer_token_entropy_change"
-                        ] = abs(sample_answer_mean_entropy)
+                        sample_base_entropy_features["answer_token_entropy_change"] = (
+                            abs(sample_answer_mean_entropy)
+                        )
                         sample_base_entropy_features[
                             "answer_token_entropy_change_direction"
                         ] = -sample_answer_mean_entropy
@@ -462,22 +549,24 @@ class FeatureEnhancer:
                         sample_base_entropy_features[
                             "base_model_vs_sample_final_answer_entropy_ratio"
                         ] = 0.0
-                        sample_base_entropy_features[
-                            "answer_token_entropy_change"
-                        ] = 0.0
+                        sample_base_entropy_features["answer_token_entropy_change"] = (
+                            0.0
+                        )
                         sample_base_entropy_features[
                             "answer_token_entropy_change_direction"
                         ] = 0.0
 
                     if base_sample_total_entropy > 0:
-                        sample_base_entropy_features["sample_entropy_ratio_vs_base_total"] = (
-                            float(sample_total_entropy) / base_sample_total_entropy
-                        )
+                        sample_base_entropy_features[
+                            "sample_entropy_ratio_vs_base_total"
+                        ] = (float(sample_total_entropy) / base_sample_total_entropy)
                         sample_base_entropy_features[
                             "sample_entropy_reduction_vs_base_total"
                         ] = base_sample_total_entropy - float(sample_total_entropy)
                     else:
-                        sample_base_entropy_features["sample_entropy_ratio_vs_base_total"] = 0.0
+                        sample_base_entropy_features[
+                            "sample_entropy_ratio_vs_base_total"
+                        ] = 0.0
                         sample_base_entropy_features[
                             "sample_entropy_reduction_vs_base_total"
                         ] = 0.0
@@ -491,7 +580,10 @@ class FeatureEnhancer:
                         )
                         sample_base_entropy_features[
                             "sample_avg_entropy_per_token_diff_vs_base"
-                        ] = float(sample_avg_entropy_per_token) - base_sample_avg_entropy_per_token
+                        ] = (
+                            float(sample_avg_entropy_per_token)
+                            - base_sample_avg_entropy_per_token
+                        )
                     else:
                         sample_base_entropy_features[
                             "sample_avg_entropy_per_token_ratio_vs_base"
@@ -502,13 +594,15 @@ class FeatureEnhancer:
 
                     # Collect round-based agent entropy statistics
                     # Group agents by round number and collect their entropy metrics
-                    round_agent_entropy_data: Dict[int, Dict[str, List[float]]] = defaultdict(
-                        lambda: defaultdict(list)
+                    round_agent_entropy_data: Dict[int, Dict[str, List[float]]] = (
+                        defaultdict(lambda: defaultdict(list))
                     )
                     sample_round_total_tokens: Dict[int, int] = defaultdict(int)
                     sample_round_total_entropy: Dict[int, float] = defaultdict(float)
 
-                    for agent_key, agent_entropy_data in sample_entropy.get("agents", {}).items():
+                    for agent_key, agent_entropy_data in sample_entropy.get(
+                        "agents", {}
+                    ).items():
                         agent_type = agent_entropy_data.get(
                             "agent_type", agent_key.split("_")[0]
                         )
@@ -543,7 +637,9 @@ class FeatureEnhancer:
                             ]
                             for entropy_type in entropy_types:
                                 value = agent_entropy_data.get(entropy_type, 0)
-                                round_agent_entropy_data[round_number][entropy_type].append(value)
+                                round_agent_entropy_data[round_number][
+                                    entropy_type
+                                ].append(value)
 
                     # Calculate round-based statistics
                     round_statistics: Dict[str, Any] = {}
@@ -591,7 +687,9 @@ class FeatureEnhancer:
                             sample_round_total_entropy.get(round_num, 0.0)
                         )
                         key_prefix = f"sample_round_{round_num}_all_agents"
-                        round_statistics[f"{key_prefix}_total_entropy"] = total_entropy_round
+                        round_statistics[f"{key_prefix}_total_entropy"] = (
+                            total_entropy_round
+                        )
                         round_statistics[f"{key_prefix}_total_token"] = total_tokens
                         if total_tokens > 0:
                             density = total_entropy_round / total_tokens
@@ -615,11 +713,11 @@ class FeatureEnhancer:
                         )
                         sample_round_dynamic_features[
                             "sample_round_all_agents_total_entropy_first_last_diff"
-                        ] = last_total_entropy - first_total_entropy
+                        ] = (last_total_entropy - first_total_entropy)
                         if first_total_entropy > 0:
                             sample_round_dynamic_features[
                                 "sample_round_all_agents_total_entropy_first_last_ratio"
-                            ] = last_total_entropy / first_total_entropy
+                            ] = (last_total_entropy / first_total_entropy)
                         else:
                             sample_round_dynamic_features[
                                 "sample_round_all_agents_total_entropy_first_last_ratio"
@@ -633,11 +731,11 @@ class FeatureEnhancer:
                         )
                         sample_round_dynamic_features[
                             "sample_round_all_agents_total_token_first_last_diff"
-                        ] = last_total_tokens - first_total_tokens
+                        ] = (last_total_tokens - first_total_tokens)
                         if first_total_tokens > 0:
                             sample_round_dynamic_features[
                                 "sample_round_all_agents_total_token_first_last_ratio"
-                            ] = last_total_tokens / first_total_tokens
+                            ] = (last_total_tokens / first_total_tokens)
                         else:
                             sample_round_dynamic_features[
                                 "sample_round_all_agents_total_token_first_last_ratio"
@@ -651,11 +749,11 @@ class FeatureEnhancer:
                         )
                         sample_round_dynamic_features[
                             "sample_round_all_agents_entropy_per_token_first_last_diff"
-                        ] = last_density - first_density
+                        ] = (last_density - first_density)
                         if first_density > 0:
                             sample_round_dynamic_features[
                                 "sample_round_all_agents_entropy_per_token_first_last_ratio"
-                            ] = last_density / first_density
+                            ] = (last_density / first_density)
                         else:
                             sample_round_dynamic_features[
                                 "sample_round_all_agents_entropy_per_token_first_last_ratio"
@@ -679,7 +777,10 @@ class FeatureEnhancer:
                             ] = 0.0
 
                         # Pairwise change between round 1 and 2 if both exist
-                        if 1 in sample_round_total_tokens and 2 in sample_round_total_tokens:
+                        if (
+                            1 in sample_round_total_tokens
+                            and 2 in sample_round_total_tokens
+                        ):
                             sample_round_dynamic_features[
                                 "sample_round_1_2_change_tokens"
                             ] = float(
@@ -710,18 +811,20 @@ class FeatureEnhancer:
                             )
 
                     if mean_agent_mean_entropy_by_round:
-                        sorted_rounds_mean = sorted(mean_agent_mean_entropy_by_round.keys())
+                        sorted_rounds_mean = sorted(
+                            mean_agent_mean_entropy_by_round.keys()
+                        )
                         first_round_mean = sorted_rounds_mean[0]
                         last_round_mean = sorted_rounds_mean[-1]
                         first_mean = mean_agent_mean_entropy_by_round[first_round_mean]
                         last_mean = mean_agent_mean_entropy_by_round[last_round_mean]
                         sample_round_trend_features[
                             "sample_round_mean_agent_mean_entropy_first_last_diff"
-                        ] = last_mean - first_mean
+                        ] = (last_mean - first_mean)
                         if first_mean > 0:
                             sample_round_trend_features[
                                 "sample_round_mean_agent_mean_entropy_first_last_ratio"
-                            ] = last_mean / first_mean
+                            ] = (last_mean / first_mean)
                         else:
                             sample_round_trend_features[
                                 "sample_round_mean_agent_mean_entropy_first_last_ratio"
@@ -733,7 +836,8 @@ class FeatureEnhancer:
                         ] = (last_mean - first_mean) / float(num_round_steps_mean)
 
                         mean_values = [
-                            mean_agent_mean_entropy_by_round[r] for r in sorted_rounds_mean
+                            mean_agent_mean_entropy_by_round[r]
+                            for r in sorted_rounds_mean
                         ]
                         if len(mean_values) > 1:
                             sample_round_trend_features[
@@ -769,11 +873,11 @@ class FeatureEnhancer:
                         ]
                         sample_round_trend_features[
                             "sample_round_mean_agent_total_entropy_first_last_diff"
-                        ] = last_total_mean - first_total_mean
+                        ] = (last_total_mean - first_total_mean)
                         if first_total_mean > 0:
                             sample_round_trend_features[
                                 "sample_round_mean_agent_total_entropy_first_last_ratio"
-                            ] = last_total_mean / first_total_mean
+                            ] = (last_total_mean / first_total_mean)
                         else:
                             sample_round_trend_features[
                                 "sample_round_mean_agent_total_entropy_first_last_ratio"
@@ -879,7 +983,7 @@ class FeatureEnhancer:
                         )
                         sample_round_trend_features[
                             "sample_round_agent_mean_entropy_spread_first_last_diff"
-                        ] = last_spread_mean - first_spread_mean
+                        ] = (last_spread_mean - first_spread_mean)
 
                         first_spread_total = round_statistics.get(
                             f"sample_round_{first_round_spread}_agent_total_entropy_spread",
@@ -891,7 +995,7 @@ class FeatureEnhancer:
                         )
                         sample_round_trend_features[
                             "sample_round_agent_total_entropy_spread_first_last_diff"
-                        ] = last_spread_total - first_spread_total
+                        ] = (last_spread_total - first_spread_total)
 
                     # Shared sample-level features used by all agent records of this sample
                     shared_sample_features: Dict[str, Any] = {}
@@ -992,6 +1096,33 @@ class FeatureEnhancer:
                         # Add sample-level shared statistics to the record
                         record.update(shared_sample_features)
 
+                        # If evaluation_score exists (finagent), add to record
+                        if "evaluation_score" in agent_metrics:
+                            record["evaluation_score"] = agent_metrics[
+                                "evaluation_score"
+                            ]
+
+                        # Step-level entropy features (for finagent ReAct steps)
+                        if "step_entropy_dynamics" in agent_entropy_data:
+                            dynamics = agent_entropy_data["step_entropy_dynamics"]
+                            record["step_num_steps"] = dynamics.get("num_steps", 0)
+                            record["step_entropy_decay_rate"] = dynamics.get(
+                                "entropy_decay_rate", 0.0
+                            )
+                            record["step_first_step_mean_entropy"] = dynamics.get(
+                                "first_step_mean_entropy", 0.0
+                            )
+                            record["step_last_step_mean_entropy"] = dynamics.get(
+                                "last_step_mean_entropy", 0.0
+                            )
+
+                            # Per-step mean entropies (variable length, store first few)
+                            step_means = dynamics.get("step_mean_entropies", [])
+                            for i, sm in enumerate(
+                                step_means[:10]
+                            ):  # Store at most first 10 steps
+                                record[f"step_{i}_mean_entropy"] = sm
+
                         # Calculate derived features with numerical stability
                         sample_mean_entropy_local = sample_mean_entropy
                         sample_std_entropy_local = sample_std_entropy
@@ -1031,7 +1162,7 @@ class FeatureEnhancer:
 
     @staticmethod
     def add_dynamic_round_features(
-        records: List[Dict[str, Any]]
+        records: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         """Add experiment-level dynamic round comparison features to records.
 

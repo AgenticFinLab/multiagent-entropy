@@ -20,7 +20,16 @@ DATASETS = [
     "math500",
     "aime2024_16384",
     "aime2025_16384",
+    "finagent",
 ]
+
+
+def _get_eval_results_path(base_path: str, dataset: str) -> Path:
+    """Get evaluation results output path for a dataset."""
+    if dataset.lower() == "finagent":
+        return Path(base_path) / "evaluation" / "results_finagent" / dataset
+    else:
+        return Path(base_path) / "evaluation" / "results" / dataset
 
 
 def main():
@@ -39,7 +48,11 @@ def main():
         type=str,
         nargs="*",
         choices=DATASETS,
-        default=DATASETS,
+        default=[
+            "aime2024_16384",
+            "gsm8k",
+            "humaneval",
+        ],
         help="Datasets to analyze (space-separated list)",
     )
     # Add flag to analyze all datasets
@@ -53,14 +66,14 @@ def main():
         "--model",
         type=str,
         nargs="*",
-        default=["qwen3_0_6b", "qwen3_4b", "qwen3_8b"],
+        default=["qwen3_14b"],
         help="Model names. If not provided, analyze all models",
     )
     # Add task type argument with choices for auto-detection
     parser.add_argument(
         "--task-type",
         type=str,
-        choices=["math", "code", "option", "auto"],
+        choices=["math", "code", "option", "finance", "auto"],
         default="auto",
         help="Task type (auto to infer from dataset)",
     )
@@ -114,7 +127,7 @@ def main():
         datasets_to_analyze = args.datasets
     else:
         # Default to aime2025_8192 if nothing specified
-        datasets_to_analyze = ["aime2025_8192"]
+        datasets_to_analyze = ["gsm8k"]
 
     # Get base path to project directory
     base_path = str(Path(__file__).parent.parent)
@@ -155,11 +168,7 @@ def main():
                         output_path = args.output
                     else:
                         output_dir = (
-                            Path(base_path)
-                            / "evaluation"
-                            / "results"
-                            / dataset
-                            / model_name
+                            _get_eval_results_path(base_path, dataset) / model_name
                         )
                         output_dir.mkdir(parents=True, exist_ok=True)
                         output_path = output_dir / f"{args.experiment}_metrics.json"
@@ -182,10 +191,7 @@ def main():
 
                     # Create output directory for entropy results
                     entropy_output_dir = (
-                        Path(base_path)
-                        / "evaluation"
-                        / "results"
-                        / dataset
+                        _get_eval_results_path(base_path, dataset)
                         / model_name
                         / "entropy"
                     )
@@ -219,7 +225,7 @@ def main():
             if args.output:
                 output_path = args.output
             else:
-                output_dir = Path(base_path) / "evaluation" / "results" / dataset
+                output_dir = _get_eval_results_path(base_path, dataset)
                 output_dir.mkdir(parents=True, exist_ok=True)
                 output_path = output_dir / "all_metrics.json"
 
@@ -235,9 +241,7 @@ def main():
                 )
 
                 # Create output directory for entropy results
-                entropy_output_dir = (
-                    Path(base_path) / "evaluation" / "results" / dataset
-                )
+                entropy_output_dir = _get_eval_results_path(base_path, dataset)
                 entropy_output_dir.mkdir(parents=True, exist_ok=True)
 
                 # Save entropy results to JSON
@@ -275,13 +279,11 @@ def main():
 
     # Run aggregator to combine metrics and entropy data if requested
     if args.run_aggregator:
-        base_results_path = Path(base_path) / "evaluation" / "results"
-
         # Aggregate all datasets if aggregate_all flag is set
         if args.aggregate_all:
             datasets = DATASETS
             for dataset in datasets:
-                dataset_path = base_results_path / dataset
+                dataset_path = _get_eval_results_path(base_path, dataset)
                 entropy_file = dataset_path / "all_entropy_results.json"
                 metrics_file = dataset_path / "all_metrics.json"
                 output_csv = dataset_path
@@ -296,7 +298,7 @@ def main():
         # Aggregate only the specified datasets
         else:
             for dataset in datasets_to_analyze:
-                dataset_path = base_results_path / dataset
+                dataset_path = _get_eval_results_path(base_path, dataset)
                 entropy_file = dataset_path / "all_entropy_results.json"
                 metrics_file = dataset_path / "all_metrics.json"
                 output_csv = dataset_path
@@ -311,13 +313,11 @@ def main():
 
     # Generate summary CSV from aggregated data if requested
     if args.generate_summary:
-        base_results_path = Path(base_path) / "evaluation" / "results"
-
         # Generate summary for all datasets if aggregate_all flag is set
         if args.aggregate_all:
             datasets = DATASETS
             for dataset in datasets:
-                dataset_path = base_results_path / dataset
+                dataset_path = _get_eval_results_path(base_path, dataset)
                 input_csv = dataset_path / "all_aggregated_data.csv"
                 output_csv = dataset_path / "all_summary_data.csv"
 
@@ -328,7 +328,7 @@ def main():
         # Generate summary only for the specified datasets
         else:
             for dataset in datasets_to_analyze:
-                dataset_path = base_results_path / dataset
+                dataset_path = _get_eval_results_path(base_path, dataset)
                 input_csv = dataset_path / "all_aggregated_data.csv"
                 output_csv = dataset_path / "all_summary_data.csv"
 

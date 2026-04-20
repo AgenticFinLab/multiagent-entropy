@@ -122,7 +122,9 @@ class EntropyStatistic:
             Dictionary containing macro and micro level entropy statistics.
         """
         # Load experiment configuration to get architecture and round settings
-        config = self.data_loader.load_experiment_config(dataset, experiment_name, model_name)
+        config = self.data_loader.load_experiment_config(
+            dataset, experiment_name, model_name
+        )
         # Extract agent architecture type from configuration
         agent_architecture = config.get("agent_type", "unknown")
         # Extract number of rounds from configuration
@@ -138,7 +140,9 @@ class EntropyStatistic:
         )
 
         # Load all results to get responses
-        all_results = self.data_loader.load_all_results(dataset, model_name, experiment_name)
+        all_results = self.data_loader.load_all_results(
+            dataset, model_name, experiment_name
+        )
 
         # Collect entropy tensors from all results in the experiment
         entropy_data = self._collect_entropy_data(
@@ -151,7 +155,12 @@ class EntropyStatistic:
         )
         # Calculate micro-level statistics (sample, sequence, token position level)
         micro_stats = self._calculate_micro_statistics(
-            entropy_data, agent_architecture, num_rounds, lm_name, all_results, task_type
+            entropy_data,
+            agent_architecture,
+            num_rounds,
+            lm_name,
+            all_results,
+            task_type,
         )
 
         # Compile results with metadata and statistics
@@ -206,6 +215,11 @@ class EntropyStatistic:
                     dataset, model_name, experiment_name, result_id
                 )
 
+                # Load step-level entropy tensors (for finagent ReAct steps)
+                step_entropy_tensors = self.data_loader.load_step_entropy_tensors(
+                    dataset, model_name, experiment_name, result_id
+                )
+
                 # Store entropy data if tensor exists
                 if entropy_tensor is not None:
                     entropy_data[sequence_id].append(
@@ -215,6 +229,7 @@ class EntropyStatistic:
                             "execution_order": execution_order,
                             "sample_number": sample_number,
                             "entropy_tensor": entropy_tensor,
+                            "step_entropy_tensors": step_entropy_tensors,
                         }
                     )
 
@@ -382,7 +397,12 @@ class EntropyStatistic:
 
                 # Calculate predicted_answer_entropy for this specific agent inference
                 predicted_answer_entropy = None
-                if tokenizer and all_results and result_id in all_results:
+                if (
+                    tokenizer
+                    and all_results
+                    and result_id in all_results
+                    and task_type != "finance"
+                ):
                     response = all_results[result_id].get("response", "")
                     # Extract answer based on task type
                     if task_type in ["math", "option"]:
@@ -391,12 +411,12 @@ class EntropyStatistic:
                         answer, ok = MetricsCalculator.extract_code_answer(response)
                     else:
                         answer, ok = MetricsCalculator.extract_boxed_answer(response)
-                    
+
                     if ok and answer:
                         predicted_answer_entropy = self._get_answer_token_entropy(
                             response, answer, tokenizer, result_id, [entropy_info]
                         )
-                
+
                 # Store it back in entropy_info to use it when building agents dict later
                 entropy_info["predicted_answer_entropy"] = predicted_answer_entropy
 
@@ -518,7 +538,11 @@ class EntropyStatistic:
                     "agent_type": sequence_agent_type,
                     "execution_order": sequence_execution_order,
                     "round_number": round_number,
-                    "predicted_answer_entropy": sample_entropies[0].get("predicted_answer_entropy") if sequence_sample_count > 0 else None,
+                    "predicted_answer_entropy": (
+                        sample_entropies[0].get("predicted_answer_entropy")
+                        if sequence_sample_count > 0
+                        else None
+                    ),
                     "total_entropy": sequence_total_entropy,
                     "max_entropy": sequence_max_entropy / sequence_sample_count,
                     "mean_entropy": sequence_mean_entropy / sequence_sample_count,
@@ -536,6 +560,58 @@ class EntropyStatistic:
                         else 0.0
                     ),
                 }
+
+                # Calculate step-level entropy statistics (for finagent ReAct steps)
+                step_entropy_list = []
+                # Collect step tensors from all samples in this sequence
+                all_step_tensors = []
+                for ent_info in sample_entropies:
+                    st = ent_info.get("step_entropy_tensors", [])
+                    if st:
+                        all_step_tensors = (
+                            st  # Use the first non-empty one (samples share same steps)
+                        )
+                        break
+
+                for step_idx, step_tensor in all_step_tensors:
+                    if isinstance(step_tensor, torch.Tensor):
+                        step_array = step_tensor.cpu().numpy()
+                    else:
+                        step_array = np.array(step_tensor)
+
+                    step_entropy_list.append(
+                        {
+                            "step_index": step_idx,
+                            "mean_entropy": float(np.mean(step_array)),
+                            "std_entropy": float(np.std(step_array)),
+                            "max_entropy": float(np.max(step_array)),
+                            "min_entropy": float(np.min(step_array)),
+                            "median_entropy": float(np.median(step_array)),
+                            "total_entropy": float(np.sum(step_array)),
+                            "token_count": len(step_array),
+                        }
+                    )
+
+                if step_entropy_list:
+                    stats["agents"][agent_key]["step_entropy"] = step_entropy_list
+
+                    # Calculate step-level dynamics
+                    num_steps = len(step_entropy_list)
+                    first_mean = step_entropy_list[0]["mean_entropy"]
+                    last_mean = step_entropy_list[-1]["mean_entropy"]
+                    entropy_decay_rate = (
+                        (first_mean - last_mean) / num_steps if num_steps > 1 else 0.0
+                    )
+
+                    stats["agents"][agent_key]["step_entropy_dynamics"] = {
+                        "num_steps": num_steps,
+                        "entropy_decay_rate": entropy_decay_rate,
+                        "first_step_mean_entropy": first_mean,
+                        "last_step_mean_entropy": last_mean,
+                        "step_mean_entropies": [
+                            s["mean_entropy"] for s in step_entropy_list
+                        ],
+                    }
 
         # Convert defaultdict to regular dict for JSON serialization
         micro_stats["samples"] = dict(micro_stats["samples"])
@@ -577,7 +653,7 @@ class EntropyStatistic:
         micro_stats["token_position_level"] = dict(micro_stats["token_position_level"])
 
         # Calculate final_predicted_answer_entropy for each sample
-        if lm_name and all_results:
+        if lm_name and all_results and task_type != "finance":
             tokenizer = self._get_tokenizer(lm_name)
             if tokenizer:
                 for main_id, agents_data in agents_by_main_id.items():
@@ -589,18 +665,26 @@ class EntropyStatistic:
                         # Extract answer based on task type
                         if task_type in ["math", "option"]:
                             # Extract boxed answer for math and option tasks
-                            answer, ok = MetricsCalculator.extract_boxed_answer(response)
+                            answer, ok = MetricsCalculator.extract_boxed_answer(
+                                response
+                            )
                         elif task_type == "code":
                             # Extract code answer for code tasks
                             answer, ok = MetricsCalculator.extract_code_answer(response)
                         else:
                             # Default to boxed answer extraction
-                            answer, ok = MetricsCalculator.extract_boxed_answer(response)
-                        
+                            answer, ok = MetricsCalculator.extract_boxed_answer(
+                                response
+                            )
+
                         if ok and answer:
                             # Find answer token entropy
                             answer_entropy = self._get_answer_token_entropy(
-                                response, answer, tokenizer, final_result_id, agents_data
+                                response,
+                                answer,
+                                tokenizer,
+                                final_result_id,
+                                agents_data,
                             )
                             if answer_entropy is not None:
                                 micro_stats["samples"][main_id][
@@ -768,15 +852,25 @@ class EntropyStatistic:
                     if len(answer_entropies) > 0:
                         # Convert to numpy array for statistical calculations
                         answer_entropies_array = np.array(answer_entropies)
-                        
+
                         # Calculate statistics
                         return {
                             "answer_token_count": len(answer_entropies),
-                            "max_answer_token_entropy": float(np.max(answer_entropies_array)),
-                            "mean_answer_token_entropy": float(np.mean(answer_entropies_array)),
-                            "min_answer_token_entropy": float(np.min(answer_entropies_array)),
-                            "std_answer_token_entropy": float(np.std(answer_entropies_array)),
-                            "median_answer_token_entropy": float(np.median(answer_entropies_array)),
+                            "max_answer_token_entropy": float(
+                                np.max(answer_entropies_array)
+                            ),
+                            "mean_answer_token_entropy": float(
+                                np.mean(answer_entropies_array)
+                            ),
+                            "min_answer_token_entropy": float(
+                                np.min(answer_entropies_array)
+                            ),
+                            "std_answer_token_entropy": float(
+                                np.std(answer_entropies_array)
+                            ),
+                            "median_answer_token_entropy": float(
+                                np.median(answer_entropies_array)
+                            ),
                             "answer_token_entropies": answer_entropies,
                         }
         except Exception as e:
@@ -893,7 +987,9 @@ class EntropyStatistic:
             Dictionary containing entropy change trend analysis results.
         """
         # Load experiment configuration to get architecture and round settings
-        config = self.data_loader.load_experiment_config(dataset, experiment_name, model_name)
+        config = self.data_loader.load_experiment_config(
+            dataset, experiment_name, model_name
+        )
         # Extract agent architecture type from configuration
         agent_architecture = config.get("agent_type", "unknown")
         # Extract number of rounds from configuration
