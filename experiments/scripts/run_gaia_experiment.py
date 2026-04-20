@@ -144,12 +144,34 @@ def main():
             save_config(merged_config, config_save_path)
             logger.info(f"Saved merged configuration to: {config_save_path}")
 
-        result = run_gaia_experiment(
-            merged_config,
-            dry_run=args.dry_run,
-            save_folder=save_folder,
-            skip_evaluation=args.skip_evaluation,
-        )
+        MAX_RETRIES = 100
+        retry_count = 0
+        result = None
+
+        while retry_count < MAX_RETRIES:
+            result = run_gaia_experiment(
+                merged_config,
+                dry_run=args.dry_run,
+                save_folder=save_folder,
+                skip_evaluation=args.skip_evaluation,
+            )
+            status = result.get("status")
+            if status in ("completed", "skipped", "dry_run"):
+                break
+            if status == "failed":
+                retry_count += 1
+                logger.warning(
+                    f"Experiment failed (attempt {retry_count}/{MAX_RETRIES}): "
+                    f"{result.get('error', 'unknown error')}"
+                )
+                if retry_count >= MAX_RETRIES:
+                    logger.error("Max retries reached. Giving up.")
+                    break
+                wait = min(30 * retry_count, 300)
+                logger.info(f"Retrying in {wait}s (checkpoint will resume remaining samples)...")
+                time.sleep(wait)
+            else:
+                break
 
         if not args.dry_run:
             dataset_name = merged_config["data"]["data_name"].lower()

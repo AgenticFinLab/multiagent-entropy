@@ -261,28 +261,25 @@ class PythonExecutor(FinancialTool):
         if not code.strip():
             raise ValueError("No code provided.")
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False, encoding="utf-8"
-        ) as tmp:
-            tmp.write(code)
-            tmp_path = tmp.name
-
-        try:
-            proc = subprocess.run(
-                [sys.executable, tmp_path],
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-            stdout = proc.stdout.strip()
-            stderr = proc.stderr.strip()
-            if stderr:
-                return f"{stdout}\n[stderr]\n{stderr}" if stdout else f"[stderr]\n{stderr}"
-            return stdout if stdout else "(No output)"
-        except subprocess.TimeoutExpired:
-            raise TimeoutError(f"Code execution timed out after {timeout}s.")
-        finally:
-            os.unlink(tmp_path)
+        with tempfile.TemporaryDirectory() as work_dir:
+            tmp_path = os.path.join(work_dir, "_script.py")
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                f.write(code)
+            try:
+                proc = subprocess.run(
+                    [sys.executable, tmp_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                    cwd=work_dir,
+                )
+                stdout = proc.stdout.strip()
+                stderr = proc.stderr.strip()
+                if stderr:
+                    return f"{stdout}\n[stderr]\n{stderr}" if stdout else f"[stderr]\n{stderr}"
+                return stdout if stdout else "(No output)"
+            except subprocess.TimeoutExpired:
+                raise TimeoutError(f"Code execution timed out after {timeout}s.")
 
 
 # ---------------------------------------------------------------------------

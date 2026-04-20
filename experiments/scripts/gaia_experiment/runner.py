@@ -5,6 +5,7 @@ import logging
 import os
 import time
 import traceback
+import dotenv
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -25,8 +26,12 @@ from .prompts import enhance_question_with_tools_context
 
 logger = logging.getLogger(__name__)
 
+dotenv.load_dotenv()
 
-def resolve_attachment_path(sample: Dict[str, Any], attachments_root: str = None) -> str:
+
+def resolve_attachment_path(
+    sample: Dict[str, Any], attachments_root: str = None
+) -> str:
     """
     Return the local absolute path of the sample's attachment, or empty string
     if the sample has no attachment or the file does not exist locally.
@@ -44,7 +49,9 @@ def resolve_attachment_path(sample: Dict[str, Any], attachments_root: str = None
     return local_path if os.path.exists(local_path) else ""
 
 
-def _build_question(question: str, sample: Dict[str, Any], attachments_root: str) -> str:
+def _build_question(
+    question: str, sample: Dict[str, Any], attachments_root: str
+) -> str:
     """
     Build the full question text passed to the agent.
 
@@ -119,54 +126,67 @@ def run_gaia_experiment(
     """
     experiment_name = config.get("experiment_name", "unnamed_experiment")
     agent_type = config.get("agent_type", "single")
-    logger.info(f"Starting GAIA experiment: {experiment_name} (Agent type: {agent_type})")
+    logger.info(
+        f"Starting GAIA experiment: {experiment_name} (Agent type: {agent_type})"
+    )
 
     if dry_run:
         logger.info("Dry run mode - skipping experiment execution")
-        return {"status": "dry_run", "experiment_name": experiment_name, "agent_type": agent_type, "config": config}
+        return {
+            "status": "dry_run",
+            "experiment_name": experiment_name,
+            "agent_type": agent_type,
+            "config": config,
+        }
 
     data_cfg = config["data"]
     dataset_name = data_cfg["data_name"].lower()
     model_name = (
         config["agents"][list(config["agents"].keys())[0]]["lm_name"]
-        .split("/")[-1].lower().replace("-", "_").replace(".", "_")
+        .split("/")[-1]
+        .lower()
+        .replace("-", "_")
+        .replace(".", "_")
     )
 
-    existing_dir = find_existing_experiment_dir(save_folder, dataset_name, model_name, experiment_name)
+    existing_dir = find_existing_experiment_dir(
+        save_folder, dataset_name, model_name, experiment_name
+    )
     completed_batches = 0
     resume_mode = False
 
     if existing_dir:
         completed_batches = get_completed_batches(existing_dir)
-        batch_size = data_cfg["batch_size"]
-        data_num = data_cfg.get("data_num", -1)
-
-        if data_num != -1:
-            expected_batches = (data_num + batch_size - 1) // batch_size
-            if completed_batches >= expected_batches:
-                logger.info(
-                    f"Experiment '{experiment_name}' already completed "
-                    f"({completed_batches}/{expected_batches} batches). Skipping."
-                )
-                return {
-                    "status": "skipped", "experiment_name": experiment_name, "agent_type": agent_type,
-                    "reason": "already_completed", "completed_batches": completed_batches,
-                    "results_path": existing_dir,
-                }
-            elif completed_batches > 0:
-                logger.info(f"Found existing experiment at: {existing_dir}")
-                logger.info(
-                    f"Resuming from batch {completed_batches + 1} "
-                    f"(completed: {completed_batches}/{expected_batches})"
-                )
-                resume_mode = True
-                config["save_folder"] = existing_dir
+        if completed_batches > 0:
+            batch_size = data_cfg["batch_size"]
+            data_num = data_cfg.get("data_num", -1)
+            if data_num != -1:
+                expected_batches = (data_num + batch_size - 1) // batch_size
+                if completed_batches >= expected_batches:
+                    logger.info(
+                        f"Experiment '{experiment_name}' already completed "
+                        f"({completed_batches}/{expected_batches} batches). Skipping."
+                    )
+                    return {
+                        "status": "skipped",
+                        "experiment_name": experiment_name,
+                        "agent_type": agent_type,
+                        "reason": "already_completed",
+                        "completed_batches": completed_batches,
+                        "results_path": existing_dir,
+                    }
+            logger.info(f"Found existing experiment at: {existing_dir}")
+            logger.info(f"Resuming from batch {completed_batches + 1}")
+            resume_mode = True
+            config["save_folder"] = existing_dir
 
     try:
         agent = _build_agent(agent_type, config)
 
         # Load dataset from pre-downloaded local JSON
-        data_file = os.path.join(GAIA_DATA_PATH, f"{data_cfg['split']}-all-samples.json")
+        data_file = os.path.join(
+            GAIA_DATA_PATH, f"{data_cfg['split']}-all-samples.json"
+        )
         with open(data_file, "r", encoding="utf-8") as f:
             all_samples_list = json.load(f)
 
@@ -177,23 +197,35 @@ def run_gaia_experiment(
         if level_filter:
             level_filter_str = [str(l) for l in level_filter]
             all_samples_list = [
-                s for s in all_samples_list
+                s
+                for s in all_samples_list
                 if str(s.get("sample_info", {}).get("level", "")) in level_filter_str
             ]
-            logger.info(f"Level filter {level_filter} applied: {len(all_samples_list)} samples remaining")
+            logger.info(
+                f"Level filter {level_filter} applied: {len(all_samples_list)} samples remaining"
+            )
 
         dataset_len = len(all_samples_list)
-        total_samples = dataset_len if data_cfg["data_num"] == -1 else min(data_cfg["data_num"], dataset_len)
+        total_samples = (
+            dataset_len
+            if data_cfg["data_num"] == -1
+            else min(data_cfg["data_num"], dataset_len)
+        )
         batch_size = data_cfg["batch_size"]
         total_batches = (total_samples + batch_size - 1) // batch_size
 
         if resume_mode and existing_dir:
             completed_batches = get_completed_batches(existing_dir)
             if completed_batches >= total_batches:
-                logger.info(f"Experiment '{experiment_name}' already completed. Skipping.")
+                logger.info(
+                    f"Experiment '{experiment_name}' already completed. Skipping."
+                )
                 return {
-                    "status": "skipped", "experiment_name": experiment_name, "agent_type": agent_type,
-                    "reason": "already_completed", "completed_batches": completed_batches,
+                    "status": "skipped",
+                    "experiment_name": experiment_name,
+                    "agent_type": agent_type,
+                    "reason": "already_completed",
+                    "completed_batches": completed_batches,
                     "results_path": existing_dir,
                 }
 
@@ -201,15 +233,21 @@ def run_gaia_experiment(
         start_sample_idx = start_batch * batch_size
 
         if resume_mode:
-            logger.info(f"Resuming from batch {start_batch + 1}/{total_batches} (sample {start_sample_idx})")
+            logger.info(
+                f"Resuming from batch {start_batch + 1}/{total_batches} (sample {start_sample_idx})"
+            )
 
         # Attachment paths
         attachments_root = gaia_config.get("attachments_root", GAIA_ATTACHMENTS_ROOT)
         samples_subset = all_samples_list[:total_samples]
-        n_attach_available = sum(1 for s in samples_subset if resolve_attachment_path(s, attachments_root))
+        n_attach_available = sum(
+            1 for s in samples_subset if resolve_attachment_path(s, attachments_root)
+        )
         n_attach_missing = sum(
-            1 for s in samples_subset
-            if s.get("sample_info", {}).get("file_name") and not resolve_attachment_path(s, attachments_root)
+            1
+            for s in samples_subset
+            if s.get("sample_info", {}).get("file_name")
+            and not resolve_attachment_path(s, attachments_root)
         )
 
         # Initialize tools
@@ -227,14 +265,24 @@ def run_gaia_experiment(
 
         web_tool = gaia_tools.get("google_web_search")
         api_status = web_tool.get_api_status() if web_tool else {}
-        logger.info(f"Processing {total_samples} GAIA samples in batches of {batch_size}")
-        logger.info(f"Attachments: {n_attach_available} available locally, {n_attach_missing} missing")
+        logger.info(
+            f"Processing {total_samples} GAIA samples in batches of {batch_size}"
+        )
+        logger.info(
+            f"Attachments: {n_attach_available} available locally, {n_attach_missing} missing"
+        )
         logger.info(f"Tools: {list(gaia_tools.keys())}")
         logger.info(f"Web search provider: {api_status.get('active_provider', 'none')}")
-        if not api_status.get("serpapi_configured") and not api_status.get("serper_configured"):
-            logger.warning("No web search API key set — google_web_search will return mock results")
+        if not api_status.get("serpapi_configured") and not api_status.get(
+            "serper_configured"
+        ):
+            logger.warning(
+                "No web search API key set — google_web_search will return mock results"
+            )
         if not ark_api_key:
-            logger.warning("ARK_API_KEY not set — multimodal_viewer will fail for image/audio/video files")
+            logger.warning(
+                "ARK_API_KEY not set — multimodal_viewer will fail for image/audio/video files"
+            )
 
         all_final_states = []
         all_evaluation_results = []
@@ -247,7 +295,9 @@ def run_gaia_experiment(
             for sample_idx in range(start_idx, end_idx):
                 sample = all_samples_list[sample_idx]
                 original_question = sample.get("question", "")
-                built_question = _build_question(original_question, sample, attachments_root)
+                built_question = _build_question(
+                    original_question, sample, attachments_root
+                )
                 local_file = resolve_attachment_path(sample, attachments_root)
 
                 enhanced_sample = sample.copy()
@@ -265,7 +315,9 @@ def run_gaia_experiment(
             }
 
             batch_num = start_idx // batch_size + 1
-            logger.info(f"Processing batch {batch_num}/{total_batches} (samples {start_idx}-{end_idx - 1})")
+            logger.info(
+                f"Processing batch {batch_num}/{total_batches} (samples {start_idx}-{end_idx - 1})"
+            )
             for i in range(start_idx, end_idx):
                 s = all_samples_list[i]
                 logger.debug(
@@ -273,7 +325,9 @@ def run_gaia_experiment(
                     f"file={s['sample_info'].get('file_name', 'none')}"
                 )
 
-            result = agent.run(batch_samples, tools=gaia_tools, tool_definitions=tool_definitions)
+            result = agent.run(
+                batch_samples, tools=gaia_tools, tool_definitions=tool_definitions
+            )
             final_state = result.final_state
 
             if "agent_results" in final_state:
@@ -284,17 +338,23 @@ def run_gaia_experiment(
             if not skip_evaluation:
                 for i, sample_idx in enumerate(range(start_idx, end_idx)):
                     sample = all_samples_list[sample_idx]
-                    if "agent_results" in final_state and i < len(final_state["agent_results"]):
+                    if "agent_results" in final_state and i < len(
+                        final_state["agent_results"]
+                    ):
                         batch_result = final_state["agent_results"][i]
                     else:
                         batch_result = final_state
-                    generated_answer = extract_answer_from_result({"agent_results": [batch_result]})
+                    generated_answer = extract_answer_from_result(
+                        {"agent_results": [batch_result]}
+                    )
                     eval_result = evaluate_gaia_result(sample, generated_answer)
                     eval_result["batch_num"] = batch_num
                     eval_result["sample_idx"] = sample_idx
                     all_evaluation_results.append(eval_result)
 
-            agent.store_manager.save(savename=f"Batch_{batch_num}_State", data=final_state)
+            agent.store_manager.save(
+                savename=f"Batch_{batch_num}_State", data=final_state
+            )
 
         if all_final_states:
             agent.store_manager.save(
@@ -304,30 +364,39 @@ def run_gaia_experiment(
         if not skip_evaluation and all_evaluation_results:
             aggregate_metrics = calculate_aggregate_metrics(all_evaluation_results)
 
-            eval_save_path = os.path.join(config.get("save_folder", ""), "gaia_evaluation_results.json")
+            eval_save_path = os.path.join(
+                config.get("save_folder", ""), "gaia_evaluation_results.json"
+            )
             os.makedirs(os.path.dirname(eval_save_path), exist_ok=True)
             with open(eval_save_path, "w", encoding="utf-8") as f:
-                json.dump({
-                    "experiment_info": {
-                        "experiment_name": experiment_name,
-                        "agent_type": agent_type,
-                        "total_samples": total_samples,
-                        "total_batches": total_batches,
-                        "level_filter": level_filter,
-                        "tools": list(gaia_tools.keys()),
-                        "attachments_root": attachments_root,
-                        "timestamp": datetime.now().isoformat(),
+                json.dump(
+                    {
+                        "experiment_info": {
+                            "experiment_name": experiment_name,
+                            "agent_type": agent_type,
+                            "total_samples": total_samples,
+                            "total_batches": total_batches,
+                            "level_filter": level_filter,
+                            "tools": list(gaia_tools.keys()),
+                            "attachments_root": attachments_root,
+                            "timestamp": datetime.now().isoformat(),
+                        },
+                        "aggregate_metrics": aggregate_metrics,
+                        "individual_results": all_evaluation_results,
                     },
-                    "aggregate_metrics": aggregate_metrics,
-                    "individual_results": all_evaluation_results,
-                }, f, ensure_ascii=False, indent=2)
+                    f,
+                    ensure_ascii=False,
+                    indent=2,
+                )
 
             logger.info("GAIA Evaluation Results:")
             logger.info(f"  - Total   : {aggregate_metrics['total_questions']}")
             logger.info(f"  - Correct : {aggregate_metrics['correct_count']}")
             logger.info(f"  - Accuracy: {aggregate_metrics['accuracy']:.4f}")
             for lvl, stats in sorted(aggregate_metrics["by_level"].items()):
-                logger.info(f"  - Level {lvl}: {stats['correct']}/{stats['count']} ({stats['accuracy']:.4f})")
+                logger.info(
+                    f"  - Level {lvl}: {stats['correct']}/{stats['count']} ({stats['accuracy']:.4f})"
+                )
             logger.info(f"  - Saved to: {eval_save_path}")
 
         duration = time.time() - start_time
@@ -346,7 +415,9 @@ def run_gaia_experiment(
             "samples_processed": total_samples,
             "batches": total_batches,
             "resumed": resume_mode,
-            "batches_processed_this_run": batches_this_run if resume_mode else total_batches,
+            "batches_processed_this_run": (
+                batches_this_run if resume_mode else total_batches
+            ),
             "duration_seconds": duration,
             "results_path": config.get("save_folder", ""),
             "tools": list(gaia_tools.keys()),
@@ -363,7 +434,12 @@ def run_gaia_experiment(
     except Exception as e:
         logger.error(f"Experiment {experiment_name} failed: {e}")
         logger.error(traceback.format_exc())
-        return {"status": "failed", "experiment_name": experiment_name, "agent_type": agent_type, "error": str(e)}
+        return {
+            "status": "failed",
+            "experiment_name": experiment_name,
+            "agent_type": agent_type,
+            "error": str(e),
+        }
 
 
 def run_batch_gaia_experiments(
@@ -387,7 +463,9 @@ def run_batch_gaia_experiments(
     if experiment_name:
         experiments = [exp for exp in experiments if exp.get("name") == experiment_name]
         if not experiments:
-            logger.error(f"Experiment '{experiment_name}' not found in batch configuration")
+            logger.error(
+                f"Experiment '{experiment_name}' not found in batch configuration"
+            )
             return []
         logger.info(f"Running single experiment from batch: {experiment_name}")
 
@@ -395,11 +473,17 @@ def run_batch_gaia_experiments(
     results = []
 
     for exp_idx, exp in enumerate(experiments):
-        logger.info(f"Processing experiment {exp_idx + 1}/{len(experiments)}: {exp.get('name', 'unnamed')}")
+        logger.info(
+            f"Processing experiment {exp_idx + 1}/{len(experiments)}: {exp.get('name', 'unnamed')}"
+        )
         merged_config = load_experiment_config(
-            base_config_path=exp.get("base_config", "experiments/configs/base_config.yml"),
+            base_config_path=exp.get(
+                "base_config", "experiments/configs/base_config.yml"
+            ),
             model_config_path=exp["model_config"],
-            dataset_config_path=exp.get("dataset_config", "experiments/configs/dataset_specific/gaia.yml"),
+            dataset_config_path=exp.get(
+                "dataset_config", "experiments/configs/dataset_specific/gaia.yml"
+            ),
             experiment_name=exp["name"],
             agent_type=exp.get("agent_type", "single"),
         )
@@ -409,8 +493,13 @@ def run_batch_gaia_experiments(
             timestamp_ms = int(time.time() * 1000) % 1000
             pid = os.getpid()
             model_name = (
-                merged_config["agents"][list(merged_config["agents"].keys())[0]]["lm_name"]
-                .split("/")[-1].lower().replace("-", "_").replace(".", "_")
+                merged_config["agents"][list(merged_config["agents"].keys())[0]][
+                    "lm_name"
+                ]
+                .split("/")[-1]
+                .lower()
+                .replace("-", "_")
+                .replace(".", "_")
             )
             config_save_path = (
                 f"experiments/configs_exp/{merged_config['data']['data_name'].lower()}/"
@@ -420,7 +509,10 @@ def run_batch_gaia_experiments(
             logger.info(f"Saved merged configuration to: {config_save_path}")
 
         result = run_gaia_experiment(
-            merged_config, dry_run=dry_run, save_folder=save_folder, skip_evaluation=skip_evaluation
+            merged_config,
+            dry_run=dry_run,
+            save_folder=save_folder,
+            skip_evaluation=skip_evaluation,
         )
         results.append(result)
 
