@@ -356,6 +356,35 @@ def run_gaia_experiment(
                 savename=f"Batch_{batch_num}_State", data=final_state
             )
 
+            # Incrementally persist evaluation results after each batch so
+            # progress is not lost if the run is interrupted by OOM or crash.
+            if not skip_evaluation and all_evaluation_results:
+                eval_save_path = os.path.join(
+                    config.get("save_folder", ""), "gaia_evaluation_results.json"
+                )
+                os.makedirs(os.path.dirname(eval_save_path), exist_ok=True)
+                partial_metrics = calculate_aggregate_metrics(all_evaluation_results)
+                with open(eval_save_path, "w", encoding="utf-8") as f:
+                    json.dump(
+                        {
+                            "experiment_info": {
+                                "experiment_name": experiment_name,
+                                "agent_type": agent_type,
+                                "total_samples": total_samples,
+                                "total_batches": total_batches,
+                                "level_filter": level_filter,
+                                "tools": list(gaia_tools.keys()),
+                                "attachments_root": attachments_root,
+                                "timestamp": datetime.now().isoformat(),
+                            },
+                            "aggregate_metrics": partial_metrics,
+                            "individual_results": all_evaluation_results,
+                        },
+                        f,
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+
         if all_final_states:
             agent.store_manager.save(
                 savename="Combined_FinalState", data={"agent_results": all_final_states}
@@ -363,32 +392,9 @@ def run_gaia_experiment(
 
         if not skip_evaluation and all_evaluation_results:
             aggregate_metrics = calculate_aggregate_metrics(all_evaluation_results)
-
             eval_save_path = os.path.join(
                 config.get("save_folder", ""), "gaia_evaluation_results.json"
             )
-            os.makedirs(os.path.dirname(eval_save_path), exist_ok=True)
-            with open(eval_save_path, "w", encoding="utf-8") as f:
-                json.dump(
-                    {
-                        "experiment_info": {
-                            "experiment_name": experiment_name,
-                            "agent_type": agent_type,
-                            "total_samples": total_samples,
-                            "total_batches": total_batches,
-                            "level_filter": level_filter,
-                            "tools": list(gaia_tools.keys()),
-                            "attachments_root": attachments_root,
-                            "timestamp": datetime.now().isoformat(),
-                        },
-                        "aggregate_metrics": aggregate_metrics,
-                        "individual_results": all_evaluation_results,
-                    },
-                    f,
-                    ensure_ascii=False,
-                    indent=2,
-                )
-
             logger.info("GAIA Evaluation Results:")
             logger.info(f"  - Total   : {aggregate_metrics['total_questions']}")
             logger.info(f"  - Correct : {aggregate_metrics['correct_count']}")

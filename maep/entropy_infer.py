@@ -279,7 +279,7 @@ class HFEntropyInference(BaseEntropyInference):
         messages_batch = self.build_messages(infer_inputs)
 
         # 2. Encode messages
-        prompts, input_ids, attention_mask, tokens_batch = self.encode_messages(
+        prompts, input_ids, attention_mask, _ = self.encode_messages(
             messages_batch
         )
 
@@ -316,7 +316,7 @@ class HFEntropyInference(BaseEntropyInference):
                     response=responses[i],
                     raw_response=None,
                     cost={"time": time.time() - t0},
-                    prompt_tokens=tokens_batch[i],
+                    prompt_tokens=None,
                     extras={
                         # "logits": logits_cpu[i],
                         "entropy": entropy_cpu[i],
