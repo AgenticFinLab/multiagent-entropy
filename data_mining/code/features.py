@@ -364,6 +364,67 @@ FINAGENT_STEP_ENTROPY_FEATURES = [
 # 注意：step_N_mean_entropy (N=0,1,2,...) 是动态字段，数量随样本变化，
 # 不在静态列表中定义，由运行时从数据中自动发现
 
+# Agent-level tool-call statistics features (GAIA / FinAgent ReAct)
+TOOL_CALL_STATISTICS_FEATURES = [
+    "tool_total_calls",
+    "tool_success_count",
+    "tool_effective_count",
+    "tool_success_rate",
+    "tool_effective_rate",
+    "tool_unique_tools_count",
+]
+
+# Agent-level tool-call entropy features
+TOOL_CALL_ENTROPY_FEATURES = [
+    "tool_call_steps_count",
+    "tool_call_mean_entropy",
+    "tool_call_max_entropy",
+    "tool_call_min_entropy",
+    "tool_call_std_entropy",
+    "tool_call_median_entropy",
+]
+# Dynamic: step_N_tool_call_mean_entropy, step_N_tool_call_token_count (N=0,1,...)
+# discovered at runtime via discover_step_tool_call_features()
+
+# Sample-level tool-call aggregated features
+SAMPLE_TOOL_CALL_FEATURES = [
+    "sample_tool_total_calls",
+    "sample_tool_success_count",
+    "sample_tool_effective_count",
+    "sample_tool_success_rate",
+    "sample_tool_effective_rate",
+    "sample_tool_call_steps_count",
+    "sample_tool_call_mean_entropy",
+    "sample_tool_call_max_entropy",
+    "sample_tool_call_min_entropy",
+]
+
+# Round-level tool-call features (static placeholders for rounds 1 and 2)
+ROUND_TOOL_CALL_FEATURES = [
+    "round_1_tool_total_calls",
+    "round_1_tool_success_count",
+    "round_1_tool_effective_count",
+    "round_1_tool_success_rate",
+    "round_1_tool_effective_rate",
+    "round_1_tool_call_mean_entropy",
+    "round_2_tool_total_calls",
+    "round_2_tool_success_count",
+    "round_2_tool_effective_count",
+    "round_2_tool_success_rate",
+    "round_2_tool_effective_rate",
+    "round_2_tool_call_mean_entropy",
+]
+
+# Experiment-level tool-call features
+EXPERIMENT_TOOL_CALL_FEATURES = [
+    "exp_tool_total_calls",
+    "exp_tool_success_count",
+    "exp_tool_effective_count",
+    "exp_tool_success_rate",
+    "exp_tool_effective_rate",
+    "exp_tool_call_mean_entropy",
+]
+
 # All features combined
 ALL_FEATURES = (
     DEFAULT_EXCLUDE_COLUMNS
@@ -405,20 +466,43 @@ FEATURE_GROUPS = {
     "all_features": ALL_FEATURES,
     "finagent_evaluation": FINAGENT_EVALUATION_FEATURES,
     "finagent_step_entropy": FINAGENT_STEP_ENTROPY_FEATURES,
+    "tool_call_statistics": TOOL_CALL_STATISTICS_FEATURES,
+    "tool_call_entropy": TOOL_CALL_ENTROPY_FEATURES,
+    "sample_tool_call": SAMPLE_TOOL_CALL_FEATURES,
+    "round_tool_call": ROUND_TOOL_CALL_FEATURES,
+    "experiment_tool_call": EXPERIMENT_TOOL_CALL_FEATURES,
 }
 
 
 def discover_step_entropy_features(df_columns):
-    """从 DataFrame 列名中发现动态的 step_N_mean_entropy 特征。
+    """Discover dynamic step_N_mean_entropy features from DataFrame column names.
 
     Args:
-        df_columns: DataFrame 的列名列表或 Index
+        df_columns: List or Index of DataFrame column names.
 
     Returns:
-        list: 按步骤顺序排列的 step_N_mean_entropy 列名列表
+        list: step_N_mean_entropy column names sorted by step order.
     """
     import re
 
     step_cols = [c for c in df_columns if re.match(r"^step_\d+_mean_entropy$", c)]
+    step_cols.sort(key=lambda x: int(re.search(r"step_(\d+)_", x).group(1)))
+    return step_cols
+
+
+def discover_step_tool_call_features(df_columns):
+    """Discover dynamic step_N_tool_call_mean_entropy features from DataFrame column names.
+
+    Args:
+        df_columns: List or Index of DataFrame column names.
+
+    Returns:
+        list: step_N_tool_call_mean_entropy column names sorted by step order.
+    """
+    import re
+
+    step_cols = [
+        c for c in df_columns if re.match(r"^step_\d+_tool_call_mean_entropy$", c)
+    ]
     step_cols.sort(key=lambda x: int(re.search(r"step_(\d+)_", x).group(1)))
     return step_cols
