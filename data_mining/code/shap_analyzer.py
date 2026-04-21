@@ -13,16 +13,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Import utilities
-from utils import (
-    setup_visualization_style,
-    load_data_from_path,
-    encode_categorical_features,
-    prepare_features,
-    create_output_directory,
-    determine_output_directory,
-    get_default_data_path,
-)
+from utils import prepare_features
+from base import BaseAnalyzer
 
 try:
     import shap
@@ -39,8 +31,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class ShapAnalyzer:
+class ShapAnalyzer(BaseAnalyzer):
     """Performs SHAP analysis to interpret model predictions for multi-agent entropy data."""
+
+    analyzer_type = "shap"
 
     def __init__(
         self,
@@ -48,91 +42,34 @@ class ShapAnalyzer:
         output_dir: str = None,
         target_dataset: str = None,
     ):
-        """
-        Initialize the ShapAnalyzer.
-
-        Args:
-            data_path: Path to the merged dataset CSV file
-            output_dir: Directory to save SHAP analysis results
-            target_dataset: Target dataset name for determining output directory
-        """
         if not SHAP_AVAILABLE:
             raise ImportError(
                 "SHAP is not installed. Please install it with: pip install shap"
             )
-
-        if data_path is None:
-            data_path = get_default_data_path()
-
-        # Determine output directory based on target_dataset
-        if output_dir is None:
-            output_dir = determine_output_directory(
-                "data_mining/results", target_dataset, "shap"
-            )
-
-        self.data_path = Path(data_path)
-        self.output_dir = Path(output_dir)
-        self.target_dataset = target_dataset
-        self.df = None
-        self.results = {}
-
-        # Create output directory if it doesn't exist
-        create_output_directory(self.output_dir)
-
-        # Set style for better visualizations
-        setup_visualization_style()
+        super().__init__(
+            data_path=data_path,
+            output_dir=output_dir,
+            target_dataset=target_dataset,
+        )
 
     def load_data(self) -> pd.DataFrame:
-        """
-        Load the merged dataset.
-
-        Returns:
-            Loaded DataFrame
-        """
-        self.df = load_data_from_path(self.data_path)
-
+        """Override: SHAP analyzer does not apply model/arch/dataset filters."""
+        from base.io_utils import load_dataset_csv
+        self.df = load_dataset_csv(self.data_path)
         return self.df
-
-    def encode_categorical_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Encode non-numeric features to numeric values (0, 1, 2, 3, 4, ...).
-
-        Args:
-            df: Input DataFrame
-
-        Returns:
-            DataFrame with encoded categorical features
-        """
-        return encode_categorical_features(df)
 
     def prepare_features(
         self,
         target_column: str = "exp_accuracy",
         exclude_columns: List[str] = None,
     ) -> Tuple[pd.DataFrame, pd.Series]:
-        """
-        Prepare features and target for SHAP analysis.
-
-        Args:
-            target_column: Name of the target column
-            exclude_columns: List of columns to exclude from features
-
-        Returns:
-            Tuple of (features DataFrame, target Series)
-        """
+        """SHAP uses a distinct, minimal exclusion set — preserve original behavior."""
         if self.df is None:
             self.load_data()
-
-        # Encode categorical features
         self.df = self.encode_categorical_features(self.df)
-
         if exclude_columns is None:
-            # Use the same exclude columns as other analyzers
             exclude_columns = ["dataset", "model_name", "sample_id"]
-
-        # Use utility function to prepare features
         X, y = prepare_features(self.df, target_column, exclude_columns)
-
         return X, y
 
     def explain_model(
@@ -192,24 +129,18 @@ class ShapAnalyzer:
                 proba = model.predict_proba(X_test)
                 # Create DataFrame with prediction probabilities
                 proba_df = pd.DataFrame(
-                    proba, columns=[f"prob_class_{i}" for i in range(proba.shape[1])]
+                    proba,
+                    columns=[f"prob_class_{i}" for i in range(proba.shape[1])]
                 )
                 proba_df.insert(0, "sample_index", range(len(proba_df)))
-
+                
                 # Save to CSV
-                csv_path = (
-                    self.output_dir
-                    / f"shap_prediction_probabilities_{model_name}_{task_type}.csv"
-                )
+                csv_path = self.output_dir / f"shap_prediction_probabilities_{model_name}_{task_type}.csv"
                 proba_df.to_csv(csv_path, index=False)
-                logger.info(
-                    f"Prediction probabilities for {model_name} saved to: {csv_path}"
-                )
+                logger.info(f"Prediction probabilities for {model_name} saved to: {csv_path}")
                 model_predictions["probabilities"] = proba_df
             except Exception as e:
-                logger.warning(
-                    f"Could not save prediction probabilities for {model_name}: {str(e)}"
-                )
+                logger.warning(f"Could not save prediction probabilities for {model_name}: {str(e)}")
 
         # Generate SHAP plots
         plots_info = self._generate_shap_plots(
@@ -303,27 +234,32 @@ class ShapAnalyzer:
             logger.info(f"SHAP importance plot saved: {importance_plot_path}")
 
             # Save SHAP values to CSV for each sample
-            shap_df = pd.DataFrame(shap_values_for_plots, columns=X_test.columns)
-            shap_df.index.name = "sample_index"
+            shap_df = pd.DataFrame(
+                shap_values_for_plots,
+                columns=X_test.columns
+            )
+            shap_df.index.name = 'sample_index'
             shap_csv_path = (
                 self.output_dir / f"shap_values_{model_name}_{task_type}.csv"
             )
             shap_df.to_csv(shap_csv_path)
             logger.info(f"SHAP values saved to CSV: {shap_csv_path}")
-
+            
             # Save X_test to CSV for later visualization
-            X_test_csv_path = self.output_dir / f"X_test_{model_name}_{task_type}.csv"
+            X_test_csv_path = (
+                self.output_dir / f"X_test_{model_name}_{task_type}.csv"
+            )
             X_test.to_csv(X_test_csv_path)
             logger.info(f"X_test data saved to CSV: {X_test_csv_path}")
 
             # Save mean absolute SHAP values (feature importance) to CSV
             mean_abs_shap = np.abs(shap_values_for_plots).mean(0)
-            importance_df = pd.DataFrame(
-                {"Feature": X_test.columns, "Mean_Abs_SHAP": mean_abs_shap}
-            ).sort_values("Mean_Abs_SHAP", ascending=False)
+            importance_df = pd.DataFrame({
+                'Feature': X_test.columns,
+                'Mean_Abs_SHAP': mean_abs_shap
+            }).sort_values('Mean_Abs_SHAP', ascending=False)
             importance_csv_path = (
-                self.output_dir
-                / f"shap_feature_importance_{model_name}_{task_type}.csv"
+                self.output_dir / f"shap_feature_importance_{model_name}_{task_type}.csv"
             )
             importance_df.to_csv(importance_csv_path, index=False)
             logger.info(f"SHAP feature importance saved to CSV: {importance_csv_path}")
@@ -394,12 +330,10 @@ class ShapAnalyzer:
                     logger.info(f"SHAP dependence plot saved: {dep_plot_path}")
 
                     # Save dependence data to CSV (feature value vs SHAP value)
-                    dependence_df = pd.DataFrame(
-                        {
-                            "Feature_Value": X_test.iloc[:, feature_idx].values,
-                            "SHAP_Value": shap_values_for_plots[:, feature_idx],
-                        }
-                    )
+                    dependence_df = pd.DataFrame({
+                        'Feature_Value': X_test.iloc[:, feature_idx].values,
+                        'SHAP_Value': shap_values_for_plots[:, feature_idx]
+                    })
                     dep_csv_path = (
                         self.output_dir
                         / "shap_dependence_plots"

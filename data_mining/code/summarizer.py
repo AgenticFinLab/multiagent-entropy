@@ -983,11 +983,11 @@ def main():
     project_root = script_dir.parent
 
     # Set paths
-    input_dir = project_root / "results_aggregated"
-    output_dir = project_root / "results_summaries"
+    input_dir = project_root / "results_all" / "results_aggregated"
+    output_dir = project_root / "results_all" / "results_summaries_extended"
 
     # Configuration
-    n_top_analysis = 5  # Number of top features to identify
+    n_top_analysis = 10  # Number of top features to identify
 
     print("=" * 80)
     print("Direct Data Analysis Tool")

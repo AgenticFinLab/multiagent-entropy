@@ -15,7 +15,6 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-
 try:
     import shap
 
@@ -212,6 +211,9 @@ class AggregatedResultsVisualizer:
             if correlation_data:
                 # Annotate each feature with its correlation value
                 y_ticks = ax.get_yticks()
+                actual_n_features = len(
+                    feature_names
+                )  # Use actual number of features displayed
                 for i, feature in enumerate(feature_names):
                     if i < len(y_ticks) and feature in correlation_data:
                         # Get the correlation value for this model
@@ -229,12 +231,13 @@ class AggregatedResultsVisualizer:
                             ]
 
                         # Position annotation to the right of the plot
+                        # Use actual number of features to calculate correct y position
                         ax.annotate(
                             f"r={corr_val:.3f}",
-                            xy=(0, self.n_features - i - 1),
+                            xy=(0, actual_n_features - i - 1),
                             xytext=(
                                 ax.get_xlim()[1] * 1.2,
-                                self.n_features - i - 1,
+                                actual_n_features - i - 1,
                             ),  # Slightly to the right of the plot
                             fontsize=5.5,
                             verticalalignment="center",
@@ -534,18 +537,67 @@ class AggregatedResultsVisualizer:
 
 def main():
     """Main function."""
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Visualize aggregated experiment results"
+    )
+    parser.add_argument(
+        "--input-dir",
+        type=str,
+        default=None,
+        help="Directory containing aggregated CSV files",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Output directory for visualization images",
+    )
+    parser.add_argument(
+        "--shap-data-dir",
+        type=str,
+        default=None,
+        help="Base directory containing SHAP results for experiments",
+    )
+    parser.add_argument(
+        "--n-features",
+        type=int,
+        default=20,
+        help="Number of top features to display (default: 20)",
+    )
+    parser.add_argument(
+        "--feature-importance-from",
+        type=str,
+        default="mean_importance_normalized",
+        help="Column to use for ranking features (default: mean_importance_normalized)",
+    )
+    args = parser.parse_args()
+
     # Get script directory
     script_dir = Path(__file__).parent
     project_root = script_dir.parent
 
-    # Set paths
-    input_dir = project_root / "results_aggregated"
-    output_dir = project_root / "results_visualizations"
-    shap_data_dir = project_root / "results"  # Base directory for SHAP data
+    # Set paths (use CLI args or defaults)
+    input_dir = (
+        Path(args.input_dir)
+        if args.input_dir
+        else project_root / "results_all" / "results_aggregated"
+    )
+    output_dir = (
+        Path(args.output_dir)
+        if args.output_dir
+        else project_root / "results_all" / "results_visualizations"
+    )
+    shap_data_dir = (
+        Path(args.shap_data_dir)
+        if args.shap_data_dir
+        else project_root / "results_all" / "results"
+    )
 
     # Configuration
-    n_features = 20  # Number of top features to display
-    feature_importance_from = "mean_importance_normalized"  # Column to use for ranking
+    n_features = args.n_features
+    feature_importance_from = args.feature_importance_from
 
     print("=" * 80)
     print("Aggregated Results Visualization Tool")
@@ -572,3 +624,11 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# python evaluator.py --datasets finagent --model qwen3_4b
+
+# python data_mining/code/main.py --dataset-type finagent --analysis-type all --exclude-features default
+
+# python data_mining/code/aggregator.py -r data_mining/results_finagent -o data_mining/results_finagent/results_aggregated
+
+# python data_mining/code/visualizer.py --input-dir data_mining/results_finagent/results_aggregated --output-dir data_mining/results_finagent/results_visualizations --shap-data-dir data_mining/results_finagent

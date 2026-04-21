@@ -5,6 +5,7 @@ Main Entry Point for Multi-Agent Entropy Data Mining Analysis
 Command-line interface for the DataMiningAnalyzer.
 Supports running full analysis, regression-only, or classification-only workflows.
 """
+
 import sys
 import argparse
 import logging
@@ -33,9 +34,17 @@ def main():
     parser.add_argument(
         "--analysis-type",
         type=str,
-        choices=["all", "regression", "classification"],
-        default="all",
-        help="Type of analysis to run: all (default), regression, or classification",
+        choices=[
+            "all",
+            "regression",
+            "classification",
+            "pca",
+            "feature_ablation",
+            "ablation_all",
+            "calibration",
+        ],
+        default="classification",
+        help="Type of analysis to run: all (default), regression, classification, pca, feature_ablation, ablation_all, or calibration",
     )
     parser.add_argument(
         "--merged-datasets",
@@ -67,58 +76,80 @@ def main():
     )
     parser.add_argument(
         "--skip-collection",
-        action="store_true",
+        default=False,
         help="Skip data collection step (use existing merged data)",
     )
     parser.add_argument(
         "--data-path",
         type=str,
-        default="data_mining/data/merged_datasets.csv",
+        default="data_mining/data/merged_datasets_qwen3_14b.csv",
         help="Path to merged data file (used when skip-collection is True)",
     )
     parser.add_argument(
         "--run-shap",
-        action="store_true",
         default=True,
         help="Run SHAP analysis (default: True)",
     )
     parser.add_argument(
         "--exclude-features",
         type=str,
-        default="default",
+        default="base_model_all_metrics",
         help="""Feature exclusion configuration. 
             Options:
             'all' - Use all features (no exclusions)
             'default' - Use default exclusions (recommended)
             Feature group name(s) - Specify groups from features.py (comma-separated)
             Available groups: 
-            base_model_metrics, unseen_features, experiment_identifier, sample_identifier, experiment_statistics, unseen_features, round_statistics, sample_statistics, sample_distribution_shape, sample_baseline_entropy, aggregation_over_agents, sample_round_wise_aggregated, cross_round_aggregated, intra_round_agent_distribution, cross_round_agent_spread_change, sample_round1_agent_statistics, sample_round2_agent_statistics
+                "base_model_wo_entropy": BASE_MODEL_WO_ENTROPY,
+                "base_model_all_metrics": BASE_MODEL_ALL_METRICS,
+                ...
             Examples:
                 --exclude-features 'all' (use all features)
                 --exclude-features 'default' (default exclusions)
-                --exclude-features 'base_model_metrics' (exclude base model metrics only)
+                --exclude-features 'base_model_all_metrics' (exclude base model metrics only)
                 --exclude-features 'base_model_metrics,experiment_identifier' (exclude multiple groups)
                 --exclude-features 'default+base_model_metrics' (combine default with additional exclusions)
         """,
     )
+    parser.add_argument(
+        "--dataset-type",
+        type=str,
+        default="standard",
+        choices=["standard", "finagent"],
+        help="dataset type: standard (gsm8k/humaneval etc.) or finagent",
+    )
     args = parser.parse_args()
 
-    # Handle the case where user specifies 'all' to collect all available datasets
-    if args.merged_datasets == ["all"]:
-        from data_collector import DataCollector
-
-        collector = DataCollector()
-        discovered_datasets = collector.discover_datasets()
-        logger.info(f"Auto-discovered datasets: {discovered_datasets}")
-        merged_datasets = discovered_datasets
+    # Determine paths based on dataset type
+    if args.dataset_type == "finagent":
+        base_dir = "evaluation/results_finagent"
+        output_dir = f"data_mining/results_finagent/{args.exclude_features}"
+        data_path = "data_mining/data/merged_datasets_finagent.csv"
+        # For finagent, dataset list only contains 'finagent'
+        merged_datasets = ["finagent"]
+        logger.info(
+            f"Using finagent mode: base_dir={base_dir}, output_dir={output_dir}"
+        )
     else:
-        # Filter out empty strings and handle default case
-        filtered_datasets = [
-            ds for ds in args.merged_datasets if ds
-        ]  # Remove empty strings
-        if not filtered_datasets:
-            filtered_datasets = ["aime2025"]  # Default to aime2025 if none provided
-        merged_datasets = filtered_datasets
+        base_dir = "evaluation/results_qwen3_14b"
+        output_dir = f"data_mining/results_qwen3_14b/{args.exclude_features}"
+        data_path = args.data_path
+        # Handle the case where user specifies 'all' to collect all available datasets
+        if args.merged_datasets == ["all"]:
+            from data_collector import DataCollector
+
+            collector = DataCollector(base_dir=base_dir)
+            discovered_datasets = collector.discover_datasets()
+            logger.info(f"Auto-discovered datasets: {discovered_datasets}")
+            merged_datasets = discovered_datasets
+        else:
+            # Filter out empty strings and handle default case
+            filtered_datasets = [
+                ds for ds in args.merged_datasets if ds
+            ]  # Remove empty strings
+            if not filtered_datasets:
+                filtered_datasets = ["gsm8k"]  # Default to aime2025 if none provided
+            merged_datasets = filtered_datasets
 
     # Process filter arguments
     model_names = None if args.model_name == ["all"] else args.model_name
@@ -128,6 +159,7 @@ def main():
     logger.info("=" * 80)
     logger.info("MULTI-AGENT ENTROPY DATA MINING ANALYSIS")
     logger.info("=" * 80)
+    logger.info(f"Dataset Type: {args.dataset_type}")
     logger.info(f"Analysis Type: {args.analysis_type}")
     logger.info(
         f"Merged Datasets (for collection): {', '.join(merged_datasets) if merged_datasets else 'None (will auto-discover)'}"
@@ -138,6 +170,20 @@ def main():
     logger.info(f"Filter - Datasets: {datasets if datasets else 'All'}")
     logger.info(f"Exclude Features: {args.exclude_features}")
 
+    # Check for incompatible combination: finagent + regression
+    if args.dataset_type == "finagent" and args.analysis_type in ["regression", "all"]:
+        if args.analysis_type == "regression":
+            logger.warning(
+                "Warning: Regression analysis is not supported for finagent dataset. "
+                "finagent uses evaluation_score as target which is not suitable for regression. "
+                "The regression analysis will be skipped."
+            )
+        elif args.analysis_type == "all":
+            logger.info(
+                "Note: For finagent dataset, regression analysis will be skipped. "
+                "Only classification analysis will be performed."
+            )
+
     try:
         # Determine target_dataset for output directory
         target_dataset = None
@@ -146,7 +192,9 @@ def main():
 
         # Initialize the analyzer with appropriate parameters
         analyzer = DataMiningAnalyzer(
-            data_path=args.data_path,
+            base_dir=base_dir,
+            data_path=data_path,
+            output_dir=output_dir,
             target_dataset=target_dataset,
             skip_collection=args.skip_collection,
             run_shap=args.run_shap,
@@ -154,6 +202,7 @@ def main():
             architectures=architectures,
             datasets=datasets,
             exclude_features=args.exclude_features,
+            dataset_type=args.dataset_type,
         )
 
         # Run the analysis based on the specified type
@@ -185,6 +234,30 @@ def main():
                 logger.info(
                     f"  {model_name}: Accuracy = {metrics['Accuracy']:.4f}, F1 = {metrics['F1']:.4f}"
                 )
+
+        if "pca" in results:
+            logger.info("\nPCA Analysis:")
+            if "optimal_components" in results["pca"]:
+                opt_comp = results["pca"]["optimal_components"]
+                if isinstance(opt_comp, dict) and "recommended_components" in opt_comp:
+                    logger.info(
+                        f"  Optimal components: {opt_comp['recommended_components']}"
+                    )
+                else:
+                    logger.info(f"  Optimal components: {opt_comp}")
+            if "comparison" in results["pca"]:
+                comp = results["pca"]["comparison"]
+                if "original" in comp and "pca" in comp:
+                    for model_name in comp["original"].keys():
+                        if model_name in comp["pca"]:
+                            logger.info(
+                                f"  {model_name}: Original Acc={comp['original'][model_name]['Accuracy']:.4f}, "
+                                f"PCA Acc={comp['pca'][model_name]['Accuracy']:.4f}"
+                            )
+
+        if "feature_ablation" in results:
+            logger.info("\nFeature Ablation Analysis:")
+            logger.info("  Feature ablation analysis completed. See detailed report.")
 
         logger.info("\nAnalysis reports saved to:")
         if isinstance(report_paths, list):

@@ -453,13 +453,42 @@ class ExperimentAggregator:
 
 def main():
     """Main function."""
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Aggregate experimental results from classification and SHAP directories"
+    )
+    parser.add_argument(
+        "-r",
+        "--results-dir",
+        type=str,
+        default=None,
+        help="Directory containing experiment results (with classification/ and shap/ subdirs)",
+    )
+    parser.add_argument(
+        "-o",
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Output directory for aggregated CSV files",
+    )
+    args = parser.parse_args()
+
     # Get script directory
     script_dir = Path(__file__).parent
     project_root = script_dir.parent
 
-    # Set paths
-    results_dir = project_root / "results"
-    output_dir = project_root / "results_aggregated"
+    # Set paths (use CLI args or defaults)
+    results_dir = (
+        Path(args.results_dir)
+        if args.results_dir
+        else project_root / "results_finagent"
+    )
+    output_dir = (
+        Path(args.output_dir)
+        if args.output_dir
+        else project_root / "results_aggregated"
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print("=" * 80)

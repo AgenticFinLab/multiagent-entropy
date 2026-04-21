@@ -16,11 +16,20 @@ EXPERIMENT_METRICS = [
     "exp_num_inferences",
     "exp_accuracy",
     "exp_format_compliance_rate",
+    "exp_total_time",
 ]
 
 # Exclude identifiers and statistics that would leak target information
 # ALL experiment will exclude this feature group
-DEFAULT_EXCLUDE_COLUMNS = EXPERIMENT_IDENTIFIER + SAMPLE_IDENTIFIER + EXPERIMENT_METRICS
+# Note: evaluation_score is also excluded as it should not be used as input feature
+DEFAULT_EXCLUDE_COLUMNS = (
+    EXPERIMENT_IDENTIFIER
+    + SAMPLE_IDENTIFIER
+    + EXPERIMENT_METRICS
+    + [
+        "evaluation_score",  # FinAgent evaluation score, should be excluded from input features
+    ]
+)
 
 # Base model metrics
 BASE_MODEL_METRICS_EXPERIMENT_LEVEL = [
@@ -341,6 +350,20 @@ SAMPLE_ROUND2_AGENT_STATISTICS = [
     "sample_round_2_variance_agent_variance_entropy",
 ]
 
+# FinAgent 特有特征
+FINAGENT_EVALUATION_FEATURES = [
+    "evaluation_score",
+]
+
+FINAGENT_STEP_ENTROPY_FEATURES = [
+    "num_steps",
+    "entropy_decay_rate",
+    "first_step_mean_entropy",
+    "last_step_mean_entropy",
+]
+# 注意：step_N_mean_entropy (N=0,1,2,...) 是动态字段，数量随样本变化，
+# 不在静态列表中定义，由运行时从数据中自动发现
+
 # All features combined
 ALL_FEATURES = (
     DEFAULT_EXCLUDE_COLUMNS
@@ -380,4 +403,22 @@ FEATURE_GROUPS = {
     "sample_round1_agent_statistics": SAMPLE_ROUND1_AGENT_STATISTICS,
     "sample_round2_agent_statistics": SAMPLE_ROUND2_AGENT_STATISTICS,
     "all_features": ALL_FEATURES,
+    "finagent_evaluation": FINAGENT_EVALUATION_FEATURES,
+    "finagent_step_entropy": FINAGENT_STEP_ENTROPY_FEATURES,
 }
+
+
+def discover_step_entropy_features(df_columns):
+    """从 DataFrame 列名中发现动态的 step_N_mean_entropy 特征。
+
+    Args:
+        df_columns: DataFrame 的列名列表或 Index
+
+    Returns:
+        list: 按步骤顺序排列的 step_N_mean_entropy 列名列表
+    """
+    import re
+
+    step_cols = [c for c in df_columns if re.match(r"^step_\d+_mean_entropy$", c)]
+    step_cols.sort(key=lambda x: int(re.search(r"step_(\d+)_", x).group(1)))
+    return step_cols

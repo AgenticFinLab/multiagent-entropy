@@ -9,6 +9,7 @@ Delegates to specialized analyzers while maintaining backward compatibility.
 """
 
 import logging
+import os
 import warnings
 from pathlib import Path
 from typing import List, Optional
@@ -24,6 +25,15 @@ from utils import (
 from shap_analyzer import ShapAnalyzer
 from regression_analyzer import RegressionAnalyzer
 from classification_analyzer import ClassificationAnalyzer
+from pca_analyzer import PCAAnalysis
+from feature_ablation_analyzer import FeatureAblationAnalyzer
+from calibration_analyzer import CalibrationAnalyzer
+
+from features import (
+    FINAGENT_EVALUATION_FEATURES,
+    FINAGENT_STEP_ENTROPY_FEATURES,
+    discover_step_entropy_features,
+)
 
 warnings.filterwarnings("ignore")
 
@@ -43,6 +53,7 @@ class DataMiningAnalyzer:
 
     def __init__(
         self,
+        base_dir: str = None,
         data_path: str = None,
         output_dir: str = None,
         target_dataset: str = None,
@@ -52,6 +63,7 @@ class DataMiningAnalyzer:
         architectures: List[str] = None,
         datasets: List[str] = None,
         exclude_features: str = "default",
+        dataset_type: str = "standard",
     ):
         """
         Initialize the DataMiningAnalyzer.
@@ -66,14 +78,22 @@ class DataMiningAnalyzer:
             architectures: List of architectures to filter (None or ['all'] for all)
             datasets: List of datasets to filter (None or ['all'] for all)
             exclude_features: Feature exclusion configuration ('all', 'default', or feature group names)
+            dataset_type: Type of dataset ('standard' or 'finagent')
         """
+        self.dataset_type = dataset_type
         if data_path is None:
             data_path = get_default_data_path()
 
-        # Determine output directory based on target_dataset and filters
+        # Determine output directory based on target_dataset, filters, and dataset_type
         if output_dir is None:
+            # Use appropriate base directory based on dataset_type
+            base_results_dir = (
+                "data_mining/results_finagent"
+                if dataset_type == "finagent"
+                else "data_mining/results"
+            )
             base_output_dir = determine_output_directory(
-                "data_mining/results", target_dataset
+                base_results_dir, target_dataset, dataset_type=dataset_type
             )
             # Add filter suffix to output directory
             filter_suffix = generate_filter_suffix(
@@ -99,6 +119,7 @@ class DataMiningAnalyzer:
             else:
                 output_dir = base_output_dir
 
+        self.base_dir = base_dir
         self.data_path = Path(data_path)
         self.output_dir = Path(output_dir)
         self.target_dataset = target_dataset
@@ -109,6 +130,16 @@ class DataMiningAnalyzer:
         self.exclude_features = exclude_features
         self.results = {}
         self.run_shap = run_shap
+
+        # Store finagent-specific features if applicable
+        self.finagent_features = []
+        if dataset_type == "finagent":
+            self.finagent_features = (
+                FINAGENT_EVALUATION_FEATURES + FINAGENT_STEP_ENTROPY_FEATURES
+            )
+            logger.info(
+                f"Finagent mode: Added {len(self.finagent_features)} finagent-specific features"
+            )
 
         # Create output directory if it doesn't exist
         create_output_directory(self.output_dir)
@@ -127,6 +158,26 @@ class DataMiningAnalyzer:
         self.classification_analyzer = ClassificationAnalyzer(
             data_path=str(self.data_path),
             output_dir=str(self.output_dir / "classification"),
+            target_dataset=target_dataset,
+            model_names=model_names,
+            architectures=architectures,
+            datasets=datasets,
+            exclude_features=exclude_features,
+        )
+
+        self.pca_analyzer_instance = PCAAnalysis(
+            data_path=str(self.data_path),
+            output_dir=str(self.output_dir / "pca"),
+            target_dataset=target_dataset,
+            model_names=model_names,
+            architectures=architectures,
+            datasets=datasets,
+            exclude_features=exclude_features,
+        )
+
+        self.feature_ablation_analyzer = FeatureAblationAnalyzer(
+            data_path=str(self.data_path),
+            output_dir=str(self.output_dir / "feature_ablation"),
             target_dataset=target_dataset,
             model_names=model_names,
             architectures=architectures,
@@ -231,6 +282,37 @@ class DataMiningAnalyzer:
         logger.info("SHAP analysis completed.")
 
         return self.results["shap"]
+
+    def run_pca_analysis(self):
+        """
+        Perform PCA analysis on classification features.
+        Delegates to PCAAnalysis.
+        """
+        pca_results, _ = self.pca_analyzer_instance.run_full_pipeline()
+        self.results["pca"] = pca_results
+        return self.results["pca"]
+
+    def run_feature_ablation_analysis(self):
+        """
+        Perform feature ablation analysis on classification features.
+        Delegates to FeatureAblationAnalyzer.
+        """
+        ablation_results, _ = self.feature_ablation_analyzer.run_full_pipeline()
+        self.results["feature_ablation"] = ablation_results
+        return self.results["feature_ablation"]
+
+    def run_calibration_analysis(self):
+        """Run model calibration analysis (ECE, reliability diagrams, quadrant analysis)."""
+        logger.info("Running calibration analysis...")
+        output_dir = os.path.join(self.output_dir, "calibration")
+        analyzer = CalibrationAnalyzer(
+            data_path=self.data_path,
+            output_dir=output_dir,
+            n_bins=10,
+            entropy_metrics=["sample_mean_entropy", "sample_mean_answer_token_entropy"],
+        )
+        analyzer.run()
+        logger.info("Calibration analysis complete.")
 
     def generate_report(self):
         """
@@ -359,6 +441,63 @@ class DataMiningAnalyzer:
                             f"  Dependence Plots: {len(shap_result['plots_info']['dependence_plots'])} plots\n\n"
                         )
 
+            # PCA Analysis results
+            if "pca" in self.results:
+                f.write("\n" + "=" * 80 + "\n")
+                f.write("PCA ANALYSIS RESULTS\n")
+                f.write("-" * 80 + "\n\n")
+                pca_res = self.results["pca"]
+                if "optimal_components" in pca_res:
+                    opt_comp = pca_res["optimal_components"]
+                    if (
+                        isinstance(opt_comp, dict)
+                        and "recommended_components" in opt_comp
+                    ):
+                        f.write(
+                            f"Optimal number of components: {opt_comp['recommended_components']}\n\n"
+                        )
+                    else:
+                        f.write(f"Optimal number of components: {opt_comp}\n\n")
+                if "comparison" in pca_res:
+                    f.write("Original vs PCA Performance Comparison:\n")
+                    comp = pca_res["comparison"]
+                    if "original" in comp and "pca" in comp:
+                        for model_name in comp["original"].keys():
+                            if model_name in comp["pca"]:
+                                f.write(f"  {model_name}:\n")
+                                f.write(
+                                    f"    Original Accuracy: {comp['original'][model_name]['Accuracy']:.6f}\n"
+                                )
+                                f.write(
+                                    f"    PCA Accuracy: {comp['pca'][model_name]['Accuracy']:.6f}\n"
+                                )
+                                f.write(
+                                    f"    Original F1: {comp['original'][model_name]['F1']:.6f}\n"
+                                )
+                                f.write(
+                                    f"    PCA F1: {comp['pca'][model_name]['F1']:.6f}\n\n"
+                                )
+                f.write(
+                    f"  Detailed report: {self.output_dir / 'pca' / 'pca_analysis_report.txt'}\n\n"
+                )
+
+            # Feature Ablation results
+            if "feature_ablation" in self.results:
+                f.write("\n" + "=" * 80 + "\n")
+                f.write("FEATURE ABLATION ANALYSIS RESULTS\n")
+                f.write("-" * 80 + "\n\n")
+                abl_res = self.results["feature_ablation"]
+                if "feature_rankings" in abl_res:
+                    f.write("Top 10 Features (Combined Ranking):\n")
+                    ranking = abl_res["feature_rankings"]
+                    if hasattr(ranking, "head"):
+                        for idx, row in ranking.head(10).iterrows():
+                            f.write(f"  {row['Feature']}: {row['Avg_Rank']:.6f}\n")
+                    f.write("\n")
+                f.write(
+                    f"  Detailed report: {self.output_dir / 'feature_ablation' / 'feature_ablation_report.txt'}\n\n"
+                )
+
         logger.info(f"Unified analysis report saved: {report_path}")
 
         return report_path
@@ -377,7 +516,11 @@ class DataMiningAnalyzer:
         logger.info("[STEP 1] Data Collection and Merging")
         logger.info("-" * 80)
 
-        collector = DataCollector(target_datasets=target_datasets)
+        collector = DataCollector(
+            base_dir=self.base_dir,
+            target_datasets=target_datasets,
+            dataset_type=self.dataset_type,
+        )
 
         # Discover datasets
         datasets = collector.discover_datasets()
@@ -429,16 +572,47 @@ class DataMiningAnalyzer:
         # Run analysis based on type
         if analysis_type == "all":
             # Run experiment-level analysis (regression)
-            self.run_experiment_level_analysis()
+            # Skip regression for finagent dataset as it doesn't need regression analysis
+            if self.dataset_type == "finagent":
+                logger.info(
+                    "Skipping regression analysis for finagent dataset: "
+                    "finagent uses evaluation_score as target which is not suitable for regression."
+                )
+            else:
+                self.run_experiment_level_analysis()
 
             # Run sample-level analysis (classification)
             self.run_sample_level_analysis()
 
         elif analysis_type == "regression":
-            self.run_experiment_level_analysis()
+            # Skip regression for finagent dataset
+            if self.dataset_type == "finagent":
+                logger.warning(
+                    "Regression analysis is not supported for finagent dataset. "
+                    "Skipping regression analysis."
+                )
+            else:
+                self.run_experiment_level_analysis()
 
         elif analysis_type == "classification":
             self.run_sample_level_analysis()
+
+        elif analysis_type == "pca":
+            self.run_pca_analysis()
+
+        elif analysis_type == "feature_ablation":
+            self.run_feature_ablation_analysis()
+
+        elif analysis_type == "ablation_all":
+            self.run_pca_analysis()
+            self.run_feature_ablation_analysis()
+
+        elif analysis_type == "calibration":
+            self.run_calibration_analysis()
+
+        # For 'all', also run calibration analysis
+        if analysis_type == "all":
+            self.run_calibration_analysis()
 
         # Run SHAP analysis if requested and available
         if (
@@ -447,13 +621,15 @@ class DataMiningAnalyzer:
             and self.shap_analyzer is not None
         ):
             # Determine which SHAP analyses to run based on what was run above
-            include_regression = analysis_type in ["all", "regression"]
-            include_classification = analysis_type in ["all", "classification"]
+            # Only run SHAP for all/regression/classification, not for pca/feature_ablation/ablation_all
+            if analysis_type in ["all", "regression", "classification"]:
+                include_regression = analysis_type in ["all", "regression"]
+                include_classification = analysis_type in ["all", "classification"]
 
-            self.run_shap_analysis(
-                include_regression=include_regression,
-                include_classification=include_classification,
-            )
+                self.run_shap_analysis(
+                    include_regression=include_regression,
+                    include_classification=include_classification,
+                )
 
         # Generate unified report
         report_path = self.generate_report()

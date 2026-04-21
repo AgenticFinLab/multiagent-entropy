@@ -168,29 +168,54 @@ def split_data(
 
 
 def determine_output_directory(
-    base_output_dir: str, target_dataset: Optional[str] = None, analyzer_type: str = ""
+    base_output_dir: str,
+    target_dataset: Optional[str] = None,
+    analyzer_type: str = "",
+    dataset_type: str = "standard",
 ) -> str:
     """
-    Determine output directory based on target dataset.
+    Determine output directory based on target dataset and dataset type.
 
     Args:
         base_output_dir: Base output directory
         target_dataset: Target dataset name
         analyzer_type: Type of analyzer (e.g., 'regression', 'classification', 'shap')
+        dataset_type: Type of dataset ('standard' or 'finagent')
 
     Returns:
         Determined output directory path
     """
+    import os
+
+    # Adjust base output directory based on dataset_type
+    if dataset_type == "finagent":
+        # Replace 'data_mining/results' with 'data_mining/results_finagent'
+        if base_output_dir.startswith(
+            "data_mining/results"
+        ) and not base_output_dir.startswith("data_mining/results_finagent"):
+            base_output_dir = base_output_dir.replace(
+                "data_mining/results", "data_mining/results_finagent", 1
+            )
+        elif not base_output_dir.startswith("data_mining/results"):
+            # For custom paths, append _finagent suffix
+            base_output_dir = f"{base_output_dir}_finagent"
+
+    # Build the output directory path
     if target_dataset:
         if analyzer_type:
-            return f"{base_output_dir}/{target_dataset}/{analyzer_type}"
+            output_dir = f"{base_output_dir}/{target_dataset}/{analyzer_type}"
         else:
-            return f"{base_output_dir}/{target_dataset}"
+            output_dir = f"{base_output_dir}/{target_dataset}"
     else:
         if analyzer_type:
-            return f"{base_output_dir}/{analyzer_type}"
+            output_dir = f"{base_output_dir}/{analyzer_type}"
         else:
-            return base_output_dir
+            output_dir = base_output_dir
+
+    # Ensure directory exists
+    os.makedirs(output_dir, exist_ok=True)
+
+    return output_dir
 
 
 def get_default_data_path() -> str:
