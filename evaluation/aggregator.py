@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, Any, List
 from collections import defaultdict
 
-from feature_enhancer import FeatureEnhancer
+from .feature_enhancer import FeatureEnhancer
 
 
 class Aggregator:
@@ -482,6 +482,37 @@ class Aggregator:
 
                 # Get base model statistics for comparison
                 model_base_stats = base_model_stats.get(model_name, {})
+
+                # Experiment-level tool-call aggregation
+                exp_tool_total_calls = 0
+                exp_tool_success_count = 0
+                exp_tool_effective_count = 0
+                exp_tool_call_entropy_values = []
+                for _, sample_entropy in samples_entropy.items():
+                    for agent_key, agent_entropy_data in sample_entropy.get(
+                        "agents", {}
+                    ).items():
+                        agent_type_check = agent_entropy_data.get(
+                            "agent_type", agent_key.split("_")[0]
+                        )
+                        if (
+                            architecture == "debate"
+                            and agent_type_check == "orchestrator"
+                        ):
+                            continue
+                        dynamics = agent_entropy_data.get("step_entropy_dynamics")
+                        if dynamics:
+                            exp_tool_total_calls += dynamics.get("tool_total_calls", 0)
+                            exp_tool_success_count += dynamics.get(
+                                "tool_success_count", 0
+                            )
+                            exp_tool_effective_count += dynamics.get(
+                                "tool_effective_count", 0
+                            )
+                            me = dynamics.get("tool_call_mean_entropy")
+                            if me is not None:
+                                exp_tool_call_entropy_values.append(me)
+
                 # Build comprehensive experiment statistics record
                 exp_stats[exp_name] = {
                     "exp_total_entropy": exp_level.get("total_entropy", 0),
@@ -496,6 +527,27 @@ class Aggregator:
                     "base_model_accuracy": model_base_stats.get("accuracy", 0),
                     "base_model_format_compliance_rate": model_base_stats.get(
                         "format_compliance_rate", 0
+                    ),
+                    "exp_tool_total_calls": exp_tool_total_calls,
+                    "exp_tool_success_count": exp_tool_success_count,
+                    "exp_tool_effective_count": exp_tool_effective_count,
+                    "exp_tool_success_rate": (
+                        exp_tool_success_count / exp_tool_total_calls
+                        if exp_tool_total_calls > 0
+                        else 0.0
+                    ),
+                    "exp_tool_effective_rate": (
+                        exp_tool_effective_count / exp_tool_total_calls
+                        if exp_tool_total_calls > 0
+                        else 0.0
+                    ),
+                    "exp_tool_call_mean_entropy": (
+                        float(
+                            sum(exp_tool_call_entropy_values)
+                            / len(exp_tool_call_entropy_values)
+                        )
+                        if exp_tool_call_entropy_values
+                        else None
                     ),
                 }
 

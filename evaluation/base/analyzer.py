@@ -8,7 +8,7 @@ and `temperature_ablation_evaluator._remove_response_fields`.
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from utils import save_json
+from ..utils import save_json
 
 
 class BaseAnalyzer:
@@ -20,7 +20,8 @@ class BaseAnalyzer:
             # Lazy import to avoid a hard cycle: BaseAnalyzer is imported by
             # `evaluation.base.__init__`, while the concrete `DataLoader` lives
             # one level up and pulls `BaseDataLoader` from this package.
-            from data_loader import DataLoader
+            from ..data_loader import DataLoader
+
             data_loader = DataLoader(str(base_path))
         self.data_loader = data_loader
 

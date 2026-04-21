@@ -13,13 +13,13 @@ import torch
 import numpy as np
 from transformers import AutoTokenizer
 
-from base.analyzer import BaseAnalyzer
-from base.architecture import (
+from .base.analyzer import BaseAnalyzer
+from .base.architecture import (
     get_round_number as _arch_get_round_number,
     get_final_result_id_from_entropy,
 )
-from utils import save_json
-from metrics_calculator import MetricsCalculator
+from .utils import save_json
+from .metrics_calculator import MetricsCalculator
 
 
 class EntropyStatistic(BaseAnalyzer):
@@ -601,7 +601,7 @@ class EntropyStatistic(BaseAnalyzer):
                         (first_mean - last_mean) / num_steps if num_steps > 1 else 0.0
                     )
 
-                    stats["agents"][agent_key]["step_entropy_dynamics"] = {
+                    dynamics = {
                         "num_steps": num_steps,
                         "entropy_decay_rate": entropy_decay_rate,
                         "first_step_mean_entropy": first_mean,
@@ -610,6 +610,60 @@ class EntropyStatistic(BaseAnalyzer):
                             s["mean_entropy"] for s in step_entropy_list
                         ],
                     }
+
+                    # Tool-call entropy and statistics (for ReAct steps with tool calls)
+                    react_steps_raw = None
+                    if all_results and result_id in all_results:
+                        extras = all_results[result_id].get("extras", {}) or {}
+                        react_steps_raw = extras.get("react_steps")
+
+                    if react_steps_raw:
+                        # --- agent-level tool-call statistics ---
+                        tool_stats = self._parse_tool_call_result_stats(react_steps_raw)
+                        dynamics.update(tool_stats)
+
+                        # --- per-step and aggregate tool-call entropy ---
+                        all_tool_entropy_values = []
+                        step_tensor_map = {idx: t for idx, t in all_step_tensors}
+                        for step_data in react_steps_raw:
+                            step_idx = step_data.get("step_index", 0)
+                            if step_data.get("tool_calls") is None:
+                                continue
+                            step_tensor = step_tensor_map.get(step_idx)
+                            if step_tensor is None:
+                                continue
+                            response_text = step_data.get("response", "")
+                            tc_entropy = self._extract_tool_call_token_entropy(
+                                response_text, step_tensor, tokenizer
+                            )
+                            if tc_entropy is not None:
+                                dynamics[f"step_{step_idx}_tool_call_mean_entropy"] = (
+                                    tc_entropy["mean"]
+                                )
+                                dynamics[f"step_{step_idx}_tool_call_token_count"] = (
+                                    tc_entropy["token_count"]
+                                )
+                                all_tool_entropy_values.extend(tc_entropy["values"])
+
+                        # aggregate across all tool-call steps
+                        dynamics["tool_call_steps_count"] = tool_stats.get(
+                            "tool_total_calls", 0
+                        )
+                        if all_tool_entropy_values:
+                            arr = np.array(all_tool_entropy_values)
+                            dynamics["tool_call_mean_entropy"] = float(np.mean(arr))
+                            dynamics["tool_call_max_entropy"] = float(np.max(arr))
+                            dynamics["tool_call_min_entropy"] = float(np.min(arr))
+                            dynamics["tool_call_std_entropy"] = float(np.std(arr))
+                            dynamics["tool_call_median_entropy"] = float(np.median(arr))
+                        else:
+                            dynamics["tool_call_mean_entropy"] = None
+                            dynamics["tool_call_max_entropy"] = None
+                            dynamics["tool_call_min_entropy"] = None
+                            dynamics["tool_call_std_entropy"] = None
+                            dynamics["tool_call_median_entropy"] = None
+
+                    stats["agents"][agent_key]["step_entropy_dynamics"] = dynamics
 
         # Convert defaultdict to regular dict for JSON serialization
         micro_stats["samples"] = dict(micro_stats["samples"])
@@ -727,6 +781,195 @@ class EntropyStatistic(BaseAnalyzer):
     ) -> Optional[str]:
         """Return the result_id of the final agent (delegates to base.architecture)."""
         return get_final_result_id_from_entropy(agents_data, agent_architecture)
+
+    def _extract_tool_call_token_entropy(
+        self,
+        response: str,
+        step_tensor: Any,
+        tokenizer: Any,
+    ) -> Optional[Dict[str, Any]]:
+        """Extract entropy statistics for tokens in the tool-call decision span.
+
+        Identifies the 'Action: ... Action Input: {...}' span in the response and
+        returns entropy stats for those tokens from the step entropy tensor.
+
+        Returns None if no tool-call span is found or tokenizer is unavailable.
+        """
+        if tokenizer is None or not response:
+            return None
+
+        # Find 'Action:' start position
+        action_match = re.search(r"Action\s*:", response)
+        if not action_match:
+            return None
+        start_char = action_match.start()
+
+        # Find 'Action Input:' and then the end of the JSON block following it
+        action_input_match = re.search(r"Action Input\s*:", response[start_char:])
+        if not action_input_match:
+            return None
+        json_start = start_char + action_input_match.end()
+
+        # Use bracket counting to find the closing '}' of the JSON
+        depth = 0
+        end_char = None
+        in_string = False
+        escape_next = False
+        for i in range(json_start, len(response)):
+            ch = response[i]
+            if escape_next:
+                escape_next = False
+                continue
+            if ch == "\\":
+                escape_next = True
+                continue
+            if ch == '"' and not escape_next:
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    end_char = i + 1
+                    break
+
+        if end_char is None:
+            # Fall back to end of line after Action Input
+            newline = response.find("\n", json_start)
+            end_char = newline if newline != -1 else len(response)
+
+        try:
+            encoding = tokenizer(
+                response,
+                return_offsets_mapping=True,
+                add_special_tokens=False,
+            )
+            offsets = encoding["offset_mapping"]
+        except Exception:
+            return None
+
+        if isinstance(step_tensor, torch.Tensor):
+            entropy_array = step_tensor.cpu().numpy()
+        else:
+            entropy_array = np.array(step_tensor)
+
+        # Collect token indices that overlap [start_char, end_char)
+        token_indices = [
+            i
+            for i, (tok_s, tok_e) in enumerate(offsets)
+            if i < len(entropy_array) and tok_e > start_char and tok_s < end_char
+        ]
+        if not token_indices:
+            return None
+
+        values = [float(entropy_array[i]) for i in token_indices]
+        return {
+            "mean": float(np.mean(values)),
+            "max": float(np.max(values)),
+            "min": float(np.min(values)),
+            "std": float(np.std(values)),
+            "median": float(np.median(values)),
+            "token_count": len(values),
+            "values": values,
+        }
+
+    @staticmethod
+    def _parse_tool_call_result_stats(react_steps_list: List[Dict]) -> Dict[str, Any]:
+        """Parse tool-call statistics from a list of react step dicts.
+
+        A call is 'successful' if tool_result JSON has success=true.
+        A call is 'effective' if successful AND the result value contains no error
+        indicators (traceback, error, exception, stderr, nameerror, typeerror).
+        """
+        ERROR_INDICATORS = (
+            "traceback",
+            "error",
+            "exception",
+            "stderr",
+            "nameerror",
+            "typeerror",
+        )
+        total_calls = 0
+        success_count = 0
+        effective_count = 0
+        tool_names = set()
+
+        for step in react_steps_list:
+            tc = step.get("tool_calls")
+            if tc is None:
+                continue
+            total_calls += 1
+            tool_name = tc.get("tool_name", "")
+            if tool_name:
+                tool_names.add(tool_name)
+
+            tool_result_str = tc.get("tool_result", "") or ""
+            # Extract JSON payload after "Observation: [tool_name] "
+            json_start = tool_result_str.find("{")
+            if json_start == -1:
+                continue
+            try:
+                import json as _json
+
+                payload = _json.loads(tool_result_str[json_start:].rstrip())
+            except Exception:
+                # Try to find the first complete JSON object
+                depth = 0
+                end = None
+                in_str = False
+                esc = False
+                for i in range(json_start, len(tool_result_str)):
+                    c = tool_result_str[i]
+                    if esc:
+                        esc = False
+                        continue
+                    if c == "\\":
+                        esc = True
+                        continue
+                    if c == '"' and not esc:
+                        in_str = not in_str
+                        continue
+                    if in_str:
+                        continue
+                    if c == "{":
+                        depth += 1
+                    elif c == "}":
+                        depth -= 1
+                        if depth == 0:
+                            end = i + 1
+                            break
+                if end is None:
+                    continue
+                try:
+                    import json as _json
+
+                    payload = _json.loads(tool_result_str[json_start:end])
+                except Exception:
+                    continue
+
+            if not payload.get("success", False):
+                continue
+            success_count += 1
+
+            result_val = str(payload.get("result", "")).lower()
+            if not any(ind in result_val for ind in ERROR_INDICATORS):
+                effective_count += 1
+
+        return {
+            "tool_total_calls": total_calls,
+            "tool_success_count": success_count,
+            "tool_effective_count": effective_count,
+            "tool_success_rate": (
+                success_count / total_calls if total_calls > 0 else 0.0
+            ),
+            "tool_effective_rate": (
+                effective_count / total_calls if total_calls > 0 else 0.0
+            ),
+            "tool_unique_tools_count": len(tool_names),
+        }
 
     def _get_answer_token_entropy(
         self,

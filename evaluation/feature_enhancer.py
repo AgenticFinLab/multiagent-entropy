@@ -600,6 +600,22 @@ class FeatureEnhancer:
                     sample_round_total_tokens: Dict[int, int] = defaultdict(int)
                     sample_round_total_entropy: Dict[int, float] = defaultdict(float)
 
+                    # Sample-level tool-call accumulators
+                    sample_tool_total_calls = 0
+                    sample_tool_success_count = 0
+                    sample_tool_effective_count = 0
+                    sample_tool_call_entropy_values: List[float] = []
+                    sample_tool_call_steps_count = 0
+                    # Round-level tool-call accumulators: round_num → {field: list}
+                    round_tool_data: Dict[int, Dict[str, Any]] = defaultdict(
+                        lambda: {
+                            "total_calls": 0,
+                            "success_count": 0,
+                            "effective_count": 0,
+                            "mean_entropy_values": [],
+                        }
+                    )
+
                     for agent_key, agent_entropy_data in sample_entropy.get(
                         "agents", {}
                     ).items():
@@ -640,6 +656,27 @@ class FeatureEnhancer:
                                 round_agent_entropy_data[round_number][
                                     entropy_type
                                 ].append(value)
+
+                        # Accumulate tool-call stats across agents (sample & round level)
+                        agent_dynamics = agent_entropy_data.get("step_entropy_dynamics")
+                        if agent_dynamics:
+                            tc = agent_dynamics.get("tool_total_calls", 0)
+                            sc = agent_dynamics.get("tool_success_count", 0)
+                            ec = agent_dynamics.get("tool_effective_count", 0)
+                            me = agent_dynamics.get("tool_call_mean_entropy")
+                            steps = agent_dynamics.get("tool_call_steps_count", 0)
+                            sample_tool_total_calls += tc
+                            sample_tool_success_count += sc
+                            sample_tool_effective_count += ec
+                            sample_tool_call_steps_count += steps
+                            if me is not None:
+                                sample_tool_call_entropy_values.append(me)
+                            if round_number > 0:
+                                round_tool_data[round_number]["total_calls"] += tc
+                                round_tool_data[round_number]["success_count"] += sc
+                                round_tool_data[round_number]["effective_count"] += ec
+                                if me is not None:
+                                    round_tool_data[round_number]["mean_entropy_values"].append(me)
 
                     # Calculate round-based statistics
                     round_statistics: Dict[str, Any] = {}
@@ -1005,6 +1042,50 @@ class FeatureEnhancer:
                     shared_sample_features.update(sample_shape_features)
                     shared_sample_features.update(sample_base_entropy_features)
 
+                    # Sample-level tool-call aggregated features
+                    shared_sample_features["sample_tool_total_calls"] = sample_tool_total_calls
+                    shared_sample_features["sample_tool_success_count"] = sample_tool_success_count
+                    shared_sample_features["sample_tool_effective_count"] = sample_tool_effective_count
+                    shared_sample_features["sample_tool_success_rate"] = (
+                        sample_tool_success_count / sample_tool_total_calls
+                        if sample_tool_total_calls > 0
+                        else 0.0
+                    )
+                    shared_sample_features["sample_tool_effective_rate"] = (
+                        sample_tool_effective_count / sample_tool_total_calls
+                        if sample_tool_total_calls > 0
+                        else 0.0
+                    )
+                    shared_sample_features["sample_tool_call_steps_count"] = sample_tool_call_steps_count
+                    if sample_tool_call_entropy_values:
+                        _arr = np.array(sample_tool_call_entropy_values)
+                        shared_sample_features["sample_tool_call_mean_entropy"] = float(np.mean(_arr))
+                        shared_sample_features["sample_tool_call_max_entropy"] = float(np.max(_arr))
+                        shared_sample_features["sample_tool_call_min_entropy"] = float(np.min(_arr))
+                    else:
+                        shared_sample_features["sample_tool_call_mean_entropy"] = None
+                        shared_sample_features["sample_tool_call_max_entropy"] = None
+                        shared_sample_features["sample_tool_call_min_entropy"] = None
+
+                    # Round-level tool-call features
+                    for round_num, rtd in round_tool_data.items():
+                        tc_r = rtd["total_calls"]
+                        sc_r = rtd["success_count"]
+                        ec_r = rtd["effective_count"]
+                        me_vals = rtd["mean_entropy_values"]
+                        shared_sample_features[f"round_{round_num}_tool_total_calls"] = tc_r
+                        shared_sample_features[f"round_{round_num}_tool_success_count"] = sc_r
+                        shared_sample_features[f"round_{round_num}_tool_effective_count"] = ec_r
+                        shared_sample_features[f"round_{round_num}_tool_success_rate"] = (
+                            sc_r / tc_r if tc_r > 0 else 0.0
+                        )
+                        shared_sample_features[f"round_{round_num}_tool_effective_rate"] = (
+                            ec_r / tc_r if tc_r > 0 else 0.0
+                        )
+                        shared_sample_features[f"round_{round_num}_tool_call_mean_entropy"] = (
+                            float(np.mean(me_vals)) if me_vals else None
+                        )
+
                     # Process each agent within the sample
                     for agent_key, agent_metrics in sample_metrics.get(
                         "agents", {}
@@ -1122,6 +1203,31 @@ class FeatureEnhancer:
                                 step_means[:10]
                             ):  # Store at most first 10 steps
                                 record[f"step_{i}_mean_entropy"] = sm
+
+                            # Agent-level tool-call statistics
+                            record["tool_total_calls"] = dynamics.get("tool_total_calls", 0)
+                            record["tool_success_count"] = dynamics.get("tool_success_count", 0)
+                            record["tool_effective_count"] = dynamics.get("tool_effective_count", 0)
+                            record["tool_success_rate"] = dynamics.get("tool_success_rate", 0.0)
+                            record["tool_effective_rate"] = dynamics.get("tool_effective_rate", 0.0)
+                            record["tool_unique_tools_count"] = dynamics.get("tool_unique_tools_count", 0)
+
+                            # Agent-level tool-call entropy
+                            record["tool_call_steps_count"] = dynamics.get("tool_call_steps_count", 0)
+                            record["tool_call_mean_entropy"] = dynamics.get("tool_call_mean_entropy")
+                            record["tool_call_max_entropy"] = dynamics.get("tool_call_max_entropy")
+                            record["tool_call_min_entropy"] = dynamics.get("tool_call_min_entropy")
+                            record["tool_call_std_entropy"] = dynamics.get("tool_call_std_entropy")
+                            record["tool_call_median_entropy"] = dynamics.get("tool_call_median_entropy")
+
+                            # Per-step tool-call entropy (first 10 steps)
+                            for i in range(10):
+                                record[f"step_{i}_tool_call_mean_entropy"] = dynamics.get(
+                                    f"step_{i}_tool_call_mean_entropy"
+                                )
+                                record[f"step_{i}_tool_call_token_count"] = dynamics.get(
+                                    f"step_{i}_tool_call_token_count"
+                                )
 
                         # Calculate derived features with numerical stability
                         sample_mean_entropy_local = sample_mean_entropy

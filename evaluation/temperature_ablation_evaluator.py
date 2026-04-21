@@ -15,10 +15,10 @@ from pathlib import Path
 from collections import defaultdict
 from typing import Dict, List, Any
 
-from base.evaluator import BaseEvaluator
-from experiment_analyzer import ExperimentAnalyzer
-from entropy_statistic import EntropyStatistic
-from temperature_ablation_data_loader import TempDataLoader
+from .base.evaluator import BaseEvaluator
+from .experiment_analyzer import ExperimentAnalyzer
+from .entropy_statistic import EntropyStatistic
+from .temperature_ablation_data_loader import TempDataLoader
 
 
 logging.basicConfig(
@@ -52,7 +52,8 @@ class TempAblationEvaluator(BaseEvaluator):
 
         temp_prefix = f"t_{str(temperature).replace('.', '_')}_"
         temp_experiments = [
-            exp for exp in completed_experiments.get(model, [])
+            exp
+            for exp in completed_experiments.get(model, [])
             if exp.startswith(temp_prefix)
         ]
         if not temp_experiments:
@@ -68,7 +69,8 @@ class TempAblationEvaluator(BaseEvaluator):
             self.base_path, data_loader=temp_data_loader
         )
 
-        from base.constants import infer_task_type
+        from .base.constants import infer_task_type
+
         inferred_task_type = infer_task_type(dataset, self.args.task_type)
 
         all_metrics: Dict[str, Any] = {
@@ -101,13 +103,11 @@ class TempAblationEvaluator(BaseEvaluator):
                 entropy_results = entropy_statistic.analyze_experiment_entropy(
                     dataset, model, exp_name
                 )
-                all_entropy_results["models"][model]["experiments"][exp_name] = (
-                    entropy_results
-                )
+                all_entropy_results["models"][model]["experiments"][
+                    exp_name
+                ] = entropy_results
                 arch = entropy_results.get("agent_architecture", "unknown")
-                all_entropy_results["architectures"][arch].append(
-                    f"{model}/{exp_name}"
-                )
+                all_entropy_results["architectures"][arch].append(f"{model}/{exp_name}")
 
                 try:
                     trend_results = entropy_statistic.analyze_entropy_change_trends(
@@ -200,14 +200,11 @@ class TempAblationEvaluator(BaseEvaluator):
                 filtered_entropy["models"][model] = all_entropy_results["models"][model]
                 logger.info(f"  Included model {model} in filtered entropy results")
             else:
-                logger.warning(
-                    f"  Model {model} not found in existing entropy results"
-                )
+                logger.warning(f"  Model {model} not found in existing entropy results")
 
         for arch, exp_list in all_entropy_results.get("architectures", {}).items():
             filtered_list = [
-                p for p in exp_list
-                if "/" in p and p.split("/")[0] in models
+                p for p in exp_list if "/" in p and p.split("/")[0] in models
             ]
             if filtered_list:
                 filtered_entropy["architectures"][arch] = filtered_list
@@ -272,18 +269,36 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Evaluate multi-agent experiments across temperature settings"
     )
-    parser.add_argument("--dataset", type=str, default="math500",
-                        help="Dataset to analyze (default: math500)")
-    parser.add_argument("--model", type=str, nargs="*", default=["qwen3_4b"],
-                        help="Model names to analyze (default: qwen3_4b)")
-    parser.add_argument("--temperatures", type=float, nargs="*",
-                        default=[0.4, 0.6, 0.8],
-                        help="Temperatures to evaluate (default: 0.4 0.6 0.8)")
-    parser.add_argument("--task-type", type=str,
-                        choices=["math", "code", "option", "auto"], default="auto",
-                        help="Task type (auto to infer from dataset)")
-    parser.add_argument("--timeout", type=int, default=10,
-                        help="Maximum time in seconds for code tasks")
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="math500",
+        help="Dataset to analyze (default: math500)",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        nargs="*",
+        default=["qwen3_4b"],
+        help="Model names to analyze (default: qwen3_4b)",
+    )
+    parser.add_argument(
+        "--temperatures",
+        type=float,
+        nargs="*",
+        default=[0.4, 0.6, 0.8],
+        help="Temperatures to evaluate (default: 0.4 0.6 0.8)",
+    )
+    parser.add_argument(
+        "--task-type",
+        type=str,
+        choices=["math", "code", "option", "auto"],
+        default="auto",
+        help="Task type (auto to infer from dataset)",
+    )
+    parser.add_argument(
+        "--timeout", type=int, default=10, help="Maximum time in seconds for code tasks"
+    )
     return parser.parse_args()
 
 

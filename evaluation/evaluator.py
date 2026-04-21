@@ -11,10 +11,10 @@ import json
 import argparse
 from pathlib import Path
 
-from base.constants import DATASETS
-from base.evaluator import BaseEvaluator
-from experiment_analyzer import ExperimentAnalyzer
-from entropy_statistic import EntropyStatistic
+from .base.constants import DATASETS
+from .base.evaluator import BaseEvaluator
+from .experiment_analyzer import ExperimentAnalyzer
+from .entropy_statistic import EntropyStatistic
 
 
 class StandardEvaluator(BaseEvaluator):
@@ -44,7 +44,11 @@ class StandardEvaluator(BaseEvaluator):
             print(f"Analyzing experiment: {model_name}/{exp_name}")
             try:
                 metrics = self.analyzer.analyze_experiment(
-                    dataset, model_name, exp_name, self.args.task_type, self.args.timeout
+                    dataset,
+                    model_name,
+                    exp_name,
+                    self.args.task_type,
+                    self.args.timeout,
                 )
                 if self.args.output:
                     output_path = Path(self.args.output)
@@ -71,7 +75,9 @@ class StandardEvaluator(BaseEvaluator):
                 json.dump(entropy_results, f, indent=2, ensure_ascii=False)
             print(f"Entropy JSON saved to: {json_output_path}")
 
-            print(f"\nAnalyzing entropy change trends for experiment: {model_name}/{exp_name}")
+            print(
+                f"\nAnalyzing entropy change trends for experiment: {model_name}/{exp_name}"
+            )
             self.entropy_statistic.analyze_entropy_change_trends(
                 dataset, model_name, exp_name
             )
@@ -108,10 +114,14 @@ class StandardEvaluator(BaseEvaluator):
                 if "error" in model_data["experiments"][exp_name]:
                     continue
                 try:
-                    trend_results = self.entropy_statistic.analyze_entropy_change_trends(
-                        dataset, model_name, exp_name
+                    trend_results = (
+                        self.entropy_statistic.analyze_entropy_change_trends(
+                            dataset, model_name, exp_name
+                        )
                     )
-                    model_data["experiments"][exp_name]["trend_analysis"] = trend_results
+                    model_data["experiments"][exp_name][
+                        "trend_analysis"
+                    ] = trend_results
                 except Exception as e:
                     print(f"Error analyzing trends for {model_name}/{exp_name}: {e}")
                     model_data["experiments"][exp_name]["trend_analysis"] = {
@@ -161,45 +171,63 @@ def _parse_args() -> argparse.Namespace:
         description="Analyze multi-agent experiment results"
     )
     parser.add_argument(
-        "--datasets", type=str, nargs="*", choices=DATASETS,
+        "--datasets",
+        type=str,
+        nargs="*",
+        choices=DATASETS,
         default=["aime2024_16384", "gsm8k", "humaneval"],
         help="Datasets to analyze (space-separated list)",
     )
     parser.add_argument(
-        "--all-datasets", action="store_true",
+        "--all-datasets",
+        action="store_true",
         help="Analyze all available datasets",
     )
     parser.add_argument(
-        "--model", type=str, nargs="*", default=["qwen3_14b"],
+        "--model",
+        type=str,
+        nargs="*",
+        default=["qwen3_14b"],
         help="Model names. If not provided, analyze all models",
     )
     parser.add_argument(
-        "--task-type", type=str,
-        choices=["math", "code", "option", "finance", "auto"], default="auto",
+        "--task-type",
+        type=str,
+        choices=["math", "code", "option", "finance", "auto"],
+        default="auto",
         help="Task type (auto to infer from dataset)",
     )
     parser.add_argument(
-        "--timeout", type=int, default=10,
+        "--timeout",
+        type=int,
+        default=10,
         help="Maximum time in seconds to execute code for code tasks",
     )
     parser.add_argument(
-        "--experiment", type=str, default=None,
+        "--experiment",
+        type=str,
+        default=None,
         help="Specific experiment to analyze (if not provided, analyze all)",
     )
     parser.add_argument(
-        "--output", type=str, default=None,
+        "--output",
+        type=str,
+        default=None,
         help="Output file path (if not provided, save to evaluation/results/)",
     )
     parser.add_argument(
-        "--run-aggregator", default=True,
+        "--run-aggregator",
+        default=True,
         help="Run results aggregator to combine metrics and entropy for data mining",
     )
     parser.add_argument(
-        "--aggregate-all", default=False,
+        "--aggregate-all",
+        default=False,
         help="Aggregate results from all datasets",
     )
     parser.add_argument(
-        "--generate-summary", default=True,
+        "--generate-summary",
+        default=True,
         help="Generate summary CSV from aggregated data",
     )
     return parser.parse_args()

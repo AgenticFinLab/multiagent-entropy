@@ -7,10 +7,10 @@ calculate metrics, and compare different agent architectures.
 from collections import defaultdict
 from typing import Dict, List, Any, Optional
 
-from base.analyzer import BaseAnalyzer
-from base.constants import infer_task_type
-from base.architecture import get_final_agent_key_from_metrics
-from metrics_calculator import MetricsCalculator
+from .base.analyzer import BaseAnalyzer
+from .base.constants import infer_task_type
+from .base.architecture import get_final_agent_key_from_metrics
+from .metrics_calculator import MetricsCalculator
 
 
 class ExperimentAnalyzer(BaseAnalyzer):

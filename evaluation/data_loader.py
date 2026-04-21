@@ -5,7 +5,7 @@ All loading logic lives in `BaseDataLoader`; this class only declares the
 storage layout via `_init_paths()`.
 """
 
-from base.data_loader import BaseDataLoader
+from .base.data_loader import BaseDataLoader
 
 
 class DataLoader(BaseDataLoader):
