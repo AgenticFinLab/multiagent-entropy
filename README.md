@@ -60,44 +60,72 @@ multiagent-entropy/
 │       ├── decentralized.py           ## Decentralized with loopback
 │       ├── full_decentralized.py      ## Full communication graph
 │       ├── debate.py                  ## Majority voting
-│       └── hybrid.py                  ## Enhanced context sharing
+│       ├── hybrid.py                  ## Enhanced context sharing
+│       └── react_utils.py             ## ReAct agent utilities
 ├── experiments/                       ## Experiment execution
 │   ├── configs/                       ## Configuration files
 │   │   ├── base_config.yml            ## Base configuration
 │   │   ├── agent_specific/            ## Agent architecture configs
-│   │   ├── dataset_specific/          ## Dataset configs (GSM8K, AIME, etc.)
-│   │   └── model_specific/            ## Model configs (Qwen3 series)
+│   │   ├── dataset_specific/          ## Dataset configs (GSM8K, AIME, FinAgent, GAIA, etc.)
+│   │   └── model_specific/            ## Model configs (Qwen3, LLaMA, etc.)
 │   ├── scripts/
-│   │   ├── run_experiment.py          ## Main experiment runner
-│   │   └── config_loader.py           ## Configuration loader
+│   │   ├── run_experiment.py          ## Standard experiment runner
+│   │   ├── run_finagent_experiment.py ## FinAgent finance benchmark runner
+│   │   ├── run_gaia_experiment.py     ## GAIA benchmark runner
+│   │   ├── config_loader.py           ## Configuration loader
+│   │   ├── download_gaia_attachments.py ## GAIA task attachment downloader
+│   │   ├── regenerate_gaia_evaluation.py ## Re-evaluate existing GAIA results
+│   │   ├── finagent_experiment/       ## FinAgent tools, evaluation, prompts
+│   │   └── gaia_experiment/           ## GAIA tools, evaluation, prompts
 │   ├── results/
 │   │   ├── raw/                       ## Raw experiment results
 │   │   └── aggregated/                ## Aggregated results
 │   └── data/                          ## Dataset storage
 ├── evaluation/                        ## Result evaluation and feature extraction
-│   ├── evaluator.py                   ## Main evaluation entry
-│   ├── aggregator.py                  ## Data aggregation
-│   ├── entropy_statistic.py           ## Entropy statistics
+│   ├── base/                          ## Shared base-class subpackage
+│   │   ├── constants.py               ## DATASETS, DATASET_TASK_MAP, infer_task_type
+│   │   ├── architecture.py            ## Agent-type / round-number helpers
+│   │   ├── data_loader.py             ## BaseDataLoader
+│   │   ├── analyzer.py                ## BaseAnalyzer
+│   │   └── evaluator.py               ## BaseEvaluator (shared CSV/summary pipeline)
+│   ├── evaluator.py                   ## StandardEvaluator — main evaluation entry
+│   ├── temperature_ablation_evaluator.py ## TempAblationEvaluator (temp 0.4/0.6/0.8)
+│   ├── temperature_ablation_data_loader.py ## TempDataLoader
+│   ├── aggregator.py                  ## Data aggregation (JSON → CSV)
 │   ├── feature_enhancer.py            ## 245-feature extraction
+│   ├── entropy_statistic.py           ## Entropy statistics
+│   ├── experiment_analyzer.py         ## Per-experiment metrics
+│   ├── metrics_summary.py             ## Summary CSV generation
 │   └── results/                       ## Evaluation outputs
 ├── data_mining/                       ## Data mining analysis
 │   ├── code/
-│   │   ├── main.py                    ## Main entry for data mining
-│   │   ├── data_mining_analyzer.py    ## Unified analyzer
-│   │   ├── shap_analyzer.py           ## SHAP interpretability
-│   │   └── run_experiments.py         ## Automated experiment runner
+│   │   ├── base/                      ## Shared base-class subpackage
+│   │   │   ├── analyzer.py            ## BaseAnalyzer template class
+│   │   │   ├── constants.py           ## Centralized constants (models, params, plot defaults)
+│   │   │   ├── feature_manager.py     ## FeatureManager (FinAgent / standard feature logic)
+│   │   │   ├── model_factory.py       ## ModelFactory (RF / XGBoost / LightGBM)
+│   │   │   ├── io_utils.py            ## OutputManager, save_plot, load_dataset_csv
+│   │   │   ├── cli.py                 ## Shared argparse builders
+│   │   │   └── post_processor.py      ## BasePostProcessor (experiment iteration)
+│   │   ├── main.py                    ## Main CLI entry for data mining
+│   │   ├── data_mining_analyzer.py    ## Unified orchestrator
+│   │   ├── regression_analyzer.py     ## Experiment-level regression (BaseAnalyzer)
+│   │   ├── classification_analyzer.py ## Sample-level classification (BaseAnalyzer)
+│   │   ├── shap_analyzer.py           ## SHAP interpretability (BaseAnalyzer)
+│   │   ├── pca_analyzer.py            ## PCA feature redundancy (BaseAnalyzer)
+│   │   ├── feature_ablation_analyzer.py ## Feature ablation study (BaseAnalyzer)
+│   │   ├── calibration_analyzer.py    ## Calibration analysis
+│   │   ├── aggregator.py              ## Experiment result aggregation
+│   │   ├── visualizer.py              ## Aggregated result visualization
+│   │   ├── summarizer.py              ## Statistical summarization
+│   │   ├── features.py                ## Feature group definitions
+│   │   ├── utils.py                   ## Shared utility functions
+│   │   └── run_experiments.py         ## Automated batch experiment runner
 │   └── results/                       ## Analysis results
-├── entropy_analysis/                  ## Auxiliary entropy visualization
-│   ├── code/
-│   │   ├── entropy_analyzer.py        ## Core analysis
-│   │   ├── visualizer.py              ## Visualization
-│   │   └── data_loader.py             ## Hierarchical data loading
-│   └── visualizations/                ## Generated plots
 └── docs/                              ## Documentation
     ├── experiment-guidance.md         ## Experiment guide
     ├── evaluation-guidance.md         ## Evaluation guide
-    ├── data-mining-guidance.md        ## Data mining guide
-    └── entropy-analysis-guide.md      ## Entropy analysis guide
+    └── data-mining-guidance.md        ## Data mining guide
 ```
 
 ---
@@ -141,15 +169,6 @@ cd data_mining/code
 python main.py --analysis-type all
 ```
 
-#### 4. Entropy Visualization
-
-Visualize entropy transitions across architectures:
-
-```bash
-cd entropy_analysis/code
-python main.py --dataset gsm8k --multi-level
-```
-
 ---
 
 ### Extensibility and Supported Configurations
@@ -164,8 +183,8 @@ python main.py --dataset gsm8k --multi-level
 - **Hybrid**: Two-layer with enhanced context sharing
 
 #### 2. Supported Models and Datasets
-- **Models**: Qwen3-0.6B, Qwen3-1.7B, Qwen3-4B, Qwen3-8B, LLaMA-3.1-8B-Instruct, LLaMA-3.2-3B-Instruct
-- **Datasets**: GSM8K, AIME2024, AIME2025, MMLU, HumanEval, MATH-500  
+- **Models**: Qwen3-0.6B, Qwen3-1.7B, Qwen3-4B, Qwen3-8B, LLaMA-3.1-8B-Instruct, LLaMA-3.2-3B-Instruct, Qwen2.5-7B-SimpleRL-Zoo
+- **Datasets**: GSM8K, AIME2024, AIME2025, MMLU, HumanEval, MATH-500, FinAgent, GAIA
 
 #### 3. Adding New Components
 
@@ -218,7 +237,6 @@ To add a new dataset:
 - [Experiment Guidance](docs/experiment-guidance.md): Experiment configuration and execution
 - [Evaluation Guidance](docs/evaluation-guidance.md): Evaluation framework and feature extraction
 - [Data Mining Guidance](docs/data-mining-guidance.md): Data mining and SHAP analysis
-- [Entropy Analysis Guide](docs/entropy-analysis-guide.md): Entropy visualization and analysis
 
 ---
 ### Citation
