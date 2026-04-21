@@ -8,20 +8,35 @@ This project performs comprehensive data mining analysis on multi-agent experime
 
 ```
 data_mining/
-├── data/                           # Data storage
-│   └── merged_datasets.csv         # Merged dataset from all sources
-├── code/                           # Source code
-│   ├── data_collector.py           # Data collection and merging module
-│   ├── regression_analyzer.py      # Experiment-level regression analysis module
-│   ├── classification_analyzer.py  # Sample-level classification analysis module
-│   ├── shap_analyzer.py            # SHAP analysis module for model interpretability
-│   ├── data_mining_analyzer.py     # Unified entry point (delegates to specialized analyzers)
-│   ├── features.py                 # Includes all features for analysis
-│   ├── utils.py                    # Shared utility functions and constants
-│   ├── main.py                     # Command-line interface (uses data_mining_analyzer)
-│   ├── run_experiments.py          # Automated experiment runner for batch processing
-│   └── data_mining_analysis.log    # Execution log
-└── results/                        # Analysis outputs
+├── data/                                # Data storage
+│   └── merged_datasets.csv              # Merged dataset from all sources
+├── code/                                # Source code
+│   ├── base/                            # Shared base-class subpackage
+│   │   ├── __init__.py                  # Public re-exports
+│   │   ├── analyzer.py                  # BaseAnalyzer — template-method pipeline
+│   │   ├── constants.py                 # MODEL_NAMES, default hyperparams, plot defaults
+│   │   ├── feature_manager.py           # FeatureManager (FinAgent / standard modes)
+│   │   ├── model_factory.py             # ModelFactory.regressor / classifier / feature_importance
+│   │   ├── io_utils.py                  # OutputManager, save_plot, load_dataset_csv
+│   │   ├── cli.py                       # Shared argparse builder helpers
+│   │   └── post_processor.py            # BasePostProcessor (experiment-iteration helper)
+│   ├── regression_analyzer.py           # RegressionAnalyzer(BaseAnalyzer) — predicts exp_accuracy
+│   ├── classification_analyzer.py       # ClassificationAnalyzer(BaseAnalyzer) — predicts is_finally_correct
+│   ├── shap_analyzer.py                 # ShapAnalyzer(BaseAnalyzer) — SHAP interpretability
+│   ├── pca_analyzer.py                  # PCAAnalysis(BaseAnalyzer) — feature redundancy
+│   ├── feature_ablation_analyzer.py     # FeatureAblationAnalyzer(BaseAnalyzer) — ablation study
+│   ├── calibration_analyzer.py          # CalibrationAnalyzer — probability calibration
+│   ├── data_mining_analyzer.py          # Unified orchestrator (delegates to specialized analyzers)
+│   ├── aggregator.py                    # Experiment result aggregation
+│   ├── visualizer.py                    # Aggregated result visualization
+│   ├── summarizer.py                    # Statistical summarization
+│   ├── data_collector.py                # Data collection and merging
+│   ├── features.py                      # Feature group definitions
+│   ├── utils.py                         # Shared utility functions (thin shims over base/)
+│   ├── main.py                          # Command-line interface
+│   ├── run_experiments.py               # Automated batch experiment runner
+│   └── data_mining_analysis.log         # Execution log
+└── results/                             # Analysis outputs
     └── {dataset}/
         ├── unified_analysis_report.txt
         ├── regression/
@@ -47,6 +62,45 @@ data_mining/
 
 The analysis uses data from:
 - `multiagent-entropy/evaluation/results/{dataset_name}/all_aggregated_data_exclude_agent.csv`
+
+## Code Architecture
+
+The `data_mining/code/` package is organized around a **base-class template** to eliminate duplicated load → encode → train → evaluate scaffolding that previously appeared in every analyzer.
+
+### `base/` Subpackage
+
+| Module | Class / Function | Purpose |
+| --- | --- | --- |
+| `base/analyzer.py` | `BaseAnalyzer` | Template-method base class shared by all analyzers |
+| `base/constants.py` | `MODEL_NAMES`, `PLOT_DEFAULTS`, … | Single source for model names, default hyperparameters, plot config |
+| `base/feature_manager.py` | `FeatureManager` | Encapsulates FinAgent step-entropy discovery and feature exclusion |
+| `base/model_factory.py` | `ModelFactory` | Constructs RF / XGBoost / LightGBM estimators; extracts `feature_importances_` |
+| `base/io_utils.py` | `OutputManager`, `save_plot`, `load_dataset_csv` | Output-path resolution, figure saving, CSV loading |
+| `base/cli.py` | `add_filter_args`, `add_io_args`, … | Shared argparse builder helpers used by `main.py` and `run_experiments.py` |
+| `base/post_processor.py` | `BasePostProcessor` | Walks `results/` trees and yields `ExperimentContext` for aggregator / visualizer |
+
+### `BaseAnalyzer` Pipeline
+
+All specialized analyzers (`RegressionAnalyzer`, `ClassificationAnalyzer`, `PCAAnalysis`, `FeatureAblationAnalyzer`, `ShapAnalyzer`) inherit from `BaseAnalyzer` and share this pipeline:
+
+```
+load_data() → encode_categorical_features() → prepare_features()
+    → split() → train_models() → run_analysis() → generate_report()
+```
+
+Subclasses configure behavior via class attributes and hook overrides:
+
+| Attribute / Hook | Purpose |
+| --- | --- |
+| `target_column` | Target variable (e.g. `"exp_accuracy"`, `"is_finally_correct"`) |
+| `analyzer_type` | Output subdirectory label (e.g. `"regression"`) |
+| `is_classification` | Enables stratified split and classifier factory |
+| `_metrics(y_true, y_pred)` | Returns task-specific metric dict (MSE/R² or Accuracy/F1) |
+| `_postprocess_model(name, model, X_test)` | Per-model post-processing (e.g. `predict_proba` capture) |
+| `run_analysis()` | Full orchestration after data is loaded |
+| `generate_report()` | Writes the text report and returns its path |
+
+Analyzers with fully custom pipelines (PCA, feature ablation, SHAP) override `run_analysis` and `generate_report` while still inheriting the data-loading and encoding infrastructure.
 
 ## Key Features
 

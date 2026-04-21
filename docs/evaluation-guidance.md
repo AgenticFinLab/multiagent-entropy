@@ -6,15 +6,43 @@ The evaluation module provides comprehensive tools for analyzing multi-agent exp
 
 ### Module Structure
 
+```
+evaluation/
+├── base/                              # Shared base-class subpackage
+│   ├── __init__.py                    # Public re-exports
+│   ├── constants.py                   # DATASETS, DATASET_TASK_MAP, infer_task_type
+│   ├── architecture.py                # ARCHITECTURE_FINAL_AGENT, get_final_agent_type, …
+│   ├── data_loader.py                 # BaseDataLoader (abstract path conventions)
+│   ├── analyzer.py                    # BaseAnalyzer (shared analysis helpers)
+│   └── evaluator.py                   # BaseEvaluator (shared CSV/summary pipeline)
+├── evaluator.py                       # StandardEvaluator(BaseEvaluator) — main CLI
+├── temperature_ablation_evaluator.py  # TempAblationEvaluator(BaseEvaluator) — temp ablation
+├── temperature_ablation_data_loader.py # TempDataLoader(DataLoader) — ablation data loading
+├── data_loader.py                     # DataLoader — loads experiment results & entropy tensors
+├── experiment_analyzer.py             # ExperimentAnalyzer — per-experiment metrics
+├── entropy_statistic.py               # EntropyStatistic — entropy stats and trend analysis
+├── feature_enhancer.py                # FeatureEnhancer — 245-feature engineering
+├── aggregator.py                      # Aggregator — merges JSON results → unified CSV
+├── metrics_summary.py                 # extract_summary_fields — summary CSV generation
+└── utils.py                           # Utility functions for saving results
+```
+
 #### Core Components
 
+- **`base/`**: Shared abstractions eliminating code duplication across the two evaluator CLIs.
+  - **`BaseEvaluator`**: Centralizes the shared downstream pipeline — running `Aggregator` to produce `all_aggregated_data.csv` and `extract_summary_fields` to produce `all_summary_data.csv`. Also provides `get_eval_results_path()` for consistent output-path conventions.
+  - **`BaseDataLoader`**: Abstract base with shared path helpers used by `DataLoader` and `TempDataLoader`.
+  - **`constants.py`**: Single source of truth for `DATASETS`, `DATASET_TASK_MAP`, and `infer_task_type()` — previously duplicated across three files.
+  - **`architecture.py`**: Shared agent-type / round-number helpers used by analyzer and aggregator.
 - **[DataLoader](../evaluation/data_loader.py)**: Loads experiment data, configurations, and results
+- **[TempDataLoader](../evaluation/temperature_ablation_data_loader.py)**: Extends `DataLoader` for temperature-ablation experiments; parses temperature from experiment names and reads from `experiments/results_temp/raw`
 - **[MetricsCalculator](../evaluation/metrics_calculator.py)**: Calculates performance metrics
 - **[ExperimentAnalyzer](../evaluation/experiment_analyzer.py)**: Analyzes experiment results
 - **[EntropyStatistic](../evaluation/entropy_statistic.py)**: Analyzes entropy statistics and change trends
 - **[FeatureEnhancer](../evaluation/feature_enhancer.py)**: Applies advanced feature engineering on aggregated metrics and entropy data (sample-level entropy features, cross-round dynamics, intra-round agent distribution, etc.)
 - **[Aggregator](../evaluation/aggregator.py)**: Loads JSON results, performs basic data aggregation, and delegates advanced feature computation to `FeatureEnhancer` before writing unified CSVs
-- **[evaluator.py](../evaluation/evaluator.py)**: Main entry point for evaluation
+- **[evaluator.py](../evaluation/evaluator.py)**: `StandardEvaluator` — main entry point for standard evaluation
+- **[temperature_ablation_evaluator.py](../evaluation/temperature_ablation_evaluator.py)**: `TempAblationEvaluator` — evaluates experiments across temperature settings (0.4 / 0.6 / 0.8)
 - **[utils.py](../evaluation/utils.py)**: Utility functions for saving results
 
 ### Usage
@@ -31,10 +59,10 @@ python -m evaluation.evaluator --dataset aime2025 --task-type math
 
 | Argument              | Type | Default | Description                                 |
 | --------------------- | ---- | ------- | ------------------------------------------- |
-| `--datasets`          | str  | All datasets | Datasets to analyze (space-separated list). Choices: gsm8k, humaneval, mmlu, math500, aime2024_16384, aime2025_16384 |
+| `--datasets`          | str  | All datasets | Datasets to analyze (space-separated list). Choices: gsm8k, humaneval, mmlu, math500, aime2024_16384, aime2025_16384, finagent |
 | `--all-datasets`      | flag | False   | Analyze all available datasets             |
 | `--model`             | str  | qwen3_0_6b, qwen3_4b, qwen3_8b | Model names (space-separated list). If not provided, analyze all models |
-| `--task-type`         | str  | auto    | Task type (math, code, option, auto to infer from dataset) |
+| `--task-type`         | str  | auto    | Task type (math, code, option, finance, auto to infer from dataset) |
 | `--experiment`        | str  | None    | Specific experiment to analyze (if not provided, analyze all) |
 | `--output`            | str  | None    | Output file path (if not provided, save to evaluation/results/) |
 | `--run-aggregator`    | bool | True    | Run results aggregator to combine metrics and entropy for data mining |
@@ -54,6 +82,7 @@ The evaluation module supports the following datasets defined in [evaluator.py](
 | `math500` | MATH-500 dataset |
 | `aime2024_16384` | AIME 2024 competition problems (16384 token context) |
 | `aime2025_16384` | AIME 2025 competition problems (16384 token context) |
+| `finagent` | Finance Agent Benchmark (rubric-based evaluation) |
 
 #### Examples
 
@@ -86,6 +115,35 @@ python -m evaluation.evaluator --dataset aime2024 --run-aggregator False
 ```bash
 python -m evaluation.evaluator --dataset mmlu --task-type option
 ```
+
+**Analyze FinAgent results:**
+```bash
+python -m evaluation.evaluator --dataset finagent --task-type finance
+```
+
+### Temperature Ablation Evaluator
+
+`TempAblationEvaluator` evaluates experiments across temperature settings (0.4, 0.6, 0.8). Temperature 0.6 is sourced by filtering `evaluation/results_qwen/`; temperatures 0.4 and 0.8 are read from `experiments/results_temp/raw` via `TempDataLoader`.
+
+#### Temperature Ablation CLI
+
+```bash
+python -m evaluation.temperature_ablation_evaluator --dataset math500 --model qwen3_4b
+```
+
+#### Temperature Ablation Arguments
+
+| Argument | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `--dataset` | str | `math500` | Dataset to analyze |
+| `--model` | str | `qwen3_4b` | Model name(s) to evaluate |
+| `--temperatures` | float[] | `0.4 0.6 0.8` | Temperature values to compare |
+| `--task-type` | str | `auto` | Task type (math, code, option, auto) |
+| `--timeout` | int | `10` | Max seconds for code-task execution |
+
+#### Output
+
+Results are written to `evaluation/results_temp/<dataset>/` with the same `all_aggregated_data.csv` and `all_summary_data.csv` layout as the standard evaluator.
 
 ### Metrics
 

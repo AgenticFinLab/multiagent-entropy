@@ -16,7 +16,9 @@ experiments/
 │   │   ├── aime2025.yml                    # AIME2025 dataset configuration
 │   │   ├── math500.yml                     # Math500 dataset configuration
 │   │   ├── mmlu.yml                        # MMLU dataset configuration
-│   │   └── humaneval.yml                   # HumanEval dataset configuration
+│   │   ├── humaneval.yml                   # HumanEval dataset configuration
+│   │   ├── finagent.yml                    # FinAgent finance benchmark configuration
+│   │   └── gaia.yml                        # GAIA benchmark configuration
 │   ├── agent_specific/                     # Agent-specific configuration files
 │   │   ├── single_agents.yml               # Single agent configuration
 │   │   ├── sequential_agents.yml           # Sequential agent configuration
@@ -29,9 +31,12 @@ experiments/
 │       ├── qwen3-0.6b.yml                  # Qwen3-0.6B model configuration
 │       ├── qwen3-1.7b.yml                  # Qwen3-1.7B model configuration
 │       ├── qwen3-4b.yml                    # Qwen3-4B model configuration
-│       └── qwen3-8b.yml                    # Qwen3-8B model configuration
+│       ├── qwen3-8b.yml                    # Qwen3-8B model configuration
+│       ├── llama-3.1-8b-instruct.yml       # LLaMA-3.1-8B-Instruct model configuration
+│       ├── llama-3.2-3b-instruct.yml       # LLaMA-3.2-3B-Instruct model configuration
+│       └── qwen-2.5-7b-simplerl-zoo.yml    # Qwen2.5-7B-SimpleRL-Zoo model configuration
 ├── configs_exp/                            # Generated experiment configuration files
-├── logs/                                   # Log files from experiments
+├── data/                                   # Dataset storage
 ├── results/                                # Experiment results
 │   ├── aggregated/                         # Aggregated results across experiments
 │   │   └── {dataset_name}/                 # Results organized by dataset
@@ -39,9 +44,16 @@ experiments/
 │   └── raw/                                # Raw results from individual experiments
 │       └── {dataset_name}/                 # Results organized by dataset
 │           └── {model_name}/               # Results organized by model
-└── scripts/                                # Utility scripts
+├── temp/                                   # Temporary files
+└── scripts/                                # Utility and experiment runner scripts
     ├── config_loader.py                    # Configuration loading and merging utilities
-    └── run_experiment.py                   # Experiment runner script
+    ├── run_experiment.py                   # Standard experiment runner
+    ├── run_finagent_experiment.py          # FinAgent experiment runner
+    ├── run_gaia_experiment.py              # GAIA benchmark experiment runner
+    ├── regenerate_gaia_evaluation.py       # Re-evaluates existing GAIA results
+    ├── download_gaia_attachments.py        # Downloads GAIA task attachments
+    ├── finagent_experiment/                # FinAgent-specific agent modules
+    └── gaia_experiment/                    # GAIA-specific agent modules
 ```
 
 ## Configuration System
@@ -355,7 +367,104 @@ The experiment runner supports all seven multi-agent system architectures:
 | `debate` | Multi-agent debate with majority voting (no LLM orchestrator) |
 | `hybrid` | Two-layer with enhanced context sharing and feedback |
 
-### Results Management
+### FinAgent Experiments
+
+FinAgent is the Finance Agent Benchmark. It uses rubric-based evaluation via financial tools (web search, EDGAR SEC search, HTML parsing).
+
+#### Running a FinAgent Experiment
+
+```bash
+cd multiagent-entropy
+python experiments/scripts/run_finagent_experiment.py \
+  --experiment-name qwen3-4b_finagent_single_agent \
+  --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
+  --dataset-config "experiments/configs/dataset_specific/finagent.yml" \
+  --agent-type "single"
+```
+
+Run as a batch:
+
+```bash
+python experiments/scripts/run_finagent_experiment.py \
+  --batch-config my_finagent_batch.yml
+```
+
+#### FinAgent-Specific CLI Options
+
+In addition to all standard options above, `run_finagent_experiment.py` accepts:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--dataset-config` | `experiments/configs/dataset_specific/finagent.yml` | Defaults to FinAgent config |
+| `--skip-evaluation` | False | Skip rubric-based evaluation; run inference only |
+
+#### FinAgent Package (`finagent_experiment/`)
+
+| Module | Purpose |
+|--------|---------|
+| `runner.py` | Main experiment orchestration |
+| `tools.py` | Financial tools: `GoogleWebSearch`, `EDGARSearch`, `ParseHtmlPage`, `RetrieveInformation` |
+| `evaluation.py` | Rubric-based scoring via `calculate_finagent_accuracy` |
+| `answer_extraction.py` | Extract answers by identifier |
+| `sec_cache.py` | SEC query caching |
+| `tool_logger.py` | Tool call logging |
+| `prompts.py` | Prompt templates |
+| `checkpoint.py` | Checkpoint / resume support |
+| `constants.py` | `MAX_END_DATE`, `FINAGENT_TASK_TYPE` |
+
+Results are saved to `experiments/results_finagent/raw/`.
+
+### GAIA Experiments
+
+GAIA is a general-purpose AI assistant benchmark with exact-match evaluation. It includes multi-modal tasks that may require web search and file-attachment processing.
+
+#### Downloading GAIA Attachments
+
+Before running GAIA experiments, download task attachments:
+
+```bash
+python experiments/scripts/download_gaia_attachments.py
+```
+
+#### Running a GAIA Experiment
+
+```bash
+cd multiagent-entropy
+python experiments/scripts/run_gaia_experiment.py \
+  --experiment-name qwen3-4b_gaia_single_agent \
+  --model-config "experiments/configs/model_specific/qwen3-4b.yml" \
+  --dataset-config "experiments/configs/dataset_specific/gaia.yml" \
+  --agent-type "single"
+```
+
+#### GAIA-Specific CLI Options
+
+In addition to all standard options above, `run_gaia_experiment.py` accepts:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--dataset-config` | `experiments/configs/dataset_specific/gaia.yml` | Defaults to GAIA config |
+| `--skip-evaluation` | False | Skip evaluation; run inference only |
+
+#### Re-evaluating Existing GAIA Results
+
+To re-score already-generated GAIA outputs without re-running inference:
+
+```bash
+python experiments/scripts/regenerate_gaia_evaluation.py
+```
+
+#### GAIA Package (`gaia_experiment/`)
+
+| Module | Purpose |
+|--------|---------|
+| `runner.py` | Main experiment orchestration |
+| `tools.py` | GAIA tools (web search, file reading, etc.) |
+| `evaluation.py` | Exact-match evaluation |
+| `answer_extraction.py` | Extract final answers |
+| `prompts.py` | Prompt templates |
+| `checkpoint.py` | Checkpoint / resume support |
+| `constants.py` | GAIA-specific constants |
 
 #### Raw Results
 
