@@ -466,6 +466,27 @@ python experiments/scripts/regenerate_gaia_evaluation.py
 | `checkpoint.py` | Checkpoint / resume support |
 | `constants.py` | GAIA-specific constants |
 
+#### ReAct Loop Behavior
+
+GAIA experiments use a ReAct (Reasoning + Acting) loop implemented in [`maep/language/react_utils.py`](../maep/language/react_utils.py) and [`maep/generic.py`](../maep/generic.py). Key parameters:
+
+| Parameter | Default | Location | Description |
+|-----------|---------|----------|-------------|
+| `MAX_REACT_ITERATIONS` | `10` | `react_utils.py` | Maximum tool-call iterations per sample |
+| `TOOL_RESULT_MAX_CHARS` | `5000` | `react_utils.py` | Maximum characters kept from a tool result |
+
+**Repeated tool call detection**: The loop tracks every `(tool_name, arguments)` pair seen so far. If the model issues an identical call a second time — a common failure mode for weaker models — the system skips the actual tool invocation and instead injects the following Observation back to the model:
+
+```
+Observation: [system] You have already called '<tool_name>' with the same arguments before.
+Do NOT repeat the same tool call. Based on the information already gathered,
+please provide your Final Answer now.
+```
+
+This nudges the model to conclude rather than loop indefinitely, preventing OOM caused by an ever-growing conversation history.
+
+**GPU memory management**: After each inference step, `torch.cuda.empty_cache()` is called to release KV-cache and activation fragments, reducing memory fragmentation across iterations.
+
 #### Raw Results
 
 Raw experiment results are saved in:
