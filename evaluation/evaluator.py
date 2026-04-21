@@ -193,7 +193,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--task-type",
         type=str,
-        choices=["math", "code", "option", "finance", "auto"],
+        choices=["math", "code", "option", "finance", "gaia", "auto"],
         default="auto",
         help="Task type (auto to infer from dataset)",
     )

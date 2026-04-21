@@ -84,8 +84,20 @@ class ExperimentAnalyzer(BaseAnalyzer):
             except FileNotFoundError as e:
                 print(f"Warning: {e}")
 
-        # Load ground truth data for the dataset (skip for finagent)
-        if dataset.lower() == "finagent":
+        # Load gaia pre-computed evaluation results if applicable
+        gaia_eval_results = None
+        if dataset.lower() == "gaia":
+            try:
+                gaia_eval_results = (
+                    self.data_loader.load_gaia_evaluation_results(
+                        model_name, experiment_name
+                    )
+                )
+            except FileNotFoundError as e:
+                print(f"Warning: {e}")
+
+        # Load ground truth data for the dataset (skip for finagent and gaia)
+        if dataset.lower() in ("finagent", "gaia"):
             ground_truths = {}
         else:
             ground_truths = self.data_loader.load_ground_truth(dataset)
@@ -132,6 +144,7 @@ class ExperimentAnalyzer(BaseAnalyzer):
                 experiment_name,
                 task_type,
                 finagent_eval_results=finagent_eval_results,
+                gaia_eval_results=gaia_eval_results,
             )
             metrics["samples"][main_id] = sample_metrics
 
@@ -149,6 +162,7 @@ class ExperimentAnalyzer(BaseAnalyzer):
         task_type: str,
         timeout: int = 10,
         finagent_eval_results: Optional[Dict] = None,
+        gaia_eval_results: Optional[Dict] = None,
     ) -> Dict[str, Any]:
         """Analyze metrics for a single sample.
 
@@ -185,6 +199,17 @@ class ExperimentAnalyzer(BaseAnalyzer):
                 "question_type", ""
             )
 
+        # For gaia, set ground truth and level from eval results
+        if (
+            task_type == "gaia"
+            and gaia_eval_results
+            and main_id in gaia_eval_results
+        ):
+            sample_metrics["ground_truth"] = gaia_eval_results[main_id].get(
+                "groundtruth", ""
+            )
+            sample_metrics["level"] = gaia_eval_results[main_id].get("level", "")
+
         # Process each agent result for this sample
         for result_info in sample_results:
             result_id = result_info["result_id"]
@@ -215,6 +240,17 @@ class ExperimentAnalyzer(BaseAnalyzer):
                 evaluation_score = 0.0
                 if finagent_eval_results and main_id in finagent_eval_results:
                     eval_data = finagent_eval_results[main_id]
+                    is_correct = eval_data.get("evaluation_result", False)
+                    evaluation_score = eval_data.get("evaluation_score", 0.0)
+            elif task_type == "gaia":
+                # For gaia, use pre-computed evaluation results
+                response = result_data.get("response", "")
+                predicted_answer = response[:200] if response else ""
+                format_compliance = True
+                is_correct = False
+                evaluation_score = 0.0
+                if gaia_eval_results and main_id in gaia_eval_results:
+                    eval_data = gaia_eval_results[main_id]
                     is_correct = eval_data.get("evaluation_result", False)
                     evaluation_score = eval_data.get("evaluation_score", 0.0)
             elif task_type == "code":
@@ -296,6 +332,8 @@ class ExperimentAnalyzer(BaseAnalyzer):
                 "format_compliance": format_compliance,
             }
             if task_type == "finance":
+                agent_metrics["evaluation_score"] = evaluation_score
+            if task_type == "gaia":
                 agent_metrics["evaluation_score"] = evaluation_score
             sample_metrics["agents"][agent_key] = agent_metrics
 

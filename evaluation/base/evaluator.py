@@ -26,9 +26,11 @@ class BaseEvaluator:
     # --- output path conventions ----------------------------------------
 
     def get_eval_results_path(self, dataset: str) -> Path:
-        """Default standard layout: `evaluation/results[/finagent]/<dataset>`."""
+        """Default standard layout: `evaluation/results[/finagent/gaia]/<dataset>`."""
         if dataset.lower() == "finagent":
             return self.base_path / "evaluation" / "results_finagent" / dataset
+        if dataset.lower() == "gaia":
+            return self.base_path / "evaluation" / "results_gaia" / dataset
         return self.base_path / "evaluation" / "results" / dataset
 
     # --- shared post-pipeline --------------------------------------------
@@ -36,7 +38,7 @@ class BaseEvaluator:
     @staticmethod
     def run_aggregator(metrics_path: Path, entropy_path: Path, output_dir: Path) -> bool:
         """Generate the aggregated CSVs. No-op if either input is missing."""
-        from aggregator import Aggregator
+        from ..aggregator import Aggregator
 
         if not metrics_path.exists() or not entropy_path.exists():
             logger.warning(
@@ -52,7 +54,7 @@ class BaseEvaluator:
     @staticmethod
     def run_summary(output_dir: Path) -> bool:
         """Generate the summary CSV from `all_aggregated_data.csv`. No-op if missing."""
-        from metrics_summary import extract_summary_fields
+        from ..metrics_summary import extract_summary_fields
 
         input_csv = output_dir / "all_aggregated_data.csv"
         if not input_csv.exists():

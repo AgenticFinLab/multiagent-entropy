@@ -18,3 +18,6 @@ class DataLoader(BaseDataLoader):
         self.results_finagent_path = (
             self.base_path / "experiments" / "results_finagent" / "raw"
         )
+        self.results_gaia_path = (
+            self.base_path / "experiments" / "results_gaia" / "raw"
+        )

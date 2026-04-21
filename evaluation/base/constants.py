@@ -13,6 +13,7 @@ DATASETS = [
     "aime2024_16384",
     "aime2025_16384",
     "finagent",
+    "gaia",
 ]
 
 
@@ -26,6 +27,7 @@ DATASET_TASK_MAP = {
     "aime2024_8192": "math",
     "aime2025_8192": "math",
     "finagent": "finance",
+    "gaia": "gaia",
 }
 
 

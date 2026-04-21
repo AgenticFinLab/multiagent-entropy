@@ -56,6 +56,14 @@ class BaseDataLoader:
                 / experiment_name
                 / "traces"
             )
+        if dataset.lower() == "gaia":
+            return (
+                self.results_gaia_path
+                / "gaia"
+                / model_name
+                / experiment_name
+                / "traces"
+            )
         return (
             self.results_path
             / dataset.lower()
@@ -136,6 +144,8 @@ class BaseDataLoader:
     def get_experiments_by_dataset(self, dataset: str) -> Dict[str, List[str]]:
         if dataset.lower() == "finagent":
             dataset_path = self.results_finagent_path / "finagent"
+        elif dataset.lower() == "gaia":
+            dataset_path = self.results_gaia_path / "gaia"
         else:
             dataset_path = self.results_path / dataset.lower()
 
@@ -201,12 +211,24 @@ class BaseDataLoader:
         return all_results
 
     def parse_result_id(self, result_id: str) -> Dict[str, Any]:
-        parts = result_id.replace("Result_", "").split("-")
-        main_id = parts[0]
-        agent_type = parts[1]
-        execution_order_sample = parts[2]
-        execution_order = int(execution_order_sample.split("_")[0])
-        sample_number = int(execution_order_sample.split("_")[2])
+        # Format: Result_<main_id>-<agent_type>-<order>_sample_<num>
+        # main_id may be a plain id or a UUID (containing hyphens), so match from the right.
+        m = re.match(
+            r"^Result_(.+)-([^-]+)-(\d+)_sample_(\d+)$", result_id
+        )
+        if m:
+            main_id = m.group(1)
+            agent_type = m.group(2)
+            execution_order = int(m.group(3))
+            sample_number = int(m.group(4))
+        else:
+            # Fallback: legacy split (no UUID hyphens)
+            parts = result_id.replace("Result_", "").split("-")
+            main_id = parts[0]
+            agent_type = parts[1]
+            execution_order_sample = parts[2]
+            execution_order = int(execution_order_sample.split("_")[0])
+            sample_number = int(execution_order_sample.split("_")[2])
         return {
             "main_id": main_id,
             "agent_type": agent_type,
@@ -258,6 +280,36 @@ class BaseDataLoader:
                 "evaluation_result": item.get("evaluation_result", False),
                 "evaluation_score": item.get("evaluation_score", 0.0),
                 "expected_answer": item.get("expected_answer", ""),
+            }
+        results_by_id["_aggregate"] = data.get("aggregate_metrics", {})
+        return results_by_id
+
+    def load_gaia_evaluation_results(
+        self, model_name: str, experiment_name: str
+    ) -> Dict[str, Any]:
+        eval_file = (
+            self.results_gaia_path
+            / "gaia"
+            / model_name
+            / experiment_name
+            / "gaia_evaluation_results.json"
+        )
+        if not eval_file.exists():
+            raise FileNotFoundError(
+                f"GAIA evaluation results not found: {eval_file}"
+            )
+        with open(eval_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        results_by_id: Dict[str, Any] = {}
+        for item in data.get("individual_results", []):
+            qid = item.get("question_id", "")
+            results_by_id[qid] = {
+                "level": item.get("level", ""),
+                "evaluation_result": item.get("evaluation_result", False),
+                "evaluation_score": item.get("evaluation_score", 0.0),
+                "groundtruth": item.get("groundtruth", ""),
+                "generated_answer": item.get("generated_answer", ""),
             }
         results_by_id["_aggregate"] = data.get("aggregate_metrics", {})
         return results_by_id
