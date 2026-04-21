@@ -7,52 +7,22 @@ calculate metrics, and compare different agent architectures.
 from collections import defaultdict
 from typing import Dict, List, Any, Optional
 
-from utils import save_json
-from data_loader import DataLoader
+from base.analyzer import BaseAnalyzer
+from base.constants import infer_task_type
+from base.architecture import get_final_agent_key_from_metrics
 from metrics_calculator import MetricsCalculator
 
 
-class ExperimentAnalyzer:
+class ExperimentAnalyzer(BaseAnalyzer):
     """Analyzer for multi-agent experiment results.
 
     Provides methods to analyze individual experiments and compare
     architectures.
     """
 
-    def __init__(self, base_path: str):
-        """Initialize the experiment analyzer.
-
-        Args:
-            base_path: Base path to the project directory.
-        """
-        # Initialize data loader for reading experiment data
-        self.data_loader = DataLoader(base_path)
-        # Initialize metrics calculator for computing performance metrics
+    def __init__(self, base_path: str, data_loader: Optional[Any] = None):
+        super().__init__(base_path, data_loader=data_loader)
         self.metrics_calculator = MetricsCalculator()
-
-    def _get_task_type_from_dataset(self, dataset: str) -> str:
-        """Determine task type from dataset name.
-
-        Args:
-            dataset: Dataset name.
-
-        Returns:
-            Task type ("math", "code", or "option").
-        """
-        # Map dataset names to their corresponding task types
-        dataset_task_map = {
-            "humaneval": "code",
-            "mmlu": "option",
-            "gsm8k": "math",
-            "aime2024_16384": "math",
-            "aime2025_16384": "math",
-            "math500": "math",
-            "aime2024_8192": "math",
-            "aime2025_8192": "math",
-            "finagent": "finance",
-        }
-        # Return task type or default to "math" if dataset not found
-        return dataset_task_map.get(dataset.lower(), "math")
 
     def analyze_experiment(
         self,
@@ -76,8 +46,7 @@ class ExperimentAnalyzer:
             Dictionary containing experiment metrics and analysis results.
         """
         # Infer task type from dataset if not provided or set to auto/math
-        if task_type == "auto" or task_type == "math":
-            task_type = self._get_task_type_from_dataset(dataset)
+        task_type = infer_task_type(dataset, task_type)
 
         # Load experiment configuration
         try:
@@ -331,7 +300,7 @@ class ExperimentAnalyzer:
             sample_metrics["agents"][agent_key] = agent_metrics
 
         # Determine final agent key based on architecture
-        final_agent_key = self._get_final_agent_key(
+        final_agent_key = get_final_agent_key_from_metrics(
             sample_metrics["agents"], agent_architecture
         )
 
@@ -355,76 +324,6 @@ class ExperimentAnalyzer:
 
         return sample_metrics
 
-    def _get_final_agent_keys(self, agent_architecture: str) -> List[str]:
-        """Get the keys for the final agent in each architecture.
-
-        Args:
-            agent_architecture: Type of agent architecture.
-
-        Returns:
-            List of agent keys for the final agent.
-        """
-        # Return final agent keys based on architecture type
-        if agent_architecture == "single":
-            return ["SingleSolver_round_1", "SingleSolver_round_2"]
-        elif agent_architecture == "sequential":
-            return ["judger_round_1", "judger_round_2"]
-        elif agent_architecture == "centralized":
-            return ["OrchestratorAgent_round_1", "OrchestratorAgent_round_2"]
-        elif agent_architecture == "debate":
-            return ["orchestrator"]
-        elif agent_architecture == "hybrid":
-            return ["OrchestratorAgent_round_1", "OrchestratorAgent_round_2"]
-        else:
-            return []
-
-    def _get_final_agent_key(
-        self, agents: Dict[str, Any], agent_architecture: str
-    ) -> Optional[str]:
-        """Get the key of the final agent for a given sample.
-
-        Args:
-            agents: Dictionary of agent data for this sample.
-            agent_architecture: Type of agent architecture.
-
-        Returns:
-            The key of the final agent, or None if not found.
-        """
-        # Return None if no agents are present
-        if not agents:
-            return None
-
-        # Determine final agent type based on architecture
-        if agent_architecture == "single":
-            final_agent_type = "SingleSolver"
-        elif agent_architecture == "sequential":
-            final_agent_type = "judger"
-        elif agent_architecture == "centralized":
-            final_agent_type = "OrchestratorAgent"
-        elif agent_architecture == "debate":
-            final_agent_type = "orchestrator"
-        elif agent_architecture == "hybrid":
-            final_agent_type = "OrchestratorAgent"
-        else:
-            return None
-
-        # For debate architecture, return orchestrator directly
-        if agent_architecture == "debate":
-            return "orchestrator"
-
-        # Find the agent with the highest execution order
-        max_execution_order = -1
-        final_agent_key = None
-
-        for agent_key, agent_data in agents.items():
-            if agent_data["agent_type"] == final_agent_type:
-                execution_order = agent_data["execution_order"]
-                if execution_order > max_execution_order:
-                    max_execution_order = execution_order
-                    final_agent_key = agent_key
-
-        return final_agent_key
-
     def analyze_all_experiments(
         self,
         dataset: str,
@@ -445,8 +344,7 @@ class ExperimentAnalyzer:
             Dictionary containing metrics for all experiments, grouped by model.
         """
         # Infer task type from dataset if not provided or set to auto/math
-        if task_type == "auto" or task_type == "math":
-            task_type = self._get_task_type_from_dataset(dataset)
+        task_type = infer_task_type(dataset, task_type)
 
         # Get all experiments grouped by model
         experiments_by_model = self.data_loader.get_experiments_by_dataset(dataset)
@@ -487,33 +385,5 @@ class ExperimentAnalyzer:
         return all_metrics
 
     def save_results(self, metrics: Dict[str, Any], output_path: str):
-        """Save analysis results to JSON file.
-
-        Args:
-            metrics: Dictionary containing analysis metrics.
-            output_path: Path to save the results.
-        """
-        # Create a copy of metrics to avoid modifying the original
-        metrics_copy = metrics.copy()
-
-        # Remove response fields to reduce file size
-        if "models" in metrics_copy:
-            for model_name, model_data in metrics_copy["models"].items():
-                if "experiments" in model_data:
-                    for exp_name, exp_metrics in model_data["experiments"].items():
-                        if "samples" in exp_metrics:
-                            for sample_id, sample_data in exp_metrics[
-                                "samples"
-                            ].items():
-                                if "agents" in sample_data:
-                                    for agent_key in sample_data["agents"]:
-                                        if (
-                                            "response"
-                                            in sample_data["agents"][agent_key]
-                                        ):
-                                            del sample_data["agents"][agent_key][
-                                                "response"
-                                            ]
-
-        # Save metrics to JSON file
-        save_json(metrics_copy, output_path)
+        """Save analysis results to JSON file (responses stripped)."""
+        self.save_metrics_json(metrics, output_path)

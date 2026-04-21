@@ -13,12 +13,16 @@ import torch
 import numpy as np
 from transformers import AutoTokenizer
 
-from data_loader import DataLoader
+from base.analyzer import BaseAnalyzer
+from base.architecture import (
+    get_round_number as _arch_get_round_number,
+    get_final_result_id_from_entropy,
+)
 from utils import save_json
 from metrics_calculator import MetricsCalculator
 
 
-class EntropyStatistic:
+class EntropyStatistic(BaseAnalyzer):
     """Analyzer for entropy statistics in multi-agent experiments.
 
     Provides methods to analyze entropy at multiple levels:
@@ -30,15 +34,9 @@ class EntropyStatistic:
     - Token position level: Entropy distribution across token positions
     """
 
-    def __init__(self, base_path: str):
-        """Initialize the entropy analyzer with base path.
-
-        Args:
-            base_path: Base path to the project directory.
-        """
-        self.data_loader = DataLoader(base_path)
-        self.base_path = Path(base_path)
-        self.tokenizer_cache = {}
+    def __init__(self, base_path: str, data_loader: Optional[Any] = None):
+        super().__init__(base_path, data_loader=data_loader)
+        self.tokenizer_cache: Dict[str, Any] = {}
 
     def analyze_all_experiments_entropy(
         self, dataset: str, models: Optional[List[str]] = None
@@ -727,44 +725,8 @@ class EntropyStatistic:
     def _get_final_agent_key(
         self, agents_data: List[Dict[str, Any]], agent_architecture: str
     ) -> Optional[str]:
-        """Determine the result_id of the final agent for a sample.
-
-        Args:
-            agents_data: List of entropy data for all agents in a sample.
-            agent_architecture: Type of agent architecture.
-
-        Returns:
-            The result_id of the final agent, or None if not found.
-        """
-        if not agents_data:
-            return None
-
-        # Determine final agent type based on architecture (replicated from experiment_analyzer.py)
-        if agent_architecture == "single":
-            final_agent_type = "SingleSolver"
-        elif agent_architecture == "sequential":
-            final_agent_type = "judger"
-        elif agent_architecture == "centralized":
-            final_agent_type = "OrchestratorAgent"
-        elif agent_architecture == "debate":
-            final_agent_type = "orchestrator"
-        elif agent_architecture == "hybrid":
-            final_agent_type = "OrchestratorAgent"
-        else:
-            return None
-
-        # Find the agent with the highest execution order among those of the specified final_agent_type
-        max_execution_order = -1
-        final_result_id = None
-
-        for data in agents_data:
-            if data["agent_type"] == final_agent_type:
-                execution_order = data["execution_order"]
-                if execution_order > max_execution_order:
-                    max_execution_order = execution_order
-                    final_result_id = data["result_id"]
-
-        return final_result_id
+        """Return the result_id of the final agent (delegates to base.architecture)."""
+        return get_final_result_id_from_entropy(agents_data, agent_architecture)
 
     def _get_answer_token_entropy(
         self,
@@ -884,34 +846,13 @@ class EntropyStatistic:
         agent_architecture: str,
         num_rounds: int,
     ) -> int:
-        """Get the round number for an entropy result.
-
-        Args:
-            entropy_info: Dictionary containing entropy information.
-            agent_architecture: Type of agent architecture.
-            num_rounds: Total number of rounds.
-
-        Returns:
-            Round number for the entropy result.
-        """
-        # Extract execution order from entropy info
-        execution_order = entropy_info["execution_order"]
-        # Extract agent type from entropy info
-        agent_type = entropy_info["agent_type"]
-
-        # For single agent architecture, round number equals execution order
-        if agent_architecture == "single":
-            return execution_order
-        # For debate architecture, orchestrator is in final round
-        elif agent_architecture == "debate":
-            if agent_type == "orchestrator":
-                return num_rounds
-            # Other agents: calculate round from execution order (3 agents per round)
-            else:
-                return (execution_order - 1) // 3 + 1
-        # For other architectures: calculate round from execution order (4 agents per round)
-        else:
-            return (execution_order - 1) // 4 + 1
+        """Return the round number for an entropy result (delegates to base.architecture)."""
+        return _arch_get_round_number(
+            entropy_info["execution_order"],
+            entropy_info["agent_type"],
+            agent_architecture,
+            num_rounds,
+        )
 
     def _analyze_entropy_distribution(
         self, all_results: Dict[str, Any]

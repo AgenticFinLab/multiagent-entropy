@@ -27,21 +27,15 @@ class TempDataLoader(DataLoader):
     grouping experiments by temperature.
     """
 
-    def __init__(self, base_path: str):
-        """Initialize the temperature data loader with base path.
-
-        Args:
-            base_path: Base path to the project directory.
-        """
-        # Initialize parent class
-        super().__init__(base_path)
-        
-        # Override paths for temperature ablation experiments
+    def _init_paths(self) -> None:
+        """Set storage layout for temperature ablation experiments."""
+        super()._init_paths()
+        # Override results to point at the temperature tree
         self.results_path = self.base_path / "experiments" / "results_temp" / "raw"
-        self.configs_path = self.base_path / "experiments" / "configs_exp"
-        
-        # Add aggregated results path specific to temperature experiments
-        self.aggregated_path = self.base_path / "experiments" / "results_temp" / "aggregated"
+        # Aggregated results path specific to temperature experiments
+        self.aggregated_path = (
+            self.base_path / "experiments" / "results_temp" / "aggregated"
+        )
 
     @staticmethod
     def get_temperature_from_experiment_name(experiment_name: str) -> Optional[float]:
