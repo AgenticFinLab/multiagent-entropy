@@ -115,8 +115,8 @@ def main():
         "--dataset-type",
         type=str,
         default="standard",
-        choices=["standard", "finagent"],
-        help="dataset type: standard (gsm8k/humaneval etc.) or finagent",
+        choices=["standard", "finagent", "gaia"],
+        help="dataset type: standard (gsm8k/humaneval etc.), finagent, or gaia",
     )
     args = parser.parse_args()
 
@@ -125,10 +125,17 @@ def main():
         base_dir = "evaluation/results_finagent"
         output_dir = f"data_mining/results_finagent/{args.exclude_features}"
         data_path = "data_mining/data/merged_datasets_finagent.csv"
-        # For finagent, dataset list only contains 'finagent'
         merged_datasets = ["finagent"]
         logger.info(
             f"Using finagent mode: base_dir={base_dir}, output_dir={output_dir}"
+        )
+    elif args.dataset_type == "gaia":
+        base_dir = "evaluation/results_gaia"
+        output_dir = f"data_mining/results_gaia/{args.exclude_features}"
+        data_path = "data_mining/data/merged_datasets_gaia.csv"
+        merged_datasets = ["gaia"]
+        logger.info(
+            f"Using gaia mode: base_dir={base_dir}, output_dir={output_dir}"
         )
     else:
         base_dir = "evaluation/results_qwen3_14b"

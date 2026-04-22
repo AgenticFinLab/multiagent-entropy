@@ -357,8 +357,10 @@ class EntropyStatistic(BaseAnalyzer):
 
         # Iterate through all sequences and their entropy data
         for sequence_id, sample_entropies in entropy_data.items():
-            # Group agents by main_id
-            main_id = sequence_id.split("-")[0]
+            # sequence_id = "{main_id}-{agent_type}-{order}"; main_id may be a UUID
+            # containing hyphens, so strip only the trailing "-<agent_type>-<order>" part.
+            m_seq = re.match(r"^(.+)-([^-]+)-(\d+)$", sequence_id)
+            main_id = m_seq.group(1) if m_seq else sequence_id.split("-")[0]
             for entropy_info in sample_entropies:
                 agents_by_main_id[main_id].append(entropy_info)
 
@@ -452,8 +454,9 @@ class EntropyStatistic(BaseAnalyzer):
                 for pos, entropy_val in enumerate(entropy_array):
                     micro_stats["token_position_level"][pos].append(float(entropy_val))
 
-            # Extract main_id from sequence_id
-            main_id = sequence_id.split("-")[0]
+            # Extract main_id from sequence_id (main_id may be a UUID with hyphens)
+            m_seq2 = re.match(r"^(.+)-([^-]+)-(\d+)$", sequence_id)
+            main_id = m_seq2.group(1) if m_seq2 else sequence_id.split("-")[0]
             # Initialize sample statistics if not already present
             if main_id not in micro_stats["samples"]:
                 micro_stats["samples"][main_id] = {
@@ -760,8 +763,9 @@ class EntropyStatistic(BaseAnalyzer):
             return self.tokenizer_cache[lm_name]
 
         try:
-            # Load tokenizer from Hugging Face
-            tokenizer = AutoTokenizer.from_pretrained(lm_name, use_fast=True)
+            # Resolve relative paths (configs often store ../models/ModelName)
+            resolved = str(Path(self.base_path) / lm_name) if lm_name.startswith(".") else lm_name
+            tokenizer = AutoTokenizer.from_pretrained(resolved, use_fast=True)
             # Set padding side to 'left' for decoder-only architecture
             tokenizer.padding_side = "left"
             if tokenizer.pad_token_id is None:

@@ -78,7 +78,7 @@ class DataMiningAnalyzer:
             architectures: List of architectures to filter (None or ['all'] for all)
             datasets: List of datasets to filter (None or ['all'] for all)
             exclude_features: Feature exclusion configuration ('all', 'default', or feature group names)
-            dataset_type: Type of dataset ('standard' or 'finagent')
+            dataset_type: Type of dataset ('standard', 'finagent', or 'gaia')
         """
         self.dataset_type = dataset_type
         if data_path is None:
@@ -90,6 +90,8 @@ class DataMiningAnalyzer:
             base_results_dir = (
                 "data_mining/results_finagent"
                 if dataset_type == "finagent"
+                else "data_mining/results_gaia"
+                if dataset_type == "gaia"
                 else "data_mining/results"
             )
             base_output_dir = determine_output_directory(

@@ -101,25 +101,42 @@ class ShapAnalyzer(BaseAnalyzer):
 
         # Create SHAP explainer based on model type
         X_test_for_plots = X_test  # Keep track of X_test used for SHAP values
-        if hasattr(model, "feature_importances_"):
-            explainer = shap.TreeExplainer(model)
-            shap_values = explainer.shap_values(X_test)
+        use_tree_explainer = hasattr(model, "feature_importances_")
+        if use_tree_explainer:
+            try:
+                explainer = shap.TreeExplainer(model)
+                shap_values = explainer.shap_values(X_test)
+            except (ValueError, TypeError) as e:
+                # XGBoost ≥2.x stores base_score as '[value]' which older SHAP cannot parse
+                logger.warning(
+                    f"TreeExplainer failed ({e}), falling back to KernelExplainer"
+                )
+                use_tree_explainer = False
 
             # For binary classification, TreeExplainer returns a list of arrays
-            if task_type == "classification" and isinstance(shap_values, list):
+            if use_tree_explainer and task_type == "classification" and isinstance(shap_values, list):
                 # For binary classification, take the positive class
                 shap_values = shap_values[1] if len(shap_values) > 1 else shap_values[0]
                 # Ensure shap_values is a numpy array after extraction
                 if isinstance(shap_values, list) and len(shap_values) > 0:
                     shap_values = np.asarray(shap_values[0])
-        else:
+
+        if not use_tree_explainer:
             # Use KernelExplainer as fallback for other model types
             # Sample X_test to reduce computation time
             X_test_sampled = X_test.sample(min(100, len(X_test)), random_state=42)
-            explainer = shap.KernelExplainer(
-                model.predict, X_train.sample(min(100, len(X_train)), random_state=42)
-            )
+            X_train_sampled = X_train.sample(min(100, len(X_train)), random_state=42)
+            # Wrap in lambda to strip __self__ — SHAP's convert_to_model otherwise
+            # tries to set feature_names_in_ on the bound model (read-only in XGBoost ≥2.x)
+            if task_type == "classification" and hasattr(model, "predict_proba"):
+                predict_fn = lambda x: model.predict_proba(x)
+            else:
+                predict_fn = lambda x: model.predict(x)
+            explainer = shap.KernelExplainer(predict_fn, X_train_sampled)
             shap_values = explainer.shap_values(X_test_sampled)
+            # For binary classification with predict_proba, shap_values is list[neg, pos]
+            if task_type == "classification" and isinstance(shap_values, list) and len(shap_values) > 1:
+                shap_values = shap_values[1]
             X_test_for_plots = X_test_sampled  # Use the sampled data for plots
 
         # Save prediction probabilities for classification tasks with XGBoost or LightGBM

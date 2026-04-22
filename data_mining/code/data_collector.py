@@ -33,7 +33,7 @@ class DataCollector:
         self,
         base_dir: str,
         target_datasets: Optional[List[str]] = None,
-        dataset_type: Literal["standard", "finagent"] = "standard",
+        dataset_type: Literal["standard", "finagent", "gaia"] = "standard",
     ):
         """
         Initialize the DataCollector.
@@ -45,6 +45,7 @@ class DataCollector:
             dataset_type: Type of dataset to collect:
                          - 'standard': Standard benchmark datasets (default)
                          - 'finagent': Financial agent dataset with dynamic step entropy columns
+                         - 'gaia': GAIA benchmark dataset
         """
         self.base_dir = Path(base_dir)
         self.target_datasets = target_datasets
@@ -65,6 +66,9 @@ class DataCollector:
         if self.dataset_type == "finagent":
             # finagent has a fixed path structure
             return self.base_dir / "finagent" / "all_aggregated_data_exclude_agent.csv"
+        elif self.dataset_type == "gaia":
+            # gaia has a fixed path structure
+            return self.base_dir / "gaia" / "all_aggregated_data_exclude_agent.csv"
         else:
             # standard datasets use subdirectory structure
             return (
@@ -93,6 +97,17 @@ class DataCollector:
                 logger.info(f"Found finagent dataset: {csv_file}")
             else:
                 logger.warning(f"finagent CSV not found: {csv_file}")
+                self.datasets = []
+            return self.datasets
+
+        # Special handling for gaia dataset type
+        if self.dataset_type == "gaia":
+            csv_file = self._get_csv_path("gaia")
+            if csv_file.exists():
+                self.datasets = ["gaia"]
+                logger.info(f"Found gaia dataset: {csv_file}")
+            else:
+                logger.warning(f"gaia CSV not found: {csv_file}")
                 self.datasets = []
             return self.datasets
 
@@ -147,8 +162,8 @@ class DataCollector:
                 f"Loaded dataset {dataset_name}: {len(df)} records, {len(df.columns)} columns"
             )
 
-            # Log finagent-specific columns if present
-            if self.dataset_type == "finagent":
+            # Log step entropy columns if present (finagent and gaia)
+            if self.dataset_type in ("finagent", "gaia"):
                 step_cols = discover_step_entropy_features(df.columns)
                 if step_cols:
                     logger.info(
@@ -314,6 +329,27 @@ def collect_finagent_data(
     return collector
 
 
+def collect_gaia_data(
+    base_dir: str = "evaluation/results_gaia",
+) -> DataCollector:
+    """
+    Collect GAIA benchmark evaluation data.
+
+    Args:
+        base_dir: Base directory containing gaia results
+
+    Returns:
+        Configured DataCollector instance with loaded data
+    """
+    collector = DataCollector(
+        base_dir=base_dir,
+        dataset_type="gaia",
+    )
+    collector.discover_datasets()
+    collector.merge_datasets()
+    return collector
+
+
 def main(dataset_type: str = "standard"):
     """Main function to execute data collection and merging.
 
@@ -324,6 +360,8 @@ def main(dataset_type: str = "standard"):
 
     if dataset_type == "finagent":
         collector = collect_finagent_data()
+    elif dataset_type == "gaia":
+        collector = collect_gaia_data()
     else:
         collector = collect_standard_data()
 
