@@ -180,10 +180,9 @@ def run_gaia_experiment(
             resume_mode = True
             config["save_folder"] = existing_dir
 
+    # Load dataset early so we can compute total_batches and check completion
+    # BEFORE building the agent (which loads the model into GPU memory).
     try:
-        agent = _build_agent(agent_type, config)
-
-        # Load dataset from pre-downloaded local JSON
         data_file = os.path.join(
             GAIA_DATA_PATH, f"{data_cfg['split']}-all-samples.json"
         )
@@ -214,20 +213,26 @@ def run_gaia_experiment(
         batch_size = data_cfg["batch_size"]
         total_batches = (total_samples + batch_size - 1) // batch_size
 
-        if resume_mode and existing_dir:
-            completed_batches = get_completed_batches(existing_dir)
-            if completed_batches >= total_batches:
-                logger.info(
-                    f"Experiment '{experiment_name}' already completed. Skipping."
-                )
-                return {
-                    "status": "skipped",
-                    "experiment_name": experiment_name,
-                    "agent_type": agent_type,
-                    "reason": "already_completed",
-                    "completed_batches": completed_batches,
-                    "results_path": existing_dir,
-                }
+        # Completion check before model loading (covers data_num == -1 case)
+        if resume_mode and existing_dir and completed_batches >= total_batches:
+            logger.info(
+                f"Experiment '{experiment_name}' already completed "
+                f"({completed_batches}/{total_batches} batches). Skipping before model load."
+            )
+            return {
+                "status": "skipped",
+                "experiment_name": experiment_name,
+                "agent_type": agent_type,
+                "reason": "already_completed",
+                "completed_batches": completed_batches,
+                "results_path": existing_dir,
+            }
+    except Exception as e:
+        logger.error(f"Failed to load dataset for completion check: {e}")
+        raise
+
+    try:
+        agent = _build_agent(agent_type, config)
 
         start_batch = completed_batches if resume_mode else 0
         start_sample_idx = start_batch * batch_size
