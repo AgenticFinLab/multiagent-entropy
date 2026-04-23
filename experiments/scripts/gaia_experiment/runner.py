@@ -451,6 +451,23 @@ def run_gaia_experiment(
             "agent_type": agent_type,
             "error": str(e),
         }
+    finally:
+        # Release GPU memory between experiments to avoid CPU offload on retry
+        try:
+            import gc
+            import torch as _torch
+            if "agent" in locals() and agent is not None:
+                if hasattr(agent, "agents_lm") and agent.agents_lm is not None:
+                    if hasattr(agent.agents_lm, "model"):
+                        del agent.agents_lm.model
+                    del agent.agents_lm
+                del agent
+            gc.collect()
+            if _torch.cuda.is_available():
+                _torch.cuda.empty_cache()
+                _torch.cuda.ipc_collect()
+        except Exception as cleanup_err:
+            logger.warning(f"GPU cleanup failed: {cleanup_err}")
 
 
 def run_batch_gaia_experiments(
