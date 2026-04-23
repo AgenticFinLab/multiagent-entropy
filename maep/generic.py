@@ -1,80 +1,38 @@
-"""
-Implementation of the general terms and abstract base classes used across the project.
+"""Multi-agent base classes (state, output container, and BaseAgents).
 
-This file serves as the central documentation hub for:
-1. Standard Dimension Notations
-2. Entropy Inference Workflow (ASCII Diagram)
-3. Common Tensor Shapes and Types
-
-Standard Dimension Notations:
------------------------------
-B       : Batch size
-L       : Sequence length (generic, after padding)
-L_g     : Sequence length of generated tokens
-V       : Vocabulary size
-D_h     : Model hidden dimension (hidden size)
-
-ASCII Diagram (Unified Entropy Inference Workflow):
----------------------------------------------------
-Read messages (List[List[Dict]])
-  ↓
-apply_chat_template → prompts [B]
-  ↓
-tokenizer(prompts, padding=True) → input_ids [B, L], attention_mask [B, L]
-  ↓
-infer_entropy (HF / vLLM)
-  - HF: Forward pass → Logits [B, L_g, V] → Entropy Calculation
-  - vLLM: Generate / Probabilities → Logits [B, L_g, V] → Entropy Calculation
-  ↓
-Output:
-  - Token-level Entropy
-  - Token-level Logits
-  - Generated Text (if applicable)
-
-Concrete Step-by-Step Workflows:
---------------------------------
-- HF workflow:
-  Read messages → Encode → Forward pass to obtain logits → Compute Entropy per token.
-- vLLM workflow:
-  Read messages → Encode → Engine Generation (with logprobs) → Extract logits/probs → Compute Entropy per token.
-
-Common Tensor Shapes and Types:
--------------------------------
-- input_ids        : [B, L] (Long)
-- attention_mask   : [B, L] (Long)
-- logits           : [B, L_g, V] (Float)
-- entropy          : [B, L_g] (Float)
+The ReAct loop implementation lives in `maep.language.react_loop`.
+The entropy-inference base class lives in `maep.inference_base`
+and is re-exported here for backward compatibility.
 """
 
 import os
 import sys
-import json
-import asyncio
-import logging
 import importlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
-import torch
 from langgraph.graph import MessagesState
 from langgraph.graph.state import CompiledStateGraph
-from lmbase.inference.base import InferInput, InferOutput
-from lmbase.utils.tools import BaseContainer, BlockBasedStoreManager
+from lmbase.inference.base import InferInput
 
+from lmbase.utils.tools import BaseContainer, BlockBasedStoreManager
 from lmbase.inference.api_call import LangChainAPIInference
 from lmbase.inference.model_call import LLMInference
-from maep.language.react_utils import (
-    parse_tool_call,
-    format_tool_result,
-    is_final_answer,
-    build_react_system_suffix,
-    ReActStepRecord,
-    ReActResult,
-    MAX_REACT_ITERATIONS,
-)
 
-logger = logging.getLogger(__name__)
+from maep.inference_base import BaseEntropyInference  # re-export
+from maep.language.react_utils import (
+    MAX_REACT_ITERATIONS,
+    build_react_system_suffix,
+)
+from maep.language.react_loop import ReActExecutor
+
+__all__ = [
+    "AgentState",
+    "AgentReasonOutput",
+    "BaseAgents",
+    "BaseEntropyInference",
+]
 
 
 class AgentState(MessagesState):
@@ -144,9 +102,6 @@ class BaseAgents(ABC):
         # Task type for dynamic prompt loading
         self.task_type = self.run_config["task_type"]
 
-        # Validate task_type
-        # self._validate_task_type()
-
         # By default, we set only one lm for agents
         # for any agent with a different generation config, we only
         # change the generation config.
@@ -207,13 +162,6 @@ class BaseAgents(ABC):
                     f"Available task types: {list(obj.keys())}"
                 )
             obj = obj[self.task_type]
-
-        # If the object is a string and contains {identifier} placeholder, format it
-        if isinstance(obj, str) and "{identifier}" in obj:
-            # Try to get the identifier from the module if it has get_identifier function
-            if hasattr(module, "get_identifier"):
-                identifier = module.get_identifier(self.task_type)
-                obj = obj.replace("{identifier}", identifier)
 
         return obj
 
@@ -365,544 +313,15 @@ class BaseAgents(ABC):
         """Batch inference with ReAct loop, recording entropy at each step.
 
         If no tools are available, falls back to standard infer_batch (zero behavior change).
-        When tools are available, runs a ReAct loop per sample:
-          1. Enhance system prompt with tool definitions and ReAct format instructions
-          2. Call LLM inference
-          3. Parse response for tool calls
-          4. If tool call found: execute tool, format result, append to history, re-infer
-          5. If final answer or max iterations: return result with all step records
-
-        Returns List[InferOutput] with extras containing react_steps entropy records.
+        Otherwise delegates to ReActExecutor.
         """
-        # if the agent has no tools, fall back to standard infer_batch
         if not self._has_tools():
             return self.agents_lm.infer_batch(infer_inputs)
 
-        max_iters = max_iterations or MAX_REACT_ITERATIONS
-        react_suffix = self._get_react_system_suffix()
-
-        all_outputs = []
-
-        for sample_idx, infer_input in enumerate(infer_inputs):
-            # enhance system_msg add ReAct instructions
-            enhanced_system = infer_input.system_msg + "\n\n" + react_suffix
-
-            react_steps = []
-            iteration = 0
-            conversation_history = ""  # accumulate ReAct history
-            current_user_msg = infer_input.user_msg
-            final_output = None
-            seen_tool_calls = (
-                set()
-            )  # track (tool_name, args_json) to detect repeated calls
-            tool_name_counts: Dict[str, int] = {}  # per-tool-name call counts
-            parse_failure_streak = 0  # consecutive parse failures
-            unknown_tool_count = 0  # cumulative unknown-tool calls
-            WEAK_MODEL_LIMIT = 3
-
-            while iteration < max_iters:
-                # build current round inference input
-                if conversation_history:
-                    # append history to user_msg
-                    augmented_user_msg = (
-                        current_user_msg + "\n\n" + conversation_history
-                    )
-                else:
-                    augmented_user_msg = current_user_msg
-
-                # create single sample InferInput
-                single_input = type(infer_input)(
-                    system_msg=enhanced_system,
-                    user_msg=augmented_user_msg,
-                )
-                # if InferInput has messages attribute, also handle it
-                if hasattr(infer_input, "messages") and infer_input.messages:
-                    single_input.messages = infer_input.messages
-
-                # call LLM inference (single sample batch)
-                step_outputs = self.agents_lm.infer_batch([single_input])
-                step_output = step_outputs[0]
-
-                # release GPU memory after each inference step
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-
-                response = step_output.response  # get response
-                # get entropy for this step
-                step_entropy = (
-                    step_output.extras.get("entropy", None)
-                    if step_output.extras
-                    else None
-                )
-
-                # parse tool call
-                tool_call = parse_tool_call(response)
-
-                if tool_call is not None:
-                    tool_name, tool_args = tool_call
-                    parse_failure_streak = 0  # reset on any successful parse
-                    tool_name_counts[tool_name] = tool_name_counts.get(tool_name, 0) + 1
-
-                    # weak-model guard: same tool name called too many times
-                    if tool_name_counts[tool_name] >= WEAK_MODEL_LIMIT:
-                        logger.warning(
-                            f"[ReAct] Sample {sample_idx}, Step {iteration}: "
-                            f"Tool '{tool_name}' called {tool_name_counts[tool_name]} times "
-                            f"(>{WEAK_MODEL_LIMIT}); forcing final answer"
-                        )
-                        redirect_msg = (
-                            f"Observation: [system] You have called '{tool_name}' "
-                            f"{WEAK_MODEL_LIMIT} times already. Stop calling tools and "
-                            f"provide your Final Answer now based on information gathered.\n"
-                        )
-                        step_record = ReActStepRecord(
-                            step_index=iteration,
-                            prompt=augmented_user_msg,
-                            response=response,
-                            tool_calls={
-                                "tool_name": tool_name,
-                                "tool_arguments": tool_args,
-                                "tool_result": redirect_msg,
-                            },
-                            entropy=step_entropy,
-                        )
-                        react_steps.append(step_record)
-                        conversation_history += response + "\n" + redirect_msg + "\n"
-                        iteration += 1
-                        continue
-
-                    # detect repeated tool call to break infinite loops
-                    try:
-                        call_signature = (
-                            tool_name,
-                            json.dumps(tool_args, sort_keys=True),
-                        )
-                    except (TypeError, ValueError):
-                        call_signature = (tool_name, str(tool_args))
-
-                    if call_signature in seen_tool_calls:
-                        logger.warning(
-                            f"[ReAct] Sample {sample_idx}, Step {iteration}: "
-                            f"Repeated tool call detected for '{tool_name}', redirecting model to give final answer"
-                        )
-                        redirect_msg = (
-                            f"Observation: [system] You have already called '{tool_name}' with the same "
-                            f"arguments before. Do NOT repeat the same tool call. "
-                            f"Based on the information already gathered, please provide your Final Answer now.\n"
-                        )
-                        step_record = ReActStepRecord(
-                            step_index=iteration,
-                            prompt=augmented_user_msg,
-                            response=response,
-                            tool_calls={
-                                "tool_name": tool_name,
-                                "tool_arguments": tool_args,
-                                "tool_result": redirect_msg,
-                            },
-                            entropy=step_entropy,
-                        )
-                        react_steps.append(step_record)
-                        conversation_history += response + "\n" + redirect_msg + "\n"
-                        iteration += 1
-                        continue
-
-                    seen_tool_calls.add(call_signature)
-
-                    # check if tool exists
-                    if tool_name in self._tools:
-                        tool_instance = self._tools[tool_name]
-                        # execute tool (async to sync)
-                        try:
-                            loop = asyncio.new_event_loop()
-                            try:
-                                tool_result = loop.run_until_complete(
-                                    tool_instance(arguments=tool_args)
-                                )
-                            finally:
-                                loop.close()
-                            tool_result_str = format_tool_result(tool_name, tool_result)
-                            logger.info(
-                                f"[ReAct] Sample {sample_idx}, Step {iteration}: "
-                                f"Called tool '{tool_name}' successfully"
-                            )
-                        except Exception as e:
-                            tool_result = {"success": False, "error": str(e)}
-                            tool_result_str = format_tool_result(tool_name, tool_result)
-                            logger.warning(
-                                f"[ReAct] Sample {sample_idx}, Step {iteration}: "
-                                f"Tool '{tool_name}' failed: {e}"
-                            )
-                    else:
-                        tool_result = {
-                            "success": False,
-                            "error": f"Unknown tool: {tool_name}",
-                        }
-                        tool_result_str = format_tool_result(tool_name, tool_result)
-                        unknown_tool_count += 1
-                        logger.warning(
-                            f"[ReAct] Sample {sample_idx}, Step {iteration}: "
-                            f"Unknown tool '{tool_name}' (count={unknown_tool_count})"
-                        )
-                        if unknown_tool_count >= WEAK_MODEL_LIMIT:
-                            available = ", ".join(self._tools.keys()) or "none"
-                            redirect_msg = (
-                                f"Observation: [system] You have called {unknown_tool_count} "
-                                f"unknown tools. Available tools: [{available}]. Stop calling "
-                                f"tools and provide your Final Answer now.\n"
-                            )
-                            step_record = ReActStepRecord(
-                                step_index=iteration,
-                                prompt=augmented_user_msg,
-                                response=response,
-                                tool_calls={
-                                    "tool_name": tool_name,
-                                    "tool_arguments": tool_args,
-                                    "tool_result": redirect_msg,
-                                },
-                                entropy=step_entropy,
-                            )
-                            react_steps.append(step_record)
-                            conversation_history += (
-                                response + "\n" + redirect_msg + "\n"
-                            )
-                            iteration += 1
-                            continue
-
-                    # record step
-                    step_record = ReActStepRecord(
-                        step_index=iteration,
-                        prompt=augmented_user_msg,
-                        response=response,
-                        tool_calls={
-                            "tool_name": tool_name,
-                            "tool_arguments": tool_args,
-                            "tool_result": tool_result_str,
-                        },
-                        entropy=step_entropy,
-                    )
-                    react_steps.append(step_record)
-
-                    # append assistant response and tool result to history
-                    conversation_history += response + "\n" + tool_result_str + "\n"
-
-                else:
-                    # check if it is the final answer
-                    if is_final_answer(response):
-                        # true final answer
-                        step_record = ReActStepRecord(
-                            step_index=iteration,
-                            prompt=augmented_user_msg,
-                            response=response,
-                            tool_calls=None,
-                            entropy=step_entropy,
-                        )
-                        react_steps.append(step_record)
-                        final_output = step_output
-                        logger.info(
-                            f"[ReAct] Sample {sample_idx}: Final answer at step {iteration}"
-                        )
-                        break
-                    else:
-                        # tool call parse failed but not a final answer
-                        parse_failure_streak += 1
-                        logger.warning(
-                            f"[ReAct] Sample {sample_idx}: Step {iteration} - "
-                            f"tool call parse failed, not a final answer "
-                            f"(streak={parse_failure_streak})"
-                        )
-                        step_record = ReActStepRecord(
-                            step_index=iteration,
-                            prompt=augmented_user_msg,
-                            response=response,
-                            tool_calls=None,
-                            entropy=step_entropy,
-                        )
-                        react_steps.append(step_record)
-
-                        if parse_failure_streak >= WEAK_MODEL_LIMIT:
-                            logger.warning(
-                                f"[ReAct] Sample {sample_idx}: {parse_failure_streak} "
-                                f"consecutive parse failures; forcing final answer"
-                            )
-                            redirect_msg = (
-                                "Observation: [system] Your last responses could not be "
-                                "parsed as either an Action or a Final Answer. You MUST "
-                                "respond with 'Final Answer: <your answer>' now.\n"
-                            )
-                            conversation_history += (
-                                response + "\n" + redirect_msg + "\n"
-                            )
-                            iteration += 1
-                            continue
-
-                        # add this response to the conversation history, continue iteration to let the model retry
-                        conversation_history += response + "\n"
-
-                iteration += 1
-
-            # if reached max iterations but no final answer, use last output
-            if final_output is None:
-                logger.warning(
-                    f"[ReAct] Sample {sample_idx}: Max iterations ({max_iters}) reached"
-                )
-                # perform one final inference without tools
-                final_user_msg = current_user_msg + "\n\n" + conversation_history
-                final_user_msg += "\n\nYou have used all available tool calls. Please provide your Final Answer now based on the information gathered above."
-                final_input = type(infer_input)(
-                    system_msg=enhanced_system,
-                    user_msg=final_user_msg,
-                )
-                final_outputs = self.agents_lm.infer_batch([final_input])
-                final_output = final_outputs[0]
-
-                final_entropy = (
-                    final_output.extras.get("entropy", None)
-                    if final_output.extras
-                    else None
-                )
-                final_step = ReActStepRecord(
-                    step_index=iteration,
-                    prompt=final_user_msg,
-                    response=final_output.response,
-                    tool_calls=None,
-                    entropy=final_entropy,
-                )
-                react_steps.append(final_step)
-
-            # build final InferOutput, containing the complete react_steps
-            react_result = ReActResult(
-                final_response=final_output.response,
-                final_entropy=(
-                    final_output.extras.get("entropy", None)
-                    if final_output.extras
-                    else None
-                ),
-                steps=react_steps,
-                total_iterations=len(react_steps),
-            )
-
-            # inject react_steps information into final_output's extras
-            if final_output.extras is None:
-                final_output.extras = {}
-            final_output.extras["react_steps"] = [s.to_dict() for s in react_steps]
-            final_output.extras["total_react_iterations"] = len(react_steps)
-            final_output.extras["has_tool_calls"] = any(
-                s.tool_calls is not None for s in react_steps
-            )
-
-            all_outputs.append(final_output)
-
-        return all_outputs
-
-
-class BaseEntropyInference(ABC):
-    """
-    Abstract base class for inference with the entropy exposure.
-
-    Config Members
-    - lm_name: Backend model identifier.
-    - inference_config: Backend/runtime settings (e.g., device, tensor_parallel).
-    - generation_config: Decoding hyperparameters (e.g., `max_new_tokens`, `temperature`, `top_p`).
-
-    """
-
-    def __init__(
-        self,
-        *,
-        lm_name: str,
-        inference_config: Dict[str, Any],
-        entropy_config: Dict[str, Any],
-        generation_config: Dict[str, Any],
-    ):
-        # Backend model identifier
-        self.lm_name = lm_name
-        # Backend/runtime settings (e.g., device, tensor parallel)
-        self.inference_config = inference_config
-        # Entropy exposure settings
-        self.entropy_config = entropy_config
-        # Decoding hyperparameters (max_new_tokens, temperature, top_p)
-        self.generation_config = generation_config
-        # Whether to append generation prompt tokens when rendering chat messages
-        self.add_generation_prompt = True
-
-        # Runtime device (mandatory)
-        # - Single-GPU: set `inference_config["device"]` to "cuda" or "cuda:0"
-        # - Multi-GPU: vLLM uses `tensor_parallel_size` and env `CUDA_VISIBLE_DEVICES` for distribution;
-        #              HF uses `device_map="auto"` for shard placement while `self.device` is the default tensor device
-        # - No protective defaults; missing key in `inference_config` raises an error
-        self.device = torch.device(self.inference_config["device"])
-        # Runtime torch dtype (mandatory)
-        # - Set `inference_config["torch_dtype"]` to a torch dtype string, e.g., "bfloat16", "float32"
-        self.torch_dtype = getattr(torch, self.inference_config["torch_dtype"])
-
-        # Tokenizer paired with the chosen backend (assigned in `load_model`)
-        self.tokenizer = None
-        # Active generation backend instance (assigned in `load_model`)
-        self.model = None
-
-        # Load the backend model and the tokenizer
-        self.load_tokenizer()
-        self.load_model()
-
-    @abstractmethod
-    def calculate_entropy(self, logits: Any) -> Any:
-        """
-        Calculate entropy from logits.
-
-        Entropy H(x) = - Σ p(x) * log(p(x))
-
-        Args:
-            logits: Input logits tensor.
-                    Shape: [B, L_g, V]
-                    Type: torch.Float
-
-        Returns:
-            Calculated entropy tensor.
-            Shape: [B, L_g]
-            Type: torch.Float
-
-        Dimensions:
-            B   : Batch size
-            L_g : Generated sequence length
-            V   : Vocabulary size
-        """
-
-    @abstractmethod
-    def load_model(self):
-        """
-        Initialize and load the active backend, then set shared members.
-
-        Contract:
-        - Decide backend via `inference_config['use_vllm']`:
-          - If True: initialize vLLM engine (requires `tensor_parallel_size`, `gpu_memory_utilization`).
-          - If False: initialize HF `AutoModelForCausalLM` with `self.torch_dtype`.
-        - Do not return anything; assign members directly.
-
-        Side effects (subclass must perform):
-        - Set `self.model` to the active generation backend instance.
-        - Optionally set any other backend-specific members required by the subclass.
-        """
-
-    @abstractmethod
-    def load_tokenizer(self):
-        """
-        Initialize and assign `self.tokenizer` compatible with the chosen backend.
-
-        Contract:
-        - Create tokenizer for `self.lm_name` using the backend library.
-        - Ensure `pad_token` is set (reuse EOS or add a new pad token).
-        - Do not return anything; assign to `self.tokenizer`.
-        """
-
-    @abstractmethod
-    def build_messages(
-        self,
-        infer_inputs: List[InferInput],
-    ) -> List[List[Dict]]:
-        """
-        Build chat messages for a batch.
-
-        Args:
-            infer_inputs: List of InferInput objects containing user/system messages.
-                          Length: B
-
-        Returns:
-            A list (batch) of message lists.
-            Shape: List[List[Dict]] (Length: B)
-            Structure: [[{"role": "user", "content": "..."}], ...]
-        """
-
-    @abstractmethod
-    def encode_messages(
-        self, messages_batch: List[List[Dict]]
-    ) -> Tuple[List[str], Any, Any, List[List[str]]]:
-        """
-        Encode a batch of messages into model inputs.
-
-        Args:
-            messages_batch: Batch of message lists.
-                            Length: B
-
-        Returns:
-            Tuple containing:
-            - prompts: List[str], length B.
-            - input_ids: Tensor, shape [B, L]. Type: torch.Long
-            - attention_mask: Tensor, shape [B, L]. Type: torch.Long
-            - tokens_batch: List[List[str]], B lists of tokens, each length L.
-
-        Dimensions:
-            B : Batch size
-            L : Padded input sequence length
-        """
-
-    def infer_entropy_hf(
-        self,
-        input_ids: Any,
-        attention_mask: Any = None,
-    ) -> Tuple[Any, Any]:
-        """
-        Execute entropy inference for HuggingFace backend.
-
-        This method performs generation and returns the full output object and computed entropy.
-
-        Args:
-            input_ids: Token IDs tensor.
-                       Shape: [B, L]
-            attention_mask: Attention mask tensor (optional).
-                            Shape: [B, L]
-
-        Returns:
-            Tuple containing:
-            - outputs: HF ModelOutput object (contains sequences, scores/logits).
-            - entropy: Calculated entropy tensor.
-                       Shape: [B, L_g]
-
-        Dimensions:
-            B   : Batch size
-            L   : Input sequence length
-            L_g : Generated sequence length
-        """
-        pass
-
-    def infer_entropy_vllm(
-        self,
-        input_ids: Any,
-    ) -> Tuple[Any, Any]:
-        """
-        Execute entropy inference for vLLM backend.
-
-        This method performs generation via vLLM engine and computes entropy from logprobs.
-
-        Args:
-            input_ids: Token IDs tensor or list.
-
-        Returns:
-            Tuple containing:
-            - outputs: vLLM output objects.
-            - entropy: Calculated entropy tensor.
-                       Shape: [B, L_g]
-
-        Dimensions:
-            B   : Batch size
-            L_g : Generated sequence length
-        """
-        pass
-
-    @abstractmethod
-    def infer_batch(self, infer_inputs: List[InferInput]) -> List[InferOutput]:
-        """
-        Orchestrate entropy inference for a batch of inputs.
-
-        This method acts as the main controller. It must implement the following pipeline:
-        1. Build and encode messages.
-        2. Dispatch to `infer_entropy_hf` or `infer_entropy_vllm` based on configuration.
-        3. Package results into `InferOutput`.
-
-        Args:
-            infer_inputs: List of inputs to process.
-                          Length: B
-
-        Returns:
-            List[InferOutput]: List of output objects, one for each input.
-                               Length: B
-        """
+        executor = ReActExecutor(
+            agents_lm=self.agents_lm,
+            tools=self._tools,
+            system_suffix=self._get_react_system_suffix(),
+            max_iterations=max_iterations or MAX_REACT_ITERATIONS,
+        )
+        return executor.run_batch(infer_inputs)
