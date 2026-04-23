@@ -395,6 +395,10 @@ class BaseAgents(ABC):
             seen_tool_calls = (
                 set()
             )  # track (tool_name, args_json) to detect repeated calls
+            tool_name_counts: Dict[str, int] = {}  # per-tool-name call counts
+            parse_failure_streak = 0  # consecutive parse failures
+            unknown_tool_count = 0  # cumulative unknown-tool calls
+            WEAK_MODEL_LIMIT = 3
 
             while iteration < max_iters:
                 # build current round inference input
@@ -436,6 +440,36 @@ class BaseAgents(ABC):
 
                 if tool_call is not None:
                     tool_name, tool_args = tool_call
+                    parse_failure_streak = 0  # reset on any successful parse
+                    tool_name_counts[tool_name] = tool_name_counts.get(tool_name, 0) + 1
+
+                    # weak-model guard: same tool name called too many times
+                    if tool_name_counts[tool_name] >= WEAK_MODEL_LIMIT:
+                        logger.warning(
+                            f"[ReAct] Sample {sample_idx}, Step {iteration}: "
+                            f"Tool '{tool_name}' called {tool_name_counts[tool_name]} times "
+                            f"(>{WEAK_MODEL_LIMIT}); forcing final answer"
+                        )
+                        redirect_msg = (
+                            f"Observation: [system] You have called '{tool_name}' "
+                            f"{WEAK_MODEL_LIMIT} times already. Stop calling tools and "
+                            f"provide your Final Answer now based on information gathered.\n"
+                        )
+                        step_record = ReActStepRecord(
+                            step_index=iteration,
+                            prompt=augmented_user_msg,
+                            response=response,
+                            tool_calls={
+                                "tool_name": tool_name,
+                                "tool_arguments": tool_args,
+                                "tool_result": redirect_msg,
+                            },
+                            entropy=step_entropy,
+                        )
+                        react_steps.append(step_record)
+                        conversation_history += response + "\n" + redirect_msg + "\n"
+                        iteration += 1
+                        continue
 
                     # detect repeated tool call to break infinite loops
                     try:
@@ -504,10 +538,35 @@ class BaseAgents(ABC):
                             "error": f"Unknown tool: {tool_name}",
                         }
                         tool_result_str = format_tool_result(tool_name, tool_result)
+                        unknown_tool_count += 1
                         logger.warning(
                             f"[ReAct] Sample {sample_idx}, Step {iteration}: "
-                            f"Unknown tool '{tool_name}'"
+                            f"Unknown tool '{tool_name}' (count={unknown_tool_count})"
                         )
+                        if unknown_tool_count >= WEAK_MODEL_LIMIT:
+                            available = ", ".join(self._tools.keys()) or "none"
+                            redirect_msg = (
+                                f"Observation: [system] You have called {unknown_tool_count} "
+                                f"unknown tools. Available tools: [{available}]. Stop calling "
+                                f"tools and provide your Final Answer now.\n"
+                            )
+                            step_record = ReActStepRecord(
+                                step_index=iteration,
+                                prompt=augmented_user_msg,
+                                response=response,
+                                tool_calls={
+                                    "tool_name": tool_name,
+                                    "tool_arguments": tool_args,
+                                    "tool_result": redirect_msg,
+                                },
+                                entropy=step_entropy,
+                            )
+                            react_steps.append(step_record)
+                            conversation_history += (
+                                response + "\n" + redirect_msg + "\n"
+                            )
+                            iteration += 1
+                            continue
 
                     # record step
                     step_record = ReActStepRecord(
@@ -544,9 +603,12 @@ class BaseAgents(ABC):
                         )
                         break
                     else:
-                        # tool call parse failed but not a final answer - record warning, still record step, continue iteration
+                        # tool call parse failed but not a final answer
+                        parse_failure_streak += 1
                         logger.warning(
-                            f"[ReAct] Sample {sample_idx}: Step {iteration} - tool call parse failed, not a final answer. Continuing..."
+                            f"[ReAct] Sample {sample_idx}: Step {iteration} - "
+                            f"tool call parse failed, not a final answer "
+                            f"(streak={parse_failure_streak})"
                         )
                         step_record = ReActStepRecord(
                             step_index=iteration,
@@ -556,6 +618,23 @@ class BaseAgents(ABC):
                             entropy=step_entropy,
                         )
                         react_steps.append(step_record)
+
+                        if parse_failure_streak >= WEAK_MODEL_LIMIT:
+                            logger.warning(
+                                f"[ReAct] Sample {sample_idx}: {parse_failure_streak} "
+                                f"consecutive parse failures; forcing final answer"
+                            )
+                            redirect_msg = (
+                                "Observation: [system] Your last responses could not be "
+                                "parsed as either an Action or a Final Answer. You MUST "
+                                "respond with 'Final Answer: <your answer>' now.\n"
+                            )
+                            conversation_history += (
+                                response + "\n" + redirect_msg + "\n"
+                            )
+                            iteration += 1
+                            continue
+
                         # add this response to the conversation history, continue iteration to let the model retry
                         conversation_history += response + "\n"
 
