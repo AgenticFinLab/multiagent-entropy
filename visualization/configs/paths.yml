@@ -1,0 +1,68 @@
+# Path configuration for visualization scripts.
+#
+# {root} is auto-substituted to the project root (the directory two levels
+# above this file). Other tokens defined in `defaults` (e.g. {data_mining_root})
+# can be referenced inside `plots`.
+
+defaults:
+  accuracy_csv: "{root}/visualization/data/accuracy.csv"
+
+  data_mining_root: "{root}/data_mining"
+  evaluation_root: "{root}/evaluation"
+  experiments_root: "{root}/experiments"
+
+  output_root: "{root}/visualization/outputs"
+
+# Per-plot inputs. Output dirs default to {output_root}/<plot_name>.
+plots:
+  accuracy:
+    csv_path: "{accuracy_csv}"
+    num_rows: 1
+
+  single_superiority:
+    csv_path: "{accuracy_csv}"
+
+  arch:
+    summary_json_path: "{data_mining_root}/exp_architecture/results_summaries/summary.json"
+    results_dir: "{data_mining_root}/exp_architecture/results"
+    accuracy_data_path: "{evaluation_root}/results_all/combined_summary_data.csv"
+
+  datasets:
+    shap_data_root: "{data_mining_root}/exp_all_data/results"
+    accuracy_data_path: "{evaluation_root}/results_all/combined_summary_data.csv"
+
+  mas:
+    results_dir: "{data_mining_root}/exp_mas/results"
+    exp_key: "exclude_base_model_all_metrics"
+    feature_importance_path: "{data_mining_root}/exp_mas/results_aggregated/exclude_base_model_all_metrics.csv"
+    top_features:
+      - sample_round_1_max_agent_total_entropy
+      - sample_total_entropy
+
+  round:
+    r2_summary_path: "{evaluation_root}/results_R_2/combined_summary_data.csv"
+    r5_summary_path: "{evaluation_root}/results_R_5/combined_summary_data.csv"
+    r5_math500_data_path: "{evaluation_root}/results_R_5/math500/all_aggregated_data_exclude_agent.csv"
+    r5_aime_data_path: "{evaluation_root}/results_R_5/aime2025_16384/all_aggregated_data_exclude_agent.csv"
+    results_dir: "{data_mining_root}/exp_round_5/results"
+    exp_key: "exclude_base_model_all_metrics"
+
+  base_model:
+    feature_importance_csv: "{data_mining_root}/exp_qwen_family/results_aggregated/exclude_base_model_wo_entropy.csv"
+    shap_results_dir: "{data_mining_root}/exp_qwen_family/results"
+    merged_data_path: "{data_mining_root}/data/merged_datasets.csv"
+
+  rl_model:
+    combined_summary_path: "{evaluation_root}/results_rl/combined_summary_data.csv"
+    shap_x_test_path: "{data_mining_root}/exp_rl_base_model/results/exclude_base_model_wo_entropy/shap/X_test_LightGBM_classification.csv"
+    shap_values_path: "{data_mining_root}/exp_rl_base_model/results/exclude_base_model_wo_entropy/shap/shap_values_LightGBM_classification.csv"
+    lightgbm_pred_path: "{data_mining_root}/exp_rl_base_model/results/exclude_base_model_wo_entropy/shap/shap_prediction_probabilities_LightGBM_classification.csv"
+    xgboost_pred_path: "{data_mining_root}/exp_rl_base_model/results/exclude_base_model_wo_entropy/shap/shap_prediction_probabilities_XGBoost_classification.csv"
+    merged_data_path: "{data_mining_root}/exp_rl_base_model/merged_datasets.csv"
+    top_features:
+      - round_2_total_entropy
+      - sample_round_1_median_agent_total_entropy
+
+  appendix_arch:
+    data_dir: "{experiments_root}/results/raw"
+    eval_dir: "{evaluation_root}/results_qwen"
