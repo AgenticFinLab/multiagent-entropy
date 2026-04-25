@@ -26,6 +26,7 @@ from maep.language.react_utils import (
     build_react_system_suffix,
 )
 from maep.language.react_loop import ReActExecutor
+from maep.prompts import get_identifier
 
 __all__ = [
     "AgentState",
@@ -162,6 +163,9 @@ class BaseAgents(ABC):
                     f"Available task types: {list(obj.keys())}"
                 )
             obj = obj[self.task_type]
+
+        if isinstance(obj, str) and "{identifier}" in obj:
+            obj = obj.replace("{identifier}", get_identifier(self.task_type))
 
         return obj
 
