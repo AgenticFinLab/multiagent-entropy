@@ -39,7 +39,7 @@ class _ReActLoopState:
     conversation_history: str = ""
     final_output: Any = None
     seen_tool_calls: Set[Tuple[str, str]] = field(default_factory=set)
-    tool_name_counts: Dict[str, int] = field(default_factory=dict)
+    consecutive_failures_by_tool: Dict[str, int] = field(default_factory=dict)
     parse_failure_streak: int = 0
     unknown_tool_count: int = 0
     augmented_user_msg: str = ""
@@ -130,11 +130,7 @@ class ReActExecutor:
 
     @staticmethod
     def _extract_entropy(step_output: Any) -> Any:
-        return (
-            step_output.extras.get("entropy", None)
-            if step_output.extras
-            else None
-        )
+        return step_output.extras.get("entropy", None) if step_output.extras else None
 
     # ----- branch handlers --------------------------------------------------
 
@@ -147,31 +143,6 @@ class ReActExecutor:
     ) -> None:
         tool_name, tool_args = tool_call
         state.parse_failure_streak = 0  # reset on any successful parse
-        state.tool_name_counts[tool_name] = (
-            state.tool_name_counts.get(tool_name, 0) + 1
-        )
-
-        # weak-model guard: same tool name called too many times
-        if state.tool_name_counts[tool_name] >= WEAK_MODEL_LIMIT:
-            logger.warning(
-                f"[ReAct] Sample {state.sample_idx}, Step {state.iteration}: "
-                f"Tool '{tool_name}' called {state.tool_name_counts[tool_name]} times "
-                f"(>{WEAK_MODEL_LIMIT}); forcing final answer"
-            )
-            redirect_msg = (
-                f"Observation: [system] You have called '{tool_name}' "
-                f"{WEAK_MODEL_LIMIT} times already. Stop calling tools and "
-                f"provide your Final Answer now based on information gathered.\n"
-            )
-            self._force_final(
-                state, response, step_entropy, redirect_msg,
-                tool_calls={
-                    "tool_name": tool_name,
-                    "tool_arguments": tool_args,
-                    "tool_result": redirect_msg,
-                },
-            )
-            return
 
         # detect repeated tool call (same args) to break infinite loops
         try:
@@ -191,7 +162,10 @@ class ReActExecutor:
                 f"Based on the information already gathered, please provide your Final Answer now.\n"
             )
             self._force_final(
-                state, response, step_entropy, redirect_msg,
+                state,
+                response,
+                step_entropy,
+                redirect_msg,
                 tool_calls={
                     "tool_name": tool_name,
                     "tool_arguments": tool_args,
@@ -203,8 +177,11 @@ class ReActExecutor:
         state.seen_tool_calls.add(call_signature)
 
         # execute tool (or report unknown)
+        tool_succeeded = False
         if tool_name in self.tools:
-            tool_result_str = self._execute_tool(state, tool_name, tool_args)
+            tool_result_str, tool_succeeded = self._execute_tool(
+                state, tool_name, tool_args
+            )
         else:
             unknown_handled = self._handle_unknown_tool(
                 state, tool_name, tool_args, response, step_entropy
@@ -215,6 +192,38 @@ class ReActExecutor:
                 tool_name,
                 {"success": False, "error": f"Unknown tool: {tool_name}"},
             )
+
+        # weak-model guard: same tool failed too many times consecutively
+        if tool_succeeded:
+            state.consecutive_failures_by_tool[tool_name] = 0
+        else:
+            state.consecutive_failures_by_tool[tool_name] = (
+                state.consecutive_failures_by_tool.get(tool_name, 0) + 1
+            )
+            if state.consecutive_failures_by_tool[tool_name] >= WEAK_MODEL_LIMIT:
+                logger.warning(
+                    f"[ReAct] Sample {state.sample_idx}, Step {state.iteration}: "
+                    f"Tool '{tool_name}' failed "
+                    f"{state.consecutive_failures_by_tool[tool_name]} times consecutively "
+                    f"(>={WEAK_MODEL_LIMIT}); forcing final answer"
+                )
+                redirect_msg = (
+                    f"Observation: [system] Tool '{tool_name}' has failed "
+                    f"{WEAK_MODEL_LIMIT} times in a row. Stop calling this tool and "
+                    f"provide your Final Answer now based on information gathered.\n"
+                )
+                self._force_final(
+                    state,
+                    response,
+                    step_entropy,
+                    redirect_msg,
+                    tool_calls={
+                        "tool_name": tool_name,
+                        "tool_arguments": tool_args,
+                        "tool_result": redirect_msg,
+                    },
+                )
+                return
 
         self._record_step(
             state,
@@ -230,7 +239,7 @@ class ReActExecutor:
 
     def _execute_tool(
         self, state: _ReActLoopState, tool_name: str, tool_args: dict
-    ) -> str:
+    ) -> Tuple[str, bool]:
         tool_instance = self.tools[tool_name]
         try:
             loop = asyncio.new_event_loop()
@@ -241,18 +250,24 @@ class ReActExecutor:
             finally:
                 loop.close()
             tool_result_str = format_tool_result(tool_name, tool_result)
+            succeeded = (
+                bool(tool_result.get("success", True))
+                if isinstance(tool_result, dict)
+                else True
+            )
             logger.info(
                 f"[ReAct] Sample {state.sample_idx}, Step {state.iteration}: "
-                f"Called tool '{tool_name}' successfully"
+                f"Called tool '{tool_name}' (success={succeeded})"
             )
         except Exception as e:
             tool_result = {"success": False, "error": str(e)}
             tool_result_str = format_tool_result(tool_name, tool_result)
+            succeeded = False
             logger.warning(
                 f"[ReAct] Sample {state.sample_idx}, Step {state.iteration}: "
                 f"Tool '{tool_name}' failed: {e}"
             )
-        return tool_result_str
+        return tool_result_str, succeeded
 
     def _handle_unknown_tool(
         self,
@@ -276,7 +291,10 @@ class ReActExecutor:
                 f"tools and provide your Final Answer now.\n"
             )
             self._force_final(
-                state, response, step_entropy, redirect_msg,
+                state,
+                response,
+                step_entropy,
+                redirect_msg,
                 tool_calls={
                     "tool_name": tool_name,
                     "tool_arguments": tool_args,
@@ -350,9 +368,7 @@ class ReActExecutor:
 
     # ----- max-iter fallback + finalize ------------------------------------
 
-    def _handle_max_iterations(
-        self, state: _ReActLoopState, infer_input: Any
-    ) -> None:
+    def _handle_max_iterations(self, state: _ReActLoopState, infer_input: Any) -> None:
         logger.warning(
             f"[ReAct] Sample {state.sample_idx}: "
             f"Max iterations ({self.max_iterations}) reached"
