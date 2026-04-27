@@ -33,6 +33,7 @@ class FinancialTool(ABC):
     description: str
     input_arguments: Dict[str, Any] = {}
     required_arguments: List[str] = []
+    timeout: float = 30.0  # seconds; override per-tool for slow/network tools
 
     def get_tool_definition(self) -> ToolDefinition:
         body = {
@@ -58,7 +59,9 @@ class FinancialTool(ABC):
         tool_logger = get_tool_call_logger()
         start_time = time.time()
         try:
-            tool_result = await self.call_tool(arguments, **kwargs)
+            tool_result = await asyncio.wait_for(
+                self.call_tool(arguments, **kwargs), timeout=self.timeout
+            )
             end_time = time.time()
             logger.info(f"[TOOL: {self.name.upper()}] Completed successfully")
             if self.name == "retrieve_information" and isinstance(tool_result, dict):
@@ -81,7 +84,10 @@ class FinancialTool(ABC):
         except Exception as e:
             end_time = time.time()
             is_verbose = os.environ.get("FINAGENT_VERBOSE", "0") == "1"
-            error_msg = str(e)
+            if isinstance(e, asyncio.TimeoutError):
+                error_msg = f"tool '{self.name}' timed out after {self.timeout}s"
+            else:
+                error_msg = str(e)
             if is_verbose:
                 error_msg += f"\nTraceback: {traceback.format_exc()}"
                 logger.warning(f"[TOOL: {self.name.upper()}] Error: {e}\nTraceback: {traceback.format_exc()}")
@@ -99,6 +105,7 @@ class FinancialTool(ABC):
 class GoogleWebSearch(FinancialTool):
     name: str = "google_web_search"
     description: str = "Search the web for information"
+    timeout: float = 90.0
     input_arguments: Dict[str, Any] = {
         "search_query": {"type": "string", "description": "The query to search for"}
     }
@@ -205,6 +212,7 @@ class GoogleWebSearch(FinancialTool):
 
 class EDGARSearch(FinancialTool):
     name: str = "edgar_search"
+    timeout: float = 120.0
     description: str = """
     Search the EDGAR Database through the SEC API.
     You should provide a query, a list of form types, a list of CIKs, a start date, an end date, a page number, and a top N results.
@@ -283,6 +291,7 @@ class EDGARSearch(FinancialTool):
 
 class ParseHtmlPage(FinancialTool):
     name: str = "parse_html_page"
+    timeout: float = 90.0
     description: str = """
     Parse an HTML page. This tool is used to parse the HTML content of a page and saves the content outside of the conversation to avoid context window issues.
     You should provide both the URL of the page to parse, as well as the key you want to use to save the result in the agent's data structure.
@@ -307,13 +316,13 @@ class ParseHtmlPage(FinancialTool):
     async def _parse_html_page(self, url: str) -> str:
         async with aiohttp.ClientSession() as session:
             try:
-                async with session.get(url, headers=self.headers, timeout=60) as response:
+                async with session.get(url, headers=self.headers, timeout=25) as response:
                     response.raise_for_status()
                     html_content = await response.text()
             except Exception as e:
                 if len(str(e)) == 0:
                     raise TimeoutError(
-                        "Timeout error when parsing HTML page after 60 seconds. "
+                        "Timeout error when parsing HTML page after 25 seconds. "
                         "The URL might be blocked or the server is taking too long to respond."
                     )
                 else:

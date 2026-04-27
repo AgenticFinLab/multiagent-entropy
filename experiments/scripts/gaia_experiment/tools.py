@@ -9,16 +9,16 @@ Tools provided:
   multimodal_viewer  - analyses images / audio / video via the Doubao multimodal API
 """
 
+import asyncio
 import base64
 import io
 import logging
 import math
 import os
 import re
-import subprocess
 import sys
 import tempfile
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from finagent_experiment.tools import GoogleWebSearch, FinancialTool
 
@@ -114,6 +114,9 @@ class FileReader(FinancialTool):
 
         if not file_path:
             raise ValueError("file_path is required.")
+        blocked = _reject_special_path(file_path)
+        if blocked:
+            return blocked
         if file_path.startswith("http://") or file_path.startswith("https://"):
             return (
                 "ERROR: file_reader requires a local file path, not a URL. "
@@ -125,7 +128,7 @@ class FileReader(FinancialTool):
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
         ext = os.path.splitext(file_path)[1].lower()
-        text = self._read(file_path, ext)
+        text = await asyncio.to_thread(self._read, file_path, ext)
 
         if len(text) > max_chars:
             text = text[:max_chars] + f"\n... [truncated at {max_chars} chars, total {len(text)}]"
@@ -234,6 +237,7 @@ class PythonExecutor(FinancialTool):
     """
 
     name: str = "python_executor"
+    timeout: float = 150.0
     description: str = (
         "Execute Python code and return its stdout output. "
         "Use this for data analysis, calculations, file processing, or any task "
@@ -265,21 +269,29 @@ class PythonExecutor(FinancialTool):
             tmp_path = os.path.join(work_dir, "_script.py")
             with open(tmp_path, "w", encoding="utf-8") as f:
                 f.write(code)
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable,
+                tmp_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=work_dir,
+            )
             try:
-                proc = subprocess.run(
-                    [sys.executable, tmp_path],
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                    cwd=work_dir,
+                stdout_b, stderr_b = await asyncio.wait_for(
+                    proc.communicate(), timeout=timeout
                 )
-                stdout = proc.stdout.strip()
-                stderr = proc.stderr.strip()
-                if stderr:
-                    return f"{stdout}\n[stderr]\n{stderr}" if stdout else f"[stderr]\n{stderr}"
-                return stdout if stdout else "(No output)"
-            except subprocess.TimeoutExpired:
+            except asyncio.TimeoutError:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+                await proc.wait()
                 raise TimeoutError(f"Code execution timed out after {timeout}s.")
+            stdout = stdout_b.decode("utf-8", errors="replace").strip()
+            stderr = stderr_b.decode("utf-8", errors="replace").strip()
+            if stderr:
+                return f"{stdout}\n[stderr]\n{stderr}" if stdout else f"[stderr]\n{stderr}"
+            return stdout if stdout else "(No output)"
 
 
 # ---------------------------------------------------------------------------
@@ -303,6 +315,7 @@ class MultimodalViewer(FinancialTool):
     """
 
     name: str = "multimodal_viewer"
+    timeout: float = 120.0
     description: str = (
         "Analyse the content of an image, audio, or video file using a multimodal AI model. "
         "Provide a local file path or a public URL. "
@@ -387,13 +400,16 @@ class MultimodalViewer(FinancialTool):
 
         is_url = self._is_url(file_path)
         if not is_url:
+            blocked = _reject_special_path(file_path)
+            if blocked:
+                return blocked
             if not os.path.exists(file_path):
                 file_path = _resolve_path_case(file_path)
             if not os.path.exists(file_path):
                 raise FileNotFoundError(f"File not found: {file_path}")
 
         media_type = self._detect_media_type(file_path)
-        image_url = file_path if is_url else self._to_data_uri(file_path)
+        image_url = file_path if is_url else await asyncio.to_thread(self._to_data_uri, file_path)
 
         client = self._get_client()
 
@@ -414,7 +430,8 @@ class MultimodalViewer(FinancialTool):
                 {"type": "input_text", "text": prompt},
             ]
 
-        response = client.responses.create(
+        response = await asyncio.to_thread(
+            client.responses.create,
             model=self.model,
             input=[{"role": "user", "content": content}],
         )
@@ -434,6 +451,27 @@ class MultimodalViewer(FinancialTool):
 # ---------------------------------------------------------------------------
 # Factory
 # ---------------------------------------------------------------------------
+
+_BLOCKED_PATH_PREFIXES = ("/dev/", "/proc/", "/sys/")
+_BLOCKED_PATH_EXACT = {"-", "/dev/stdin", "/dev/stdout", "/dev/stderr", "/dev/tty"}
+
+
+def _reject_special_path(file_path: str) -> Optional[str]:
+    """Return an error message if file_path points to a blocking/special device, else None."""
+    p = file_path.strip()
+    if p in _BLOCKED_PATH_EXACT:
+        return (
+            f"ERROR: refusing to read special path '{p}'. "
+            "file_reader only accepts regular files, not stdin/tty/device streams."
+        )
+    for prefix in _BLOCKED_PATH_PREFIXES:
+        if p.startswith(prefix):
+            return (
+                f"ERROR: refusing to read system path '{p}'. "
+                "file_reader only accepts regular files under the dataset directory."
+            )
+    return None
+
 
 def _resolve_path_case(file_path: str) -> str:
     """Try to fix case-sensitivity issues in file paths (e.g. Validation vs validation)."""
