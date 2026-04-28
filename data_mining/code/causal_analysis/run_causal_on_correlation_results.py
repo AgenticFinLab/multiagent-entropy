@@ -32,6 +32,8 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 import pandas as pd
+import numpy as np
+
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))  # causal_analysis/
