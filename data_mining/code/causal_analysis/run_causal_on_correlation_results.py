@@ -34,8 +34,8 @@ from typing import List, Optional, Tuple
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))            # causal_analysis/
-sys.path.insert(0, str(HERE.parent))     # code/
+sys.path.insert(0, str(HERE))  # causal_analysis/
+sys.path.insert(0, str(HERE.parent))  # code/
 
 import features as features_mod
 
@@ -78,6 +78,11 @@ TARGET_COLUMN = "is_finally_correct"
 DEFAULT_MAX_FEATURES = 30
 DEFAULT_MIN_ROWS = 200
 
+# exp_* folders to skip entirely (basename match).
+SKIP_EXP_FOLDERS = {
+    "exp_qwen_family",
+}
+
 # Default feature exclusion baseline (mirrors data_mining_analyzer behavior).
 _DEFAULT_EXCLUDE_GROUPS = ["experiment_identifier"]
 
@@ -115,6 +120,7 @@ def parse_slice_filename(stem: str) -> Tuple[Optional[str], Optional[str], str]:
 def discover_exp_folders(root: Path) -> List[Path]:
     """Find ``exp_*`` folders that have a ``results_aggregated/`` directory.
 
+    Folders listed in ``SKIP_EXP_FOLDERS`` are excluded.
     Note: not all exp_* folders ship their own ``merged_datasets.csv`` — those
     fall back to ``data_mining/data/merged_datasets.csv`` (resolved by
     ``resolve_merged_csv``).
@@ -122,6 +128,9 @@ def discover_exp_folders(root: Path) -> List[Path]:
     folders: List[Path] = []
     for child in sorted(root.glob("exp_*")):
         if not child.is_dir():
+            continue
+        if child.name in SKIP_EXP_FOLDERS:
+            logger.info("Skip %s (in SKIP_EXP_FOLDERS)", child.name)
             continue
         if (child / "results_aggregated").is_dir():
             folders.append(child)
@@ -145,7 +154,9 @@ def resolve_merged_csv(exp_folder: Path, root: Path) -> Optional[Path]:
     return None
 
 
-def discover_slices(exp_folder: Path) -> List[Tuple[Path, Optional[str], Optional[str], str]]:
+def discover_slices(
+    exp_folder: Path,
+) -> List[Tuple[Path, Optional[str], Optional[str], str]]:
     """Return ``(csv_path, architecture, dataset, exclude_token)`` for each slice CSV."""
     out: List[Tuple[Path, Optional[str], Optional[str], str]] = []
     for csv_path in sorted((exp_folder / "results_aggregated").glob("*.csv")):
@@ -157,6 +168,7 @@ def discover_slices(exp_folder: Path) -> List[Tuple[Path, Optional[str], Optiona
 # ---------------------------------------------------------------------------
 # Exclude-features token resolution
 # ---------------------------------------------------------------------------
+
 
 def resolve_exclude_columns(token: str) -> List[str]:
     """Translate an exclude_features token into a list of column names.
@@ -190,7 +202,9 @@ def resolve_exclude_columns(token: str) -> List[str]:
             if isinstance(const, list):
                 cols = const
         if cols is None:
-            logger.warning("Unknown exclude group '%s' (token=%r); ignoring.", group_name, token)
+            logger.warning(
+                "Unknown exclude group '%s' (token=%r); ignoring.", group_name, token
+            )
             continue
         excluded.extend(cols)
     # Deduplicate, preserve order
@@ -206,6 +220,7 @@ def resolve_exclude_columns(token: str) -> List[str]:
 # ---------------------------------------------------------------------------
 # Slice preparation
 # ---------------------------------------------------------------------------
+
 
 def prepare_slice_data(
     merged_csv: Path,
@@ -253,6 +268,73 @@ def prepare_slice_data(
 # Feature selection from correlation results
 # ---------------------------------------------------------------------------
 
+
+def _drop_rank_deficient(
+    features: List[str],
+    slice_df: pd.DataFrame,
+    cond_threshold: float = 1e10,
+) -> List[str]:
+    """Iteratively drop features until the correlation matrix is invertible.
+
+    Mirrors what ``CausalDiscovery.load_data`` does (subset + dropna), then
+    checks the condition number of the correlation matrix. While the matrix is
+    rank-deficient, drops the feature whose removal most improves the condition
+    number (greedy). This catches multivariate collinearity that pairwise
+    correlation filtering misses.
+    """
+    cols = [c for c in features if c in slice_df.columns]
+    if TARGET_COLUMN in slice_df.columns:
+        sub = (
+            slice_df[cols + [TARGET_COLUMN]]
+            .apply(pd.to_numeric, errors="coerce")
+            .dropna()
+        )
+        sub = sub.drop(columns=[TARGET_COLUMN])
+    else:
+        sub = slice_df[cols].apply(pd.to_numeric, errors="coerce").dropna()
+
+    current = list(cols)
+    max_iter = len(current)
+    for _ in range(max_iter):
+        if len(current) < 2:
+            break
+        X = sub[current].values
+        # Standardize so the correlation matrix == X.T @ X / (n-1).
+        std = X.std(axis=0, ddof=1)
+        if np.any(std == 0):
+            zero_idx = np.where(std == 0)[0][0]
+            dropped = current.pop(zero_idx)
+            logger.info("Rank check: drop %s (zero variance on subsample)", dropped)
+            continue
+        Xs = (X - X.mean(axis=0)) / std
+        corr = (Xs.T @ Xs) / (Xs.shape[0] - 1)
+        try:
+            cond = float(np.linalg.cond(corr))
+        except np.linalg.LinAlgError:
+            cond = np.inf
+        if np.isfinite(cond) and cond < cond_threshold:
+            return current
+        # Find the column whose removal most reduces the condition number.
+        best_idx, best_cond = None, cond
+        for i in range(len(current)):
+            keep_idx = [j for j in range(len(current)) if j != i]
+            sub_corr = corr[np.ix_(keep_idx, keep_idx)]
+            try:
+                c = float(np.linalg.cond(sub_corr))
+            except np.linalg.LinAlgError:
+                c = np.inf
+            if c < best_cond:
+                best_cond = c
+                best_idx = i
+        if best_idx is None:
+            # No single removal helps — drop the last (lowest-ranked) feature
+            # and keep trying.
+            best_idx = len(current) - 1
+        dropped = current.pop(best_idx)
+        logger.info("Rank check: drop %s (cond %.2e -> %.2e)", dropped, cond, best_cond)
+    return current
+
+
 def select_features_from_aggregated(
     agg_csv: Path,
     slice_data_csv: Path,
@@ -272,8 +354,15 @@ def select_features_from_aggregated(
     agg = pd.read_csv(agg_csv)
 
     rank_col = next(
-        (c for c in ("mean_importance_normalized", "mean_importance", "mean_mean_abs_shap")
-         if c in agg.columns),
+        (
+            c
+            for c in (
+                "mean_importance_normalized",
+                "mean_importance",
+                "mean_mean_abs_shap",
+            )
+            if c in agg.columns
+        ),
         None,
     )
     if rank_col is None:
@@ -319,7 +408,9 @@ def select_features_from_aggregated(
             r = float(v1.corr(v2))
             if abs(r) >= CORR_DUP_THRESH:
                 is_dup = True
-                logger.debug("Drop %s: |corr|=%.4f with already-selected feature", feat, r)
+                logger.debug(
+                    "Drop %s: |corr|=%.4f with already-selected feature", feat, r
+                )
                 break
         if is_dup:
             continue
@@ -330,6 +421,17 @@ def select_features_from_aggregated(
 
     if not selected:
         raise RuntimeError(f"No usable features after filtering {agg_csv}")
+
+    # Final guard: causal_discovery.load_data does ``df[cols + target].dropna()``
+    # then feeds the matrix to fisherz, which inverts the correlation matrix.
+    # Pairwise dedup above only catches 2-feature collinearity; fisherz also
+    # blows up on *multivariate* linear dependence (e.g. ``diff = r2 - r1`` or
+    # any near-perfect linear combination of 3+ features). Drop features
+    # iteratively until the on-subsample correlation matrix is full-rank.
+    selected = _drop_rank_deficient(selected, slice_df)
+
+    if not selected:
+        raise RuntimeError(f"No usable features after rank check on {agg_csv}")
 
     out_df = pd.DataFrame(
         {
@@ -350,6 +452,7 @@ def select_features_from_aggregated(
 # ---------------------------------------------------------------------------
 # Per-slice pipeline
 # ---------------------------------------------------------------------------
+
 
 def run_pipeline_for_slice(
     *,
@@ -385,15 +488,25 @@ def run_pipeline_for_slice(
 
     slice_out.mkdir(parents=True, exist_ok=True)
     logger.info("=" * 80)
-    logger.info("[%s] arch=%s dataset=%s exclude=%s", slice_id, architecture, dataset, exclude_token)
+    logger.info(
+        "[%s] arch=%s dataset=%s exclude=%s",
+        slice_id,
+        architecture,
+        dataset,
+        exclude_token,
+    )
 
     # 1) Materialize the slice CSV
     slice_data_csv = slice_out / "_slice_data.csv"
     exclude_cols = resolve_exclude_columns(exclude_token)
-    _, n_rows = prepare_slice_data(merged_csv, architecture, dataset, exclude_cols, slice_data_csv)
+    _, n_rows = prepare_slice_data(
+        merged_csv, architecture, dataset, exclude_cols, slice_data_csv
+    )
     logger.info("[%s] slice rows=%d (after filtering)", slice_id, n_rows)
     if n_rows < min_rows:
-        logger.warning("[%s] only %d rows (< min_rows=%d); skipping", slice_id, n_rows, min_rows)
+        logger.warning(
+            "[%s] only %d rows (< min_rows=%d); skipping", slice_id, n_rows, min_rows
+        )
         return False
 
     # 2) Feature selection (derived from aggregated correlation CSV)
@@ -441,6 +554,7 @@ def run_pipeline_for_slice(
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -491,7 +605,8 @@ def main() -> int:
     log_path: Optional[Path]
     if args.log_file is None:
         log_path = (
-            Path(args.data_mining_root) / "logs"
+            Path(args.data_mining_root)
+            / "logs"
             / f"run_causal_on_correlation_results_{datetime.now():%Y%m%d_%H%M%S}.log"
         )
     elif args.log_file == "":
@@ -559,7 +674,9 @@ def main() -> int:
     for exp_folder in exp_folders:
         merged_csv = resolve_merged_csv(exp_folder, root)
         if merged_csv is None:
-            logger.warning("Skip %s (no merged_datasets.csv local or shared)", exp_folder)
+            logger.warning(
+                "Skip %s (no merged_datasets.csv local or shared)", exp_folder
+            )
             continue
         logger.debug("Using merged data for %s: %s", exp_folder.name, merged_csv)
         output_root = exp_folder / "results_causal"
@@ -572,7 +689,9 @@ def main() -> int:
         logger.error("No slices matched.")
         return 2
 
-    logger.info("Discovered %d slice(s) across %d exp folder(s).", len(plan), len(exp_folders))
+    logger.info(
+        "Discovered %d slice(s) across %d exp folder(s).", len(plan), len(exp_folders)
+    )
     if args.dry_run:
         for agg_csv, merged_csv, arch, ds, exc, output_root in plan:
             logger.info(
@@ -614,7 +733,9 @@ def main() -> int:
             failures += 1
 
     logger.info("=" * 80)
-    logger.info("Done. successes=%d failures=%d total=%d", successes, failures, len(plan))
+    logger.info(
+        "Done. successes=%d failures=%d total=%d", successes, failures, len(plan)
+    )
     return 0 if successes > 0 else 1
 
 
