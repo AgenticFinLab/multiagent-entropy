@@ -423,7 +423,7 @@ GAIA is a general-purpose AI assistant benchmark with exact-match evaluation. It
 Before running GAIA experiments, download task attachments:
 
 ```bash
-python experiments/scripts/download_gaia_attachments.py
+python experiments/scripts/tools/download_gaia_attachments.py
 ```
 
 #### Running a GAIA Experiment
@@ -451,7 +451,7 @@ In addition to all standard options above, `run_gaia_experiment.py` accepts:
 To re-score already-generated GAIA outputs without re-running inference:
 
 ```bash
-python experiments/scripts/regenerate_gaia_evaluation.py
+python experiments/scripts/tools/regenerate_gaia_evaluation.py
 ```
 
 #### GAIA Package (`gaia_experiment/`)

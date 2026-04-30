@@ -5,7 +5,7 @@ GAIA_DATA_PATH = "experiments/data/GAIA"
 GAIA_SPLIT = "validation"
 
 # Root directory of downloaded GAIA attachments (from snapshot_download).
-# After running scripts/download_gaia_attachments.py, attachments are stored under
+# After running scripts/tools/download_gaia_attachments.py, attachments are stored under
 # <GAIA_ATTACHMENTS_ROOT>/<file_path>, where file_path is the value from sample_info.
 # e.g. experiments/data/GAIA/attachments/2023/validation/xxx.xlsx
 GAIA_ATTACHMENTS_ROOT = "experiments/data/GAIA/attachments"

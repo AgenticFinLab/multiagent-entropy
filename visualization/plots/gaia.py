@@ -725,7 +725,7 @@ class GAIAPlot(BaseVisualizer):
             "network": "Network / HTTP",
             "timeout": "Timeout",
             "parse_error": "Unparseable output",
-            "other_explicit": "Other explicit failure",
+            "other_explicit": "Malformed invocation",
         }
         # Blue→red diverging palette: cool tones for "interface-layer" failures
         # (parsing, args, duplicate calls — the tool never really ran), warm tones
@@ -833,7 +833,11 @@ class GAIAPlot(BaseVisualizer):
             "classified by string-matching the result body into eight reasons: "
             "argument/schema errors, duplicate calls, empty results, executed-with-"
             "error (effectiveness), network/HTTP, timeout, unparseable output, and "
-            "other explicit failures.\n\n"
+            "*malformed invocation* — calls the framework rejected with a non-"
+            "standard error message, typically structurally broken JSON or "
+            "off-protocol output that does not match the tool schema at all "
+            "(distinct from `arg_error`, which is rejection by the tool itself "
+            "with a recognizable schema/argument complaint).\n\n"
             "**Panel (a)** ranks models by total tool-call volume (log scale, blue "
             "bars) and overlays the overall failure rate (red line). **Panel (b)** "
             "decomposes the failed calls of each model into a 100%-stacked bar.\n\n"
@@ -848,12 +852,14 @@ class GAIAPlot(BaseVisualizer):
             "**Dominant failure category per model:**\n"
             + "\n".join(dom_lines) +
             "\n\n**Reading.** Failure attribution is **model-shaped, not random**. "
-            "Smaller models pour calls into the loop and most of those calls produce "
-            "outputs the parser cannot interpret (unparseable output) or arguments "
-            "the tool rejects — they fail at the *interface* layer before the tool "
-            "even runs. Stronger models call tools far less often, but their failures "
-            "concentrate on *executed-with-error* and *empty results* — the tool ran, "
-            "but with the wrong intent. This is the practical message of the figure: "
+            "Smaller models pour calls into the loop and most of those calls are "
+            "*malformed invocations* — structurally broken JSON or off-protocol "
+            "output that the framework rejects with a non-standard error — or are "
+            "flagged as unparseable. Both are *interface-layer* failures: the tool "
+            "never actually ran. Stronger models call tools far less often, but "
+            "their failures concentrate on *executed-with-error* and *empty "
+            "results* — the tool ran, but with the wrong intent. This is the "
+            "practical message of the figure: "
             "improving GAIA-style tool use is not one engineering problem but two "
             "different ones depending on the base model — schema robustness for the "
             "weak-model regime, search/grounding quality for the strong-model regime."

@@ -20,7 +20,7 @@ gaia_config:
   level_filter: null
 
   # Root directory of locally downloaded attachments.
-  # Run experiments/scripts/download_gaia_attachments.py to fetch them.
+  # Run experiments/scripts/tools/download_gaia_attachments.py to fetch them.
   # Attachment path inside this root mirrors file_path from sample_info
   # (e.g. 2023/validation/xxx.xlsx).
   # null = use default: experiments/data/GAIA/attachments
