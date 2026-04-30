@@ -253,6 +253,17 @@ class ExperimentAnalyzer(BaseAnalyzer):
                     eval_data = gaia_eval_results[main_id]
                     is_correct = eval_data.get("evaluation_result", False)
                     evaluation_score = eval_data.get("evaluation_score", 0.0)
+                    # For single architecture, round-1 SingleSolver represents
+                    # the base-model accuracy (separate from final MAS output).
+                    if (
+                        agent_architecture == "single"
+                        and execution_order == 1
+                        and eval_data.get("round1_evaluation_result") is not None
+                    ):
+                        is_correct = eval_data["round1_evaluation_result"]
+                        evaluation_score = eval_data.get(
+                            "round1_evaluation_score", 0.0
+                        ) or 0.0
             elif task_type == "code":
                 if "final_answer" in result_data:
                     response = result_data["final_answer"]

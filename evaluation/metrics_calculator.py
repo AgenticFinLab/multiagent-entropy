@@ -60,6 +60,30 @@ class MetricsCalculator:
         return None, False
 
     @staticmethod
+    def extract_final_answer_marker(text: str) -> tuple[Optional[str], bool]:
+        """Extract answer following the ``FINAL ANSWER:`` marker (GAIA / finance).
+
+        Returns:
+            Tuple of (extracted_answer, format_compliance). Returns (None, False)
+            when no marker is found.
+        """
+        if not text:
+            return None, False
+        patterns = [
+            r"FINAL\s+ANSWER\s*:\s*(.+?)(?:\n|$)",
+            r"\*\*FINAL\s+ANSWER\*\*\s*:?\s*(.+?)(?:\n|$)",
+            r"FINAL\s+ANSWER\s*:\s*[\[\(](.+?)[\]\)]",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                answer = match.group(1).strip()
+                answer = re.sub(r"['\]\}\*\[]+$", "", answer).strip()
+                if answer:
+                    return answer, True
+        return None, False
+
+    @staticmethod
     def has_valid_format(text: str) -> bool:
         """Check if text contains valid boxed answer format.
 

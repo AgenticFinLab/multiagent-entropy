@@ -409,12 +409,17 @@ class EntropyStatistic(BaseAnalyzer):
                         answer, ok = MetricsCalculator.extract_boxed_answer(response)
                     elif task_type == "code":
                         answer, ok = MetricsCalculator.extract_code_answer(response)
+                    elif task_type in ("gaia", "finance"):
+                        answer, ok = MetricsCalculator.extract_final_answer_marker(
+                            response
+                        )
                     else:
                         answer, ok = MetricsCalculator.extract_boxed_answer(response)
 
                     if ok and answer:
                         predicted_answer_entropy = self._get_answer_token_entropy(
-                            response, answer, tokenizer, result_id, [entropy_info]
+                            response, answer, tokenizer, result_id, [entropy_info],
+                            task_type=task_type,
                         )
 
                 # Store it back in entropy_info to use it when building agents dict later
@@ -726,6 +731,10 @@ class EntropyStatistic(BaseAnalyzer):
                         elif task_type == "code":
                             # Extract code answer for code tasks
                             answer, ok = MetricsCalculator.extract_code_answer(response)
+                        elif task_type in ("gaia", "finance"):
+                            answer, ok = MetricsCalculator.extract_final_answer_marker(
+                                response
+                            )
                         else:
                             # Default to boxed answer extraction
                             answer, ok = MetricsCalculator.extract_boxed_answer(
@@ -740,6 +749,7 @@ class EntropyStatistic(BaseAnalyzer):
                                 tokenizer,
                                 final_result_id,
                                 agents_data,
+                                task_type=task_type,
                             )
                             if answer_entropy is not None:
                                 micro_stats["samples"][main_id][
@@ -982,6 +992,7 @@ class EntropyStatistic(BaseAnalyzer):
         tokenizer: Any,
         result_id: str,
         agents_data: List[Dict[str, Any]],
+        task_type: str = "math",
     ) -> Optional[Dict[str, Any]]:
         """Find the entropy statistics of tokens containing the final answer.
 
@@ -1003,24 +1014,46 @@ class EntropyStatistic(BaseAnalyzer):
             - answer_token_entropies: List of entropy values for all answer tokens
             Returns None if answer tokens not found.
         """
-        # Find the last \boxed{...} that contains the answer
-        # MetricsCalculator.extract_boxed_answer returns the content of the last \boxed match
-        matches = list(re.finditer(r"\\boxed\{([^}]*)\}", response))
-
-        if not matches:
-            # Fallback to simple find if \boxed pattern not found
-            start_char = response.find(answer)
+        # Locate the answer span inside the response. Strategy depends on task_type:
+        #   - math / option : last \boxed{...} content
+        #   - gaia / finance: span following the last "FINAL ANSWER:" marker
+        #   - others        : substring search fallback
+        start_char = -1
+        if task_type in ("math", "option"):
+            matches = list(re.finditer(r"\\boxed\{([^}]*)\}", response))
+            if matches:
+                last_match = matches[-1]
+                start_char = last_match.start(1)
+                content = last_match.group(1)
+                if content.startswith("{") and not answer.startswith("{"):
+                    start_char += 1
+                elif content.startswith("(") and not answer.startswith("("):
+                    start_char += 1
+            else:
+                start_char = response.find(answer)
+        elif task_type in ("gaia", "finance"):
+            marker_matches = list(
+                re.finditer(
+                    r"FINAL\s+ANSWER\s*:\s*", response, flags=re.IGNORECASE
+                )
+            )
+            if marker_matches:
+                # Use the last FINAL ANSWER marker; the answer span starts right
+                # after the colon and runs to the end of that line.
+                marker_end = marker_matches[-1].end()
+                line_end = response.find("\n", marker_end)
+                if line_end == -1:
+                    line_end = len(response)
+                start_char = marker_end
+                # Override end_char downstream by truncating the answer length.
+                # We compute it locally so the offset-overlap loop below works
+                # against the actual on-disk answer span, even after the caller
+                # post-processed the answer string (stripping etc.).
+                answer = response[marker_end:line_end].strip() or answer
+            else:
+                start_char = response.find(answer)
         else:
-            # Get the content position of the last \boxed match
-            last_match = matches[-1]
-            start_char = last_match.start(1)
-
-            # Adjust start_char if MetricsCalculator modified the answer (e.g. nested braces)
-            content = last_match.group(1)
-            if content.startswith("{") and not answer.startswith("{"):
-                start_char += 1
-            elif content.startswith("(") and not answer.startswith("("):
-                start_char += 1
+            start_char = response.find(answer)
 
         if start_char == -1:
             return None

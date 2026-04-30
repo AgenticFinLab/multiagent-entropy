@@ -310,6 +310,15 @@ class BaseDataLoader:
                 "evaluation_score": item.get("evaluation_score", 0.0),
                 "groundtruth": item.get("groundtruth", ""),
                 "generated_answer": item.get("generated_answer", ""),
+                "round1_evaluation_result": item.get(
+                    "round1_evaluation_result", None
+                ),
+                "round1_evaluation_score": item.get(
+                    "round1_evaluation_score", None
+                ),
+                "round1_generated_answer": item.get(
+                    "round1_generated_answer", ""
+                ),
             }
         results_by_id["_aggregate"] = data.get("aggregate_metrics", {})
         return results_by_id
