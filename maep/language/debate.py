@@ -184,7 +184,7 @@ class DebateMAS(BaseAgents):
                 agent_name = list(result_dict.keys())[0]
                 responses = result_dict[agent_name]
 
-                answer = self._extract_boxed_answer(responses[i])
+                answer = self._extract_answer(responses[i])
                 if answer:
                     all_answers.append(answer)
 
@@ -192,12 +192,24 @@ class DebateMAS(BaseAgents):
                 final_answers.append("No valid answers found in agent responses")
                 answer_votes_list.append({})
             else:
-                from collections import Counter
+                # Vote with a normalized key so that small formatting/casing
+                # differences (especially common in GAIA "FINAL ANSWER:" outputs)
+                # do not split otherwise-identical answers across vote buckets.
+                # The stored final_answer keeps the original wording from the
+                # winning bucket so downstream string-equality evaluation against
+                # the groundtruth still sees the model's chosen phrasing.
+                buckets = {}
+                for ans in all_answers:
+                    key = self._normalize_for_vote(ans)
+                    if key not in buckets:
+                        buckets[key] = {"count": 0, "first": ans}
+                    buckets[key]["count"] += 1
 
-                answer_counts = Counter(all_answers)
-                most_common_answer, count = answer_counts.most_common(1)[0]
-                final_answers.append(most_common_answer)
-                answer_votes_list.append(dict(answer_counts))
+                winner_key = max(buckets, key=lambda k: buckets[k]["count"])
+                final_answers.append(buckets[winner_key]["first"])
+                answer_votes_list.append(
+                    {buckets[k]["first"]: buckets[k]["count"] for k in buckets}
+                )
 
         latency = time.time() - t0
 
@@ -248,23 +260,87 @@ class DebateMAS(BaseAgents):
             raise ValueError(f"Unknown agent: {agent_name}")
 
     def _extract_boxed_answer(self, text: str):
-        """
-        Extract the final answer wrapped in \\boxed{} from the response text.
+        """Backwards-compatible alias for the math/option boxed extractor."""
+        return self._extract_answer(text, task_type="math")
 
-        Args:
-            text: The agent's response text
+    def _normalize_for_vote(self, answer: str) -> str:
+        """Normalize an extracted answer for majority-vote bucketing.
 
-        Returns:
-            The extracted answer, or None if no \\boxed{} is found
+        Lower-cases, strips surrounding markdown emphasis and quotes, and
+        collapses whitespace. Used as a vote key only — the original answer
+        is still stored as the chosen final answer.
         """
         import re
 
-        pattern = r"\\boxed\{([^}]+)\}"
-        matches = re.findall(pattern, text)
+        if not answer:
+            return ""
+        s = answer.strip()
+        s = re.sub(r"^[\*\"'`\s]+|[\*\"'`\s\.,;:!?]+$", "", s)
+        s = re.sub(r"\s+", " ", s)
+        return s.lower()
 
-        if matches:
-            return matches[-1].strip()
+    def _extract_answer(self, text: str, task_type: str = None):
+        """
+        Extract a comparable final answer from a single agent's response,
+        using the marker that matches the configured task_type.
 
+        - math / option : last ``\\boxed{...}`` capture
+        - code          : last ```python ... ``` block
+        - finance / gaia: last ``FINAL ANSWER:`` segment
+
+        Returns None when no answer can be located, in which case this agent
+        contributes no vote in the orchestrator's majority count.
+        """
+        import re
+
+        if not text:
+            return None
+
+        tt = (task_type or self.task_type or "math").lower()
+
+        if tt in ("math", "option"):
+            matches = re.findall(r"\\boxed\{([^}]+)\}", text)
+            if matches:
+                return matches[-1].strip()
+            return None
+
+        if tt == "code":
+            matches = re.findall(r"```python\s*\n(.+?)\n```", text, re.DOTALL)
+            if matches:
+                return matches[-1].strip()
+            return None
+
+        # finance, gaia, and any other task using the FINAL ANSWER marker
+        patterns = [
+            r"FINAL\s+ANSWER\s*:\s*(.+?)(?:\n|$)",
+            r"\*\*FINAL\s+ANSWER\*\*\s*:?\s*(.+?)(?:\n|$)",
+            r"FINAL\s+ANSWER\s*:\s*[\[\(](.+?)[\]\)]",
+        ]
+        last_answer = None
+        for pattern in patterns:
+            last_match = None
+            # Models occasionally emit ``Final Answer: FINAL ANSWER: 32`` —
+            # walk all matches and keep the last one so the inner marker wins.
+            for m in re.finditer(pattern, text, re.IGNORECASE):
+                last_match = m
+            if last_match:
+                answer = last_match.group(1).strip()
+                answer = re.sub(r"['\]\}\*\[]+$", "", answer).strip()
+                if answer:
+                    last_answer = answer
+                    break
+        if last_answer:
+            for _ in range(3):
+                stripped = re.sub(
+                    r"^FINAL\s+ANSWER\s*:\s*",
+                    "",
+                    last_answer,
+                    flags=re.IGNORECASE,
+                ).strip()
+                if stripped == last_answer:
+                    break
+                last_answer = stripped
+            return last_answer
         return None
 
     def check_loop(self, state: AgentState) -> str:
