@@ -113,6 +113,18 @@ def _build_appendix_arch(params):
     )
 
 
+def _build_gaia(params):
+    from visualization.plots.gaia import GAIAPlot
+    return GAIAPlot(
+        gaia_aggregated_path=params["gaia_aggregated_path"],
+        gaia_aggregated_exclude_agent_path=params["gaia_aggregated_exclude_agent_path"],
+        nongaia_merged_path=params["nongaia_merged_path"],
+        shap_values_path=params["shap_values_path"],
+        shap_x_test_path=params["shap_x_test_path"],
+        output_dir=params["output_dir"],
+    )
+
+
 PLOT_BUILDERS: Dict[str, Callable] = {
     "accuracy": _build_accuracy,
     "single_superiority": _build_single_superiority,
@@ -123,6 +135,7 @@ PLOT_BUILDERS: Dict[str, Callable] = {
     "base_model": _build_base_model,
     "rl_model": _build_rl_model,
     "appendix_arch": _build_appendix_arch,
+    "gaia": _build_gaia,
 }
 
 

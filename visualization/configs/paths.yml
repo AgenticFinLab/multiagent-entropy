@@ -66,3 +66,10 @@ plots:
   appendix_arch:
     data_dir: "{experiments_root}/results/raw"
     eval_dir: "{evaluation_root}/results_qwen"
+
+  gaia:
+    gaia_aggregated_path: "{evaluation_root}/results_gaia/gaia/all_aggregated_data.csv"
+    gaia_aggregated_exclude_agent_path: "{evaluation_root}/results_gaia/gaia/all_aggregated_data_exclude_agent.csv"
+    nongaia_merged_path: "{data_mining_root}/data/merged_datasets.csv"
+    shap_values_path: "{data_mining_root}/results_gaia/base_model_all_metrics/shap/shap_values_LightGBM_classification.csv"
+    shap_x_test_path: "{data_mining_root}/results_gaia/base_model_all_metrics/shap/X_test_LightGBM_classification.csv"
