@@ -27,8 +27,9 @@ from collections import defaultdict
 from datetime import datetime
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, THIS_DIR)
-PROJECT_ROOT = os.path.abspath(os.path.join(THIS_DIR, "..", ".."))
+SCRIPTS_DIR = os.path.abspath(os.path.join(THIS_DIR, ".."))
+sys.path.insert(0, SCRIPTS_DIR)
+PROJECT_ROOT = os.path.abspath(os.path.join(THIS_DIR, "..", "..", ".."))
 sys.path.insert(0, PROJECT_ROOT)
 
 from gaia_experiment.answer_extraction import extract_final_answer_by_identifier
