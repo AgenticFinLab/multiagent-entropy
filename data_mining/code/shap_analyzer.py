@@ -204,6 +204,12 @@ class ShapAnalyzer(BaseAnalyzer):
         if not isinstance(shap_values_for_plots, np.ndarray):
             shap_values_for_plots = np.asarray(shap_values_for_plots)
 
+        # XGBoost ≥1.7 / SHAP ≥0.42 returns a 3D array (n_samples, n_features, n_classes)
+        # for binary classification; collapse to the positive-class 2D slice so
+        # downstream DataFrame construction and plotting work uniformly.
+        if shap_values_for_plots.ndim == 3:
+            shap_values_for_plots = shap_values_for_plots[..., -1]
+
         # Verify dimensions
         if shap_values_for_plots.shape[0] != len(X_test):
             logger.error(
@@ -233,6 +239,10 @@ class ShapAnalyzer(BaseAnalyzer):
             plt.close()
 
         # 2. SHAP Feature Importance Plot (dot plot)
+        # Plotting and CSV persistence are in separate try-blocks so that a
+        # plotting failure (e.g. shape quirks for XGBoost binary classifiers)
+        # does not prevent the downstream aggregator/causal pipeline from
+        # finding shap_values_*.csv and shap_feature_importance_*.csv.
         try:
             plt.figure(figsize=(12, 8))
             shap.summary_plot(
@@ -249,7 +259,11 @@ class ShapAnalyzer(BaseAnalyzer):
             plt.close()
             plots_info["importance_plot"] = str(importance_plot_path)
             logger.info(f"SHAP importance plot saved: {importance_plot_path}")
+        except Exception as e:
+            logger.warning(f"Could not create importance plot: {str(e)}")
+            plt.close()
 
+        try:
             # Save SHAP values to CSV for each sample
             shap_df = pd.DataFrame(
                 shap_values_for_plots,
@@ -261,7 +275,7 @@ class ShapAnalyzer(BaseAnalyzer):
             )
             shap_df.to_csv(shap_csv_path)
             logger.info(f"SHAP values saved to CSV: {shap_csv_path}")
-            
+
             # Save X_test to CSV for later visualization
             X_test_csv_path = (
                 self.output_dir / f"X_test_{model_name}_{task_type}.csv"
@@ -281,8 +295,7 @@ class ShapAnalyzer(BaseAnalyzer):
             importance_df.to_csv(importance_csv_path, index=False)
             logger.info(f"SHAP feature importance saved to CSV: {importance_csv_path}")
         except Exception as e:
-            logger.warning(f"Could not create importance plot: {str(e)}")
-            plt.close()
+            logger.warning(f"Could not save SHAP CSV outputs: {str(e)}")
 
         # 3. SHAP Dependence Plots for top 5 important features
         # Calculate mean absolute SHAP values for feature importance

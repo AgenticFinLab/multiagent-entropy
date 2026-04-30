@@ -455,6 +455,7 @@ class AggregatedResultsVisualizer:
 
         ax.set_yticks(x)
         ax.set_yticklabels(features, fontsize=8, ha="right")
+        ax.tick_params(axis="x", labelsize=8)
         ax.set_xlabel("Normalized Importance", fontweight="bold", fontsize=9)
         ax.set_title(
             "Feature Importance Comparison", fontweight="bold", fontsize=11, pad=15
@@ -492,6 +493,7 @@ class AggregatedResultsVisualizer:
         ax.set_title("SHAP Value Impact", fontweight="bold", fontsize=11, pad=15)
         ax.set_yticks(y_positions)
         ax.set_yticklabels(features, fontsize=8, ha="right")
+        ax.tick_params(axis="x", labelsize=8)
         ax.invert_yaxis()
         ax.grid(axis="x", alpha=0.3)
         ax.set_facecolor("#f8f9fa")

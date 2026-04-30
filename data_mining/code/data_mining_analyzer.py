@@ -565,8 +565,15 @@ class DataMiningAnalyzer:
         if not self.skip_collection:
             merged_data_path = self.run_data_collection(target_datasets)
             # Update analyzers with the new path - convert to Path object to match analyzer expectations
+            self.data_path = Path(str(merged_data_path))
             self.regression_analyzer.data_path = Path(str(merged_data_path))
             self.classification_analyzer.data_path = Path(str(merged_data_path))
+            if hasattr(self, "pca_analyzer_instance"):
+                self.pca_analyzer_instance.data_path = Path(str(merged_data_path))
+            if hasattr(self, "feature_ablation_analyzer"):
+                self.feature_ablation_analyzer.data_path = Path(str(merged_data_path))
+            if getattr(self, "shap_analyzer", None) is not None:
+                self.shap_analyzer.data_path = Path(str(merged_data_path))
         else:
             logger.info("Skipping data collection step")
             merged_data_path = self.data_path
