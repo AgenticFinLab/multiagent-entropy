@@ -25,6 +25,136 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _run_causal_pipeline(
+    *,
+    analyzer: "DataMiningAnalyzer",
+    data_path: str,
+    exclude_features_token: str,
+    max_features: int,
+    alpha: float,
+    discovery_max_sample: int,
+    effect_max_sample: int,
+    mediation_max_sample: int,
+    n_bootstrap: int,
+    min_rows: int,
+) -> None:
+    """Aggregate per-experiment SHAP/classification outputs and run the 4-stage
+    causal pipeline on the resulting slice.
+
+    Layout produced (relative to ``analyzer.output_dir.parent``, i.e. the
+    ``data_mining/results_<dataset_type>`` root):
+
+        results_aggregated/<exclude_token>.csv
+        results_causal/<exclude_token>/
+            _slice_data.csv
+            feature_selection/selected_features.csv
+            causal_discovery/, causal_effects/, mediation/
+            causal_analysis_report.txt
+    """
+    from pathlib import Path
+
+    from aggregator import ExperimentAggregator
+    from visualizer import AggregatedResultsVisualizer
+    from summarizer import VisualizationSummarizer
+
+    # Late import — needs sys.path entry for causal_analysis/.
+    causal_dir = Path(__file__).parent / "causal_analysis"
+    if str(causal_dir) not in sys.path:
+        sys.path.insert(0, str(causal_dir))
+    from run_causal_on_correlation_results import run_pipeline_for_slice
+
+    # ``analyzer.output_dir`` is e.g. ``data_mining/results_gaia/<exclude>``.
+    # We aggregate at the *parent* (results_<type>) so the layout matches
+    # data_mining/exp_*/results_aggregated.
+    exclude_subdir = analyzer.output_dir
+    results_root = exclude_subdir.parent
+    aggregated_dir = results_root / "results_aggregated"
+    aggregated_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info("=" * 80)
+    logger.info("CAUSAL PIPELINE: aggregating SHAP / classification outputs")
+    logger.info(f"  results_root  = {results_root}")
+    logger.info(f"  aggregated_to = {aggregated_dir}")
+
+    aggregator = ExperimentAggregator(
+        str(results_root), str(aggregated_dir)
+    )
+    aggregator.aggregate_experiment(exclude_subdir.name)
+
+    agg_csv = aggregated_dir / f"{exclude_subdir.name}.csv"
+    if not agg_csv.exists():
+        logger.error(
+            "Aggregator did not produce %s; skipping causal pipeline.", agg_csv
+        )
+        return
+
+    merged_csv = Path(data_path)
+    if not merged_csv.exists():
+        logger.error("Merged dataset CSV not found: %s; cannot run causal pipeline.", merged_csv)
+        return
+
+    causal_root = results_root / "results_causal"
+    causal_root.mkdir(parents=True, exist_ok=True)
+
+    logger.info("CAUSAL PIPELINE: running 4-stage analysis on slice '%s'", agg_csv.stem)
+    ok = run_pipeline_for_slice(
+        agg_csv=agg_csv,
+        merged_csv=merged_csv,
+        architecture=None,
+        dataset=None,
+        exclude_token=exclude_features_token,
+        output_root=causal_root,
+        max_features=max_features,
+        alpha=alpha,
+        discovery_max_sample=discovery_max_sample,
+        effect_max_sample=effect_max_sample,
+        mediation_max_sample=mediation_max_sample,
+        n_bootstrap=n_bootstrap,
+        min_rows=min_rows,
+        skip_existing=False,
+    )
+    if ok:
+        logger.info(
+            "CAUSAL PIPELINE: complete -> %s", causal_root / agg_csv.stem
+        )
+    else:
+        logger.warning("CAUSAL PIPELINE: did not complete successfully.")
+
+    # ------------------------------------------------------------------
+    # Visualization + summarization (mirrors run_experiments.py:582-610)
+    # ------------------------------------------------------------------
+    viz_dir = results_root / "results_visualizations"
+    summary_dir = results_root / "results_summaries"
+    shap_data_dir = results_root  # per-experiment <exp>/shap/ lives here
+
+    try:
+        logger.info("VISUALIZATION: generating aggregated-results plots")
+        visualizer = AggregatedResultsVisualizer(
+            str(aggregated_dir),
+            str(viz_dir),
+            n_features=20,
+            feature_importance_from="mean_importance_normalized",
+            shap_data_dir=str(shap_data_dir),
+        )
+        visualizer.visualize_all_experiments()
+        logger.info("VISUALIZATION: complete -> %s", viz_dir)
+    except Exception as e:
+        logger.error("VISUALIZATION failed: %s", e, exc_info=True)
+
+    try:
+        logger.info("SUMMARIZATION: analyzing visualizations")
+        summarizer = VisualizationSummarizer(
+            str(aggregated_dir),
+            str(summary_dir),
+            sort_column="mean_importance_normalized",
+        )
+        summarizer.analyze_visualizations(n=20)
+        summarizer.perform_hierarchical_statistical_analysis()
+        logger.info("SUMMARIZATION: complete -> %s", summary_dir)
+    except Exception as e:
+        logger.error("SUMMARIZATION failed: %s", e, exc_info=True)
+
+
 def main():
     """Execute the data mining analysis pipeline via command-line interface."""
     # Parse command line arguments
@@ -117,6 +247,36 @@ def main():
         default="standard",
         choices=["standard", "finagent", "gaia"],
         help="dataset type: standard (gsm8k/humaneval etc.), finagent, or gaia",
+    )
+    parser.add_argument(
+        "--run-causal",
+        dest="run_causal",
+        action="store_true",
+        default=True,
+        help=(
+            "After data mining, run the 4-stage causal pipeline "
+            "(aggregator -> feature selection -> discovery -> effects -> mediation -> report). "
+            "Only effective when analysis-type is 'all' or 'classification' "
+            "(needs SHAP / classification outputs). Default: enabled."
+        ),
+    )
+    parser.add_argument(
+        "--no-run-causal",
+        dest="run_causal",
+        action="store_false",
+        help="Disable the causal pipeline post-step.",
+    )
+    parser.add_argument("--causal-max-features", type=int, default=30)
+    parser.add_argument("--causal-alpha", type=float, default=0.01)
+    parser.add_argument("--causal-discovery-max-sample", type=int, default=10000)
+    parser.add_argument("--causal-effect-max-sample", type=int, default=15000)
+    parser.add_argument("--causal-mediation-max-sample", type=int, default=20000)
+    parser.add_argument("--causal-n-bootstrap", type=int, default=1000)
+    parser.add_argument(
+        "--causal-min-rows",
+        type=int,
+        default=100,
+        help="Minimum rows required to run the causal pipeline for a slice (default: 100, lower than the standard 200 because GAIA has only ~165 samples).",
     )
     args = parser.parse_args()
 
@@ -217,6 +377,32 @@ def main():
             analysis_type=args.analysis_type,
             target_datasets=merged_datasets if not args.skip_collection else None,
         )
+
+        # Optional: continue into the causal pipeline (aggregator -> 4-stage causal)
+        if args.run_causal:
+            if args.analysis_type not in ("all", "classification"):
+                logger.info(
+                    "Skipping causal pipeline: requires --analysis-type 'all' or "
+                    "'classification' (needs SHAP / classification outputs)."
+                )
+            else:
+                try:
+                    _run_causal_pipeline(
+                        analyzer=analyzer,
+                        data_path=str(analyzer.data_path),
+                        exclude_features_token=args.exclude_features,
+                        max_features=args.causal_max_features,
+                        alpha=args.causal_alpha,
+                        discovery_max_sample=args.causal_discovery_max_sample,
+                        effect_max_sample=args.causal_effect_max_sample,
+                        mediation_max_sample=args.causal_mediation_max_sample,
+                        n_bootstrap=args.causal_n_bootstrap,
+                        min_rows=args.causal_min_rows,
+                    )
+                except Exception as e:
+                    logger.error(
+                        "Causal pipeline failed: %s", e, exc_info=True
+                    )
 
         # Print summary of results
         logger.info("\n[ANALYSIS SUMMARY]")
