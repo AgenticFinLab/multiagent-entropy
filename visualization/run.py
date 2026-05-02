@@ -121,6 +121,7 @@ def _build_gaia(params):
         nongaia_merged_path=params["nongaia_merged_path"],
         shap_values_path=params["shap_values_path"],
         shap_x_test_path=params["shap_x_test_path"],
+        summary_path=params["summary_path"],
         output_dir=params["output_dir"],
     )
 

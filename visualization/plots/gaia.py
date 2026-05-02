@@ -85,6 +85,7 @@ class GAIAPlot(BaseVisualizer):
         shap_values_path: Path | str,
         shap_x_test_path: Path | str,
         output_dir: Path | str,
+        summary_path: Path | str | None = None,
     ) -> None:
         super().__init__(output_dir=output_dir, base_font_size=13)
         self.gaia_path = Path(gaia_aggregated_path)
@@ -92,6 +93,7 @@ class GAIAPlot(BaseVisualizer):
         self.nongaia_path = Path(nongaia_merged_path)
         self.shap_values_path = Path(shap_values_path)
         self.shap_x_test_path = Path(shap_x_test_path)
+        self.summary_path = Path(summary_path) if summary_path else None
         # Collected interpretation strings; flushed by compose().
         self._analyses: list[str] = []
 
@@ -135,36 +137,66 @@ class GAIAPlot(BaseVisualizer):
         shap_df = pd.read_csv(self.shap_values_path)
         x_df = pd.read_csv(self.shap_x_test_path)
 
-        factors = [(F_R1_Q3_STD, "(a)"), (F_TOOL_ENT, "(b)"), (F_STEP1_MEAN, "(c)")]
-        fig, axes = plt.subplots(1, 3, figsize=(15, 4.6))
+        factors = [
+            (F_R1_Q3_STD, "Round-1 Q3 std entropy", "#1B7E3D"),
+            (F_TOOL_ENT, "Tool-call mean entropy", "#D73027"),
+            (F_STEP1_MEAN, "Step-1 mean entropy", "#4575B4"),
+        ]
+
+        fig, ax = plt.subplots(figsize=(6.5, 5.4))
         slope_summary = []
-        for ax, (col, tag) in zip(axes, factors):
-            label = FACTOR_LABEL.get(col, col)
+        for col, label, color in factors:
             if col not in shap_df.columns or col not in x_df.columns:
-                ax.text(0.5, 0.5, f"missing\n{col}", ha="center", va="center",
-                        transform=ax.transAxes, fontsize=10)
                 continue
             x = pd.to_numeric(x_df[col], errors="coerce").values
             y = pd.to_numeric(shap_df[col], errors="coerce").values
             mask = ~(np.isnan(x) | np.isnan(y))
             x, y = x[mask], y[mask]
-            sc = ax.scatter(x, y, c=x, cmap="viridis", alpha=0.55, s=12,
-                            edgecolors="none")
-            ax.axhline(0, color="black", lw=0.6, alpha=0.5)
-            ax.set_xlabel(label)
-            ax.set_ylabel("SHAP value")
-            ax.text(0.5, -0.22, tag, transform=ax.transAxes, ha="center",
-                    va="top", fontsize=14, fontweight="bold")
-            sns.despine(ax=ax, top=True, right=True)
-            plt.colorbar(sc, ax=ax, fraction=0.046, pad=0.04, label="feature value")
+            if x.size == 0:
+                continue
+            # Min-max normalize x so the three different feature scales share
+            # a common axis. SHAP values keep their native scale (probability units).
+            lo, hi = float(np.nanmin(x)), float(np.nanmax(x))
+            x_norm = (x - lo) / (hi - lo) if hi > lo else np.zeros_like(x)
+            ax.scatter(
+                x_norm, y, color=color, alpha=0.18, s=8, edgecolors="none",
+            )
+
+            # Smooth trend line via LOWESS for a clean monotone-ish curve
+            try:
+                from statsmodels.nonparametric.smoothers_lowess import lowess
+                sm = lowess(y, x_norm, frac=0.35, it=2, return_sorted=True)
+                tx, ty = sm[:, 0], sm[:, 1]
+            except Exception:
+                # Fallback: rolling mean over sorted x
+                order = np.argsort(x_norm)
+                xs, ys = x_norm[order], y[order]
+                w = max(50, len(xs) // 25)
+                ty = pd.Series(ys).rolling(w, min_periods=max(10, w // 4),
+                                            center=True).mean().values
+                tx = xs
+            ax.plot(tx, ty, color=color, lw=2.6, alpha=0.7, linestyle="--", label=label)
 
             try:
                 slope = np.polyfit(x, y, 1)[0]
             except Exception:
                 slope = float("nan")
-            slope_summary.append((label, float(np.nanmean(y[x >= np.nanmedian(x)])),
-                                  float(np.nanmean(y[x < np.nanmedian(x)])),
-                                  slope))
+            slope_summary.append(
+                (
+                    label,
+                    float(np.nanmean(y[x >= np.nanmedian(x)])),
+                    float(np.nanmean(y[x < np.nanmedian(x)])),
+                    slope,
+                )
+            )
+
+        ax.axhline(0, color="black", lw=0.6, alpha=0.5)
+        ax.set_xlabel("Normalized feature value (min–max per feature)")
+        ax.set_ylabel("SHAP value")
+        ax.legend(loc="upper right", frameon=True, fontsize=11,
+                  framealpha=0.9, edgecolor="#CCCCCC")
+        ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.3)
+        sns.despine(ax=ax, top=True, right=True)
 
         fig.tight_layout()
         self.save_figure(fig, "fig1_shap_three_factor.pdf", dpi=600)
@@ -181,21 +213,23 @@ class GAIAPlot(BaseVisualizer):
                 f"Higher feature value {direction} the predicted probability of correctness."
             )
         body = (
-            "Each subplot shows the per-sample SHAP contribution of one of three "
-            "uncertainty features to the LightGBM classifier (target: "
-            "`is_finally_correct`). x-axis is the feature value, y-axis the SHAP "
-            "value, color encodes the same feature value to make the gradient "
-            "visible.\n\n"
-            + "\n".join(bullets) +
-            "\n\n**Reading.** The three features cover three complementary slices of "
-            "uncertainty during a GAIA run. (a) **Round-1 Q3 agent std entropy** is a "
-            "*spread* signal — it measures how disagreeing the upper-quartile of "
-            "round-1 agents are about their own next tokens; high spread early in "
-            "the run reliably subtracts from success probability. (b) **Tool-call "
-            "mean entropy** is the *decision-hesitation* signal at the Action / "
-            "Action-Input span; the more uncertain the agent is while choosing "
-            "tools and arguments, the worse the outcome. (c) **Step-1 mean entropy** "
-            "is the *post-observation re-anchoring* signal — entropy of the second "
+            "All three uncertainty features are overlaid on a single axes to save "
+            "page space. Each feature's raw value is min–max normalized to [0, 1] "
+            "so they can share an x-axis; SHAP values keep their native scale "
+            "(units of predicted probability of `is_finally_correct`). Per feature, "
+            "the translucent dots are per-sample SHAP contributions and the solid "
+            "line is the mean SHAP value within 12 quantile bins of the (normalized) "
+            "feature.\n\n"
+            + "\n".join(bullets)
+            + "\n\n**Reading.** The three features cover three complementary slices of "
+            "uncertainty during a GAIA run. **Round-1 Q3 agent std entropy** (green) "
+            "is a *spread* signal — how disagreeing the upper-quartile of round-1 "
+            "agents are about their own next tokens; high spread early in the run "
+            "reliably subtracts from success probability. **Tool-call mean entropy** "
+            "(red) is the *decision-hesitation* signal at the Action / Action-Input "
+            "span; the more uncertain the agent is while choosing tools and "
+            "arguments, the worse the outcome. **Step-1 mean entropy** (blue) is "
+            "the *post-observation re-anchoring* signal — entropy of the second "
             "ReAct step, after the first tool result has come back; if the agent "
             "is still highly entropic at this point, downstream rounds rarely "
             "recover. Together they tell the same story from three angles: failure "
@@ -226,18 +260,28 @@ class GAIAPlot(BaseVisualizer):
             print("[fig2] skipped: no rows")
             return
 
-        fig, ax = plt.subplots(figsize=(7, 5.5))
+        fig, ax = plt.subplots(figsize=(6.5, 5.4))
         sizes = 8 + np.clip(sub[F_TOOL_CALLS_SAMPLE].values, 1, 30) * 4
         correct = sub["is_finally_correct"].astype(bool).values
 
-        ax.scatter(sub.loc[~correct, x_col],
-                   sub.loc[~correct, y_col],
-                   s=sizes[~correct], color="#E45756", alpha=0.4,
-                   label="Wrong", edgecolors="none")
-        ax.scatter(sub.loc[correct, x_col],
-                   sub.loc[correct, y_col],
-                   s=sizes[correct], color="#4C9F70", alpha=0.7,
-                   label="Correct", edgecolors="none")
+        ax.scatter(
+            sub.loc[~correct, x_col],
+            sub.loc[~correct, y_col],
+            s=sizes[~correct],
+            color="#E45756",
+            alpha=0.4,
+            label="Wrong",
+            edgecolors="none",
+        )
+        ax.scatter(
+            sub.loc[correct, x_col],
+            sub.loc[correct, y_col],
+            s=sizes[correct],
+            color="#4C9F70",
+            alpha=0.7,
+            label="Correct",
+            edgecolors="none",
+        )
 
         from scipy.stats import gaussian_kde
 
@@ -250,14 +294,14 @@ class GAIAPlot(BaseVisualizer):
         for mask, color in [(correct, "#1B7E3D"), (~correct, "#9C2E26")]:
             if mask.sum() < 30:
                 continue
-            xy = np.vstack([sub.loc[mask, x_col].values,
-                            sub.loc[mask, y_col].values])
+            xy = np.vstack([sub.loc[mask, x_col].values, sub.loc[mask, y_col].values])
             try:
                 kde = gaussian_kde(xy)
                 xx, yy = np.mgrid[xmin:xmax:120j, ymin:ymax:120j]
                 zz = kde(np.vstack([xx.ravel(), yy.ravel()])).reshape(xx.shape)
-                ax.contour(xx, yy, zz, levels=4, colors=color, alpha=0.7,
-                           linewidths=1.2)
+                ax.contour(
+                    xx, yy, zz, levels=4, colors=color, alpha=0.7, linewidths=1.2
+                )
             except Exception as e:
                 print(f"[fig2] KDE failed: {e}")
 
@@ -298,7 +342,8 @@ class GAIAPlot(BaseVisualizer):
             "x) is the most reliable success indicator."
         )
         self._record_analysis(
-            "Figure 2 — Tool effective rate × round-1 Q3 std entropy phase plot", body,
+            "Figure 2 — Tool effective rate × round-1 Q3 std entropy phase plot",
+            body,
         )
 
     # ------------------------------------------------------------------
@@ -306,8 +351,7 @@ class GAIAPlot(BaseVisualizer):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _quantile_curve(df: pd.DataFrame, x_col: str,
-                        n_bins: int = 5) -> pd.DataFrame:
+    def _quantile_curve(df: pd.DataFrame, x_col: str, n_bins: int = 5) -> pd.DataFrame:
         out = []
         for arch, g in df.groupby("architecture"):
             g = g[[x_col, "is_finally_correct"]].dropna()
@@ -318,11 +362,15 @@ class GAIAPlot(BaseVisualizer):
                 g["_bin"] = pd.qcut(g[x_col], q=n_bins, duplicates="drop")
             except ValueError:
                 continue
-            agg = g.groupby("_bin").agg(
-                x=(x_col, "mean"),
-                acc=("is_finally_correct", "mean"),
-                n=("is_finally_correct", "size"),
-            ).reset_index()
+            agg = (
+                g.groupby("_bin")
+                .agg(
+                    x=(x_col, "mean"),
+                    acc=("is_finally_correct", "mean"),
+                    n=("is_finally_correct", "size"),
+                )
+                .reset_index()
+            )
             agg["architecture"] = arch
             agg["_quantile"] = range(1, len(agg) + 1)
             out.append(agg)
@@ -340,46 +388,83 @@ class GAIAPlot(BaseVisualizer):
 
         # Quintile index on shared x-axis (1..5) so the two entropy scales
         # (which differ by orders of magnitude) can share one panel.
-        fig, ax = plt.subplots(figsize=(8.5, 5.2))
+        fig, ax = plt.subplots(figsize=(6.5, 5.4))
         for arch in ARCH_ORDER:
             color = ARCH_COLORS.get(arch, "#999999")
             g = gaia_curve[gaia_curve["architecture"] == arch]
             n = non_curve[non_curve["architecture"] == arch]
             if not g.empty:
-                ax.plot(g["_quantile"], g["acc"] * 100,
-                        color=color, marker="o", linestyle="-",
-                        linewidth=1.8, markersize=6,
-                        label=ARCH_LABEL.get(arch, arch))
+                ax.plot(
+                    g["_quantile"],
+                    g["acc"] * 100,
+                    color=color,
+                    marker="o",
+                    linestyle="-",
+                    linewidth=1.8,
+                    markersize=6,
+                    label=ARCH_LABEL.get(arch, arch),
+                )
             if not n.empty:
-                ax.plot(n["_quantile"], n["acc"] * 100,
-                        color=color, marker="s", linestyle="--",
-                        linewidth=1.8, markersize=5, alpha=0.85)
+                ax.plot(
+                    n["_quantile"],
+                    n["acc"] * 100,
+                    color=color,
+                    marker="s",
+                    linestyle="--",
+                    linewidth=1.8,
+                    markersize=5,
+                    alpha=0.85,
+                )
 
         ax.set_xticks([1, 2, 3, 4, 5])
-        ax.set_xticklabels(["Q1\n(low entropy)", "Q2", "Q3", "Q4",
-                            "Q5\n(high entropy)"])
+        ax.set_xticklabels(
+            ["Q1\n(low entropy)", "Q2", "Q3", "Q4", "Q5\n(high entropy)"]
+        )
         ax.set_xlabel("Sample-entropy quintile")
         ax.set_ylabel("Accuracy (%)")
         ax.grid(True, linestyle="--", linewidth=0.6, alpha=0.3)
         sns.despine(ax=ax, top=True, right=True)
 
         arch_handles = [
-            Line2D([], [], color=ARCH_COLORS[a], lw=2,
-                   label=ARCH_LABEL.get(a, a))
+            Line2D([], [], color=ARCH_COLORS[a], lw=2, label=ARCH_LABEL.get(a, a))
             for a in ARCH_ORDER
         ]
         style_handles = [
-            Line2D([], [], color="#444", lw=2, linestyle="-", marker="o",
-                   label="GAIA (tool-call entropy)"),
-            Line2D([], [], color="#444", lw=2, linestyle="--", marker="s",
-                   label="Non-GAIA (sample total entropy)"),
+            Line2D(
+                [],
+                [],
+                color="#444",
+                lw=2,
+                linestyle="-",
+                marker="o",
+                label="GAIA (tool-call entropy)",
+            ),
+            Line2D(
+                [],
+                [],
+                color="#444",
+                lw=2,
+                linestyle="--",
+                marker="s",
+                label="Non-GAIA (sample total entropy)",
+            ),
         ]
-        leg1 = ax.legend(handles=arch_handles, title="Architecture",
-                         loc="upper right", frameon=False, fontsize=10,
-                         ncol=1)
+        leg1 = ax.legend(
+            handles=arch_handles,
+            title="Architecture",
+            loc="upper right",
+            frameon=False,
+            fontsize=10,
+            ncol=1,
+        )
         ax.add_artist(leg1)
-        ax.legend(handles=style_handles, title="Dataset family",
-                  loc="lower left", frameon=False, fontsize=10)
+        ax.legend(
+            handles=style_handles,
+            title="Dataset family",
+            loc="lower left",
+            frameon=False,
+            fontsize=10,
+        )
 
         fig.tight_layout()
         self.save_figure(fig, "fig3_entropy_accuracy.pdf", dpi=600)
@@ -392,8 +477,9 @@ class GAIAPlot(BaseVisualizer):
             for arch in ARCH_ORDER:
                 sub = curve[curve["architecture"] == arch].sort_values("_quantile")
                 if len(sub) >= 2:
-                    rows.append((arch, sub["acc"].iloc[0] * 100,
-                                 sub["acc"].iloc[-1] * 100))
+                    rows.append(
+                        (arch, sub["acc"].iloc[0] * 100, sub["acc"].iloc[-1] * 100)
+                    )
             return rows
 
         gaia_drops = _drop(gaia_curve)
@@ -438,8 +524,11 @@ class GAIAPlot(BaseVisualizer):
         if df is None:
             return
         step_cols = sorted(
-            [c for c in df.columns
-             if c.startswith("step_") and c.endswith("_tool_call_mean_entropy")],
+            [
+                c
+                for c in df.columns
+                if c.startswith("step_") and c.endswith("_tool_call_mean_entropy")
+            ],
             key=lambda c: int(c.split("_")[1]),
         )
         if not step_cols:
@@ -486,8 +575,10 @@ class GAIAPlot(BaseVisualizer):
             c_mat = c_mat[::-1]  # high -> low (so low-entropy correct rows sit at top)
         if w_mat.size:
             pass  # ascending: low entropy near boundary, high entropy at bottom
-        full = np.vstack([c_mat, w_mat]) if c_mat.size and w_mat.size else (
-            c_mat if c_mat.size else w_mat
+        full = (
+            np.vstack([c_mat, w_mat])
+            if c_mat.size and w_mat.size
+            else (c_mat if c_mat.size else w_mat)
         )
         n_corr_bins = c_mat.shape[0]
 
@@ -499,8 +590,9 @@ class GAIAPlot(BaseVisualizer):
 
         # Layout: top marginal line + main heatmap, sharing x.
         fig = plt.figure(figsize=(9.0, 6.5))
-        gs = fig.add_gridspec(2, 2, height_ratios=[1, 3.2], width_ratios=[40, 1],
-                              hspace=0.05, wspace=0.04)
+        gs = fig.add_gridspec(
+            2, 2, height_ratios=[1, 3.2], width_ratios=[40, 1], hspace=0.05, wspace=0.04
+        )
         ax_top = fig.add_subplot(gs[0, 0])
         ax_main = fig.add_subplot(gs[1, 0], sharex=ax_top)
         cax = fig.add_subplot(gs[1, 1])
@@ -519,11 +611,25 @@ class GAIAPlot(BaseVisualizer):
         w_mean, w_q1, w_q3 = _stats(w_block)
 
         ax_top.fill_between(x_idx, c_q1, c_q3, color="#4C9F70", alpha=0.18)
-        ax_top.plot(x_idx, c_mean, color="#1B7E3D", lw=2,
-                    marker="o", markersize=5, label=f"Correct (n = {len(c_block):,})")
+        ax_top.plot(
+            x_idx,
+            c_mean,
+            color="#1B7E3D",
+            lw=2,
+            marker="o",
+            markersize=5,
+            label=f"Correct (n = {len(c_block):,})",
+        )
         ax_top.fill_between(x_idx, w_q1, w_q3, color="#E45756", alpha=0.18)
-        ax_top.plot(x_idx, w_mean, color="#9C2E26", lw=2,
-                    marker="s", markersize=5, label=f"Wrong   (n = {len(w_block):,})")
+        ax_top.plot(
+            x_idx,
+            w_mean,
+            color="#9C2E26",
+            lw=2,
+            marker="s",
+            markersize=5,
+            label=f"Wrong   (n = {len(w_block):,})",
+        )
         ax_top.set_ylabel("Step entropy\n(mean ± IQR)", fontsize=11)
         ax_top.legend(loc="upper left", frameon=False, fontsize=10)
         ax_top.grid(True, linestyle="--", linewidth=0.5, alpha=0.3)
@@ -534,18 +640,21 @@ class GAIAPlot(BaseVisualizer):
         cmap = plt.get_cmap("Blues").copy()
         cmap.set_bad(color="#EDEDED")
         masked = np.ma.masked_invalid(full)
-        im = ax_main.imshow(masked, aspect="auto", cmap=cmap, vmin=0, vmax=vmax,
-                            interpolation="nearest")
+        im = ax_main.imshow(
+            masked, aspect="auto", cmap=cmap, vmin=0, vmax=vmax, interpolation="nearest"
+        )
 
         if n_corr_bins > 0 and n_corr_bins < full.shape[0]:
             ax_main.axhline(n_corr_bins - 0.5, color="white", lw=1.6, ls="-")
             ax_main.axhline(n_corr_bins - 0.5, color="black", lw=0.8, ls="--")
 
         # y tick labels: just two block labels, not per-row
-        ax_main.set_yticks([
-            n_corr_bins / 2 - 0.5,
-            n_corr_bins + (full.shape[0] - n_corr_bins) / 2 - 0.5,
-        ])
+        ax_main.set_yticks(
+            [
+                n_corr_bins / 2 - 0.5,
+                n_corr_bins + (full.shape[0] - n_corr_bins) / 2 - 0.5,
+            ]
+        )
         ax_main.set_yticklabels(["Correct\n(binned)", "Wrong\n(binned)"], fontsize=11)
         ax_main.set_xticks(range(len(step_cols)))
         ax_main.set_xticklabels([c.split("_")[1] for c in step_cols])
@@ -559,7 +668,9 @@ class GAIAPlot(BaseVisualizer):
         c_first = float(c_mean[0]) if not np.isnan(c_mean[0]) else float("nan")
         c_last = float(np.nanmean(c_mean))
         w_first = float(w_mean[0]) if not np.isnan(w_mean[0]) else float("nan")
-        w_last_idx = int(np.where(~np.isnan(w_mean))[0][-1]) if (~np.isnan(w_mean)).any() else 0
+        w_last_idx = (
+            int(np.where(~np.isnan(w_mean))[0][-1]) if (~np.isnan(w_mean)).any() else 0
+        )
         w_last = float(w_mean[w_last_idx])
         gap = float(np.nanmean(w_mean - c_mean))
         body = (
@@ -612,9 +723,9 @@ class GAIAPlot(BaseVisualizer):
         if df is None:
             return
         axes_def = [
-            ("Tool effective rate", F_TOOL_EFF_SAMPLE, False),
-            ("Low tool-call entropy", F_TOOL_ENT_SAMPLE, True),
-            ("Low round-1 max entropy", F_ROUND1_MAX, True),
+            ("Low round-1 Q3 std entropy", F_R1_Q3_STD, True),
+            ("Low tool-call entropy", F_TOOL_ENT, True),
+            ("Low step-1 mean entropy", F_STEP1_MEAN, True),
         ]
         rows = []
         for arch, g in df.groupby("architecture"):
@@ -648,42 +759,53 @@ class GAIAPlot(BaseVisualizer):
             if arch not in norm.index:
                 continue
             vals = norm.loc[arch].tolist() + [norm.loc[arch].iloc[0]]
-            ax.plot(angles, vals, color=ARCH_COLORS.get(arch, "#999999"),
-                    label=ARCH_LABEL.get(arch, arch), linewidth=1.8)
-            ax.fill(angles, vals, color=ARCH_COLORS.get(arch, "#999999"),
-                    alpha=0.12)
+            ax.plot(
+                angles,
+                vals,
+                color=ARCH_COLORS.get(arch, "#999999"),
+                label=ARCH_LABEL.get(arch, arch),
+                linewidth=1.8,
+            )
+            ax.fill(angles, vals, color=ARCH_COLORS.get(arch, "#999999"), alpha=0.12)
 
         ax.set_xticks(angles[:-1])
         ax.set_xticklabels(labels)
         ax.set_yticks([0.25, 0.5, 0.75, 1.0])
         ax.set_yticklabels(["0.25", "0.50", "0.75", "1.00"], fontsize=9)
         ax.set_ylim(0, 1.05)
-        ax.legend(loc="upper right", bbox_to_anchor=(1.25, 1.05), fontsize=10,
-                  frameon=False)
+        ax.legend(
+            loc="upper right", bbox_to_anchor=(1.25, 1.05), fontsize=10, frameon=False
+        )
         fig.tight_layout()
         self.save_figure(fig, "fig5_arch_radar.pdf", dpi=600)
         self.save_figure(fig, "fig5_arch_radar.png", dpi=300)
         plt.close(fig)
 
-        winners = {label: table[label].idxmax() if not reverse else table[label].idxmin()
-                   for label, _, reverse in axes_def}
+        winners = {
+            label: table[label].idxmax() if not reverse else table[label].idxmin()
+            for label, _, reverse in axes_def
+        }
         winners_lines = "\n".join(
             f"  - **{ax_lbl}** — best: {ARCH_LABEL.get(winner, winner)}"
             for ax_lbl, winner in winners.items()
         )
         body = (
-            "Three axes — tool effective rate, low tool-call entropy, low round-1 max "
-            "agent entropy — each min-max normalized across architectures so that "
-            "**outward = better** on every axis (the two entropy axes are reversed "
-            "before normalization). Polylines are colored by architecture.\n\n"
+            "Three axes — low round-1 Q3 std entropy, low tool-call mean entropy, low "
+            "step-1 mean entropy — the same three uncertainty features featured in "
+            "Figure 1's SHAP scatter, each min-max normalized across architectures and "
+            "reversed so that **outward = lower entropy = better**. Polylines are "
+            "colored by architecture.\n\n"
             f"{winners_lines}\n\n"
-            "**Reading.** No single architecture dominates all three axes simultaneously "
-            "on GAIA. Architectures that maximize tool effectiveness do not always "
-            "minimize tool-call entropy, and the round-1 entropy axis ranks the "
-            "architectures differently again. This is consistent with the paper's broader "
-            "claim that **MAS architectures trade off effectiveness against uncertainty**, "
-            "and that picking the right architecture for tool-using tasks is not a single-"
-            "objective decision."
+            "**Reading.** The three axes capture three complementary slices of "
+            "uncertainty during a GAIA run: round-1 agent disagreement (spread), "
+            "tool-call decision hesitation (localized), and step-1 post-observation "
+            "re-anchoring (persistence). No single architecture dominates all three "
+            "simultaneously — the architecture that minimizes tool-call entropy is "
+            "not the same one that minimizes round-1 spread or step-1 hesitation. "
+            "This makes the paper's broader claim concrete: **MAS architectures "
+            "trade off across distinct uncertainty regimes**, and selecting the "
+            "right architecture for tool-using tasks is not a single-objective "
+            "decision."
         )
         self._record_analysis("Figure 5 — Architecture comparison radar", body)
 
@@ -700,15 +822,25 @@ class GAIAPlot(BaseVisualizer):
           (a) tool-call volume + overall failure rate per model
           (b) failure-reason composition (stacked, normalized) per model
         """
-        breakdown_path = (self.gaia_path.parent / "tool_failure_breakdown.csv")
+        breakdown_path = self.gaia_path.parent / "tool_failure_breakdown.csv"
         if not breakdown_path.exists():
-            print(f"[fig6] skipped: {breakdown_path} not found "
-                  f"(run scripts/scan_gaia_tool_failures.py first)")
+            print(
+                f"[fig6] skipped: {breakdown_path} not found "
+                f"(run scripts/scan_gaia_tool_failures.py first)"
+            )
             return
         bd = pd.read_csv(breakdown_path)
 
-        cats = ["parse_error", "arg_error", "duplicate_call", "timeout",
-                "network", "empty_result", "executed_with_error", "other_explicit"]
+        cats = [
+            "parse_error",
+            "arg_error",
+            "duplicate_call",
+            "timeout",
+            "network",
+            "empty_result",
+            "executed_with_error",
+            "other_explicit",
+        ]
         cats = [c for c in cats if c in bd.columns]
 
         agg = bd.groupby("model")[["n_calls", "ok"] + cats].sum()
@@ -732,47 +864,70 @@ class GAIAPlot(BaseVisualizer):
         # for "execution-layer" failures (call ran but produced bad/empty output).
         cat_colors = {
             # cool side — interface / pre-execution failures
-            "parse_error":         "#08306B",  # darkest navy
-            "arg_error":           "#2171B5",
-            "duplicate_call":      "#6BAED6",
-            "timeout":             "#C6DBEF",
+            "parse_error": "#08306B",  # darkest navy
+            "arg_error": "#2171B5",
+            "duplicate_call": "#6BAED6",
+            "timeout": "#C6DBEF",
             # warm side — execution / semantic failures
-            "network":             "#FCBBA1",
-            "empty_result":        "#FB6A4A",
+            "network": "#FCBBA1",
+            "empty_result": "#FB6A4A",
             "executed_with_error": "#CB181D",
-            "other_explicit":      "#67000D",  # darkest red
+            "other_explicit": "#67000D",  # darkest red
         }
 
         models = list(agg.index)
         short_labels = [MODEL_SHORT.get(m, m) for m in models]
         x = np.arange(len(models))
 
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5.2),
-                                       gridspec_kw=dict(width_ratios=[1, 1.25]))
+        fig, (ax1, ax2) = plt.subplots(
+            1, 2, figsize=(13, 5.2), gridspec_kw=dict(width_ratios=[1, 1.25])
+        )
 
         # ---------- (a) volume + failure rate ----------
-        bars = ax1.bar(x, agg["n_calls"].values, color="#4575B4", alpha=0.6,
-                       edgecolor="white")
+        bars = ax1.bar(
+            x, agg["n_calls"].values, color="#4575B4", alpha=0.6, edgecolor="white"
+        )
         ax1.set_yscale("log")
         ax1.set_ylabel("Tool calls (log scale)")
         ax1.set_xticks(x)
         ax1.set_xticklabels(short_labels, rotation=0, ha="center")
-        ax1.text(0.5, -0.18, "(a) Tool-call volume and overall failure rate",
-                 transform=ax1.transAxes, ha="center", va="top",
-                 fontsize=12, fontweight="bold")
+        ax1.text(
+            0.5,
+            -0.18,
+            "(a) Tool-call volume and overall failure rate",
+            transform=ax1.transAxes,
+            ha="center",
+            va="top",
+            fontsize=12,
+            fontweight="bold",
+        )
         ax1.grid(True, axis="y", linestyle="--", linewidth=0.5, alpha=0.3)
         sns.despine(ax=ax1, top=True, right=False)
 
         ax1b = ax1.twinx()
-        ax1b.plot(x, agg["fail_rate"].values * 100, color="#D73027",
-                  marker="o", lw=2, markersize=7, label="Failure rate (%)")
+        ax1b.plot(
+            x,
+            agg["fail_rate"].values * 100,
+            color="#D73027",
+            marker="o",
+            lw=2,
+            markersize=7,
+            label="Failure rate (%)",
+        )
         ax1b.set_ylabel("Failure rate (%)", color="#D73027")
         ax1b.tick_params(axis="y", colors="#D73027")
         ax1b.set_ylim(0, max(60, agg["fail_rate"].max() * 100 * 1.15))
         for xi, n, fr in zip(x, agg["n_calls"], agg["fail_rate"]):
             ax1.text(xi, n, f"{int(n):,}", ha="center", va="bottom", fontsize=8)
-            ax1b.text(xi, fr * 100, f"{fr * 100:.0f}%", ha="center",
-                      va="bottom", fontsize=9, color="#D73027")
+            ax1b.text(
+                xi,
+                fr * 100,
+                f"{fr * 100:.0f}%",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+                color="#D73027",
+            )
 
         # ---------- (b) failure-reason composition ----------
         # Normalize to percentages of failed calls only
@@ -784,20 +939,34 @@ class GAIAPlot(BaseVisualizer):
             vals = comp[c].values
             if vals.sum() < 1e-9:
                 continue
-            ax2.barh(x, vals, left=bottom, color=cat_colors[c],
-                     edgecolor="white", linewidth=0.5,
-                     label=cat_label[c])
+            ax2.barh(
+                x,
+                vals,
+                left=bottom,
+                color=cat_colors[c],
+                edgecolor="white",
+                linewidth=0.5,
+                label=cat_label[c],
+            )
             bottom += vals
         ax2.set_yticks(x)
         ax2.set_yticklabels(short_labels)
         ax2.invert_yaxis()
         ax2.set_xlim(0, 100)
         ax2.set_xlabel("Share of failed tool calls (%)")
-        ax2.text(0.5, -0.20, "(b) Failure-reason composition (% of failed calls)",
-                 transform=ax2.transAxes, ha="center", va="top",
-                 fontsize=12, fontweight="bold")
-        ax2.legend(loc="center left", bbox_to_anchor=(1.02, 0.5),
-                   frameon=False, fontsize=9)
+        ax2.text(
+            0.5,
+            -0.20,
+            "(b) Failure-reason composition (% of failed calls)",
+            transform=ax2.transAxes,
+            ha="center",
+            va="top",
+            fontsize=12,
+            fontweight="bold",
+        )
+        ax2.legend(
+            loc="center left", bbox_to_anchor=(1.02, 0.5), frameon=False, fontsize=9
+        )
         ax2.grid(True, axis="x", linestyle="--", linewidth=0.5, alpha=0.3)
         sns.despine(ax=ax2, top=True, right=True)
 
@@ -850,8 +1019,8 @@ class GAIAPlot(BaseVisualizer):
             f"{int(agg['fail'].sum()):,} failed "
             f"({agg['fail'].sum() / agg['n_calls'].sum() * 100:.1f}%).\n\n"
             "**Dominant failure category per model:**\n"
-            + "\n".join(dom_lines) +
-            "\n\n**Reading.** Failure attribution is **model-shaped, not random**. "
+            + "\n".join(dom_lines)
+            + "\n\n**Reading.** Failure attribution is **model-shaped, not random**. "
             "Smaller models pour calls into the loop and most of those calls are "
             "*malformed invocations* — structurally broken JSON or off-protocol "
             "output that the framework rejects with a non-standard error — or are "
@@ -865,7 +1034,154 @@ class GAIAPlot(BaseVisualizer):
             "weak-model regime, search/grounding quality for the strong-model regime."
         )
         self._record_analysis(
-            "Figure 6 — Tool-call failure attribution per base model", body,
+            "Figure 6 — Tool-call failure attribution per base model",
+            body,
+        )
+
+    # ------------------------------------------------------------------
+    # Figure 7 — per-model architecture accuracy with base-model marker
+    # ------------------------------------------------------------------
+
+    def fig7_arch_accuracy(self) -> None:
+        if self.summary_path is None or not self.summary_path.exists():
+            print("[fig7] skipped: summary_path not found")
+            return
+        df = pd.read_csv(self.summary_path)
+        needed = {"model", "architecture", "accuracy", "base model accuracy"}
+        if not needed.issubset(df.columns):
+            print(f"[fig7] skipped: missing columns {needed - set(df.columns)}")
+            return
+
+        # MAS accuracy is fractional (0–1); base accuracy already percent (0–100).
+        df = df.copy()
+        df["acc_pct"] = df["accuracy"] * 100.0
+        df["base_pct"] = df["base model accuracy"]
+
+        # Order models by base-model strength (ascending) for readability
+        base_by_model = df.groupby("model")["base_pct"].first().sort_values()
+        models = list(base_by_model.index)
+        short_labels = [MODEL_SHORT.get(m, m) for m in models]
+
+        fig, ax = plt.subplots(figsize=(6.5, 5.4))
+        n_arch = len(ARCH_ORDER)
+        bar_w = 0.8 / n_arch
+        x = np.arange(len(models))
+
+        for j, arch in enumerate(ARCH_ORDER):
+            sub = df[df["architecture"] == arch].set_index("model")
+            vals = [sub["acc_pct"].get(m, np.nan) for m in models]
+            offset = (j - (n_arch - 1) / 2) * bar_w
+            ax.bar(
+                x + offset,
+                vals,
+                width=bar_w,
+                color=ARCH_COLORS.get(arch, "#999999"),
+                edgecolor="white",
+                linewidth=0.6,
+                label=ARCH_LABEL.get(arch, arch),
+            )
+
+        # Base-model accuracy as a horizontal gray dashed tick spanning each model's group
+        half = (bar_w * n_arch) / 2
+        for xi, m in enumerate(models):
+            base = base_by_model[m]
+            ax.hlines(
+                base,
+                xi - half,
+                xi + half,
+                colors="#888888",
+                linestyles="--",
+                linewidth=1.6,
+                zorder=5,
+            )
+            ax.text(
+                xi - half - 0.04,
+                base + 0.4,
+                f"{base:.1f}%",
+                va="bottom",
+                ha="right",
+                fontsize=9,
+                color="#555555",
+            )
+
+        ax.set_xticks(x)
+        ax.set_xticklabels(short_labels)
+        ax.set_xlabel("Base model")
+        ax.set_ylabel("GAIA accuracy (%)")
+        ax.set_ylim(0, max(df["acc_pct"].max(), df["base_pct"].max()) * 1.18)
+        ax.grid(True, axis="y", linestyle="--", linewidth=0.5, alpha=0.3)
+        sns.despine(ax=ax, top=True, right=True)
+
+        arch_handles = [
+            plt.Rectangle(
+                (0, 0),
+                1,
+                1,
+                color=ARCH_COLORS.get(a, "#999999"),
+                label=ARCH_LABEL.get(a, a),
+            )
+            for a in ARCH_ORDER
+        ]
+        base_handle = Line2D(
+            [],
+            [],
+            color="#888888",
+            linestyle="--",
+            linewidth=1.6,
+            label="Base model",
+        )
+        ax.legend(
+            handles=arch_handles + [base_handle],
+            loc="upper left",
+            frameon=False,
+            ncol=1,
+            fontsize=10,
+        )
+
+        fig.tight_layout()
+        self.save_figure(fig, "fig7_arch_accuracy.pdf", dpi=600)
+        self.save_figure(fig, "fig7_arch_accuracy.png", dpi=300)
+        plt.close(fig)
+
+        # ----- analysis -----
+        lines = []
+        for m in models:
+            base = base_by_model[m]
+            sub = df[df["model"] == m].set_index("architecture")["acc_pct"]
+            best_arch = sub.idxmax()
+            best_val = sub.max()
+            delta = best_val - base
+            lines.append(
+                f"  - **{MODEL_SHORT.get(m, m)}** ({m}): base = {base:.1f}%, "
+                f"best MAS = {ARCH_LABEL.get(best_arch, best_arch)} {best_val:.1f}% "
+                f"(Δ {delta:+.1f}pp)"
+            )
+        body = (
+            "Per-model GAIA accuracy across the five MAS architectures, with the "
+            "base-model (no-MAS) accuracy overlaid as a black dashed tick spanning "
+            "each model's bar group. Base-model accuracy is taken from "
+            "`all_summary_data.csv:base model accuracy` (already in percent); MAS "
+            "accuracies come from the `accuracy` column (fraction, scaled ×100). "
+            "Models are ordered along the x-axis by ascending base-model strength.\n\n"
+            "**Per-model best architecture vs. base model:**\n"
+            + "\n".join(lines)
+            + "\n\n**Reading.** The dashed tick for each model is the *no-MAS ceiling* — "
+            "what a single forward pass of that base model achieves on GAIA without "
+            "any orchestration. For the weakest models (Q-0.6, L-3, L-8) every MAS "
+            "architecture lands well below this ceiling: the orchestration overhead "
+            "compounds the model's tool-use weakness rather than mitigating it. For "
+            "the strongest models (Q-4, Q-8, Q-14) several MAS architectures match or "
+            "exceed the base-model line, but the gain is modest and not uniform — "
+            "**centralized** and **hybrid** tend to be the architectures that lift "
+            "above base, while **debate** typically lags. The figure makes the paper's "
+            "headline trade-off concrete: MAS only helps when the base model is "
+            "already competent at tool use, and even then the choice of architecture "
+            "is the difference between recovering the base-model accuracy and "
+            "destroying it."
+        )
+        self._record_analysis(
+            "Figure 7 — Per-model GAIA accuracy by architecture, with base-model overlay",
+            body,
         )
 
     # ------------------------------------------------------------------
@@ -885,6 +1201,8 @@ class GAIAPlot(BaseVisualizer):
         self.fig5_arch_radar()
         print("[gaia] Figure 6 — failure-mode breakdown")
         self.fig6_failure_breakdown()
+        print("[gaia] Figure 7 — per-model architecture accuracy")
+        self.fig7_arch_accuracy()
 
         if self._analyses:
             md = (

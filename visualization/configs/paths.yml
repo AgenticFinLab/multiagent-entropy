@@ -73,3 +73,4 @@ plots:
     nongaia_merged_path: "{data_mining_root}/data/merged_datasets.csv"
     shap_values_path: "{data_mining_root}/results_gaia/base_model_all_metrics/shap/shap_values_LightGBM_classification.csv"
     shap_x_test_path: "{data_mining_root}/results_gaia/base_model_all_metrics/shap/X_test_LightGBM_classification.csv"
+    summary_path: "{evaluation_root}/results_gaia/gaia/all_summary_data.csv"
