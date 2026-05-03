@@ -1,6 +1,6 @@
 
 <div align="center">
-<h1>On the Uncertainty of Large Language Model-Based Multi-Agent Systems</h1>
+<h1>When Does Multi-Agent Collaboration Help? An Entropy Perspective</h1>
 
 
 Yuxuan Zhao<sup>1,2</sup>,  Sijia Chen<sup>2</sup>†,  Ningxin Su<sup>2</sup>
@@ -15,7 +15,7 @@ Yuxuan Zhao<sup>1,2</sup>,  Sijia Chen<sup>2</sup>†,  Ningxin Su<sup>2</sup>
 
 ### Overview
 
-Multi-agent systems (MAS) have emerged as a prominent paradigm for leveraging large language models (LLMs) to tackle complex tasks. However, the mechanisms governing the effectiveness of MAS built upon publicly available LLMs, specifically the underlying rationales for their success or failure, remain largely unexplored. In this paper, we revisit MAS through the perspective of uncertainty, considering both intra- and inter-agent dynamics by investigating entropy transitions during problem-solving across various topologies and six benchmark tasks. By analyzing 245 features spanning token-, trajectory-, and round-level entropy, we counterintuitively find that **a single agent outperforms MAS in approximately 43.3% of cases**, and that **uncertainty dynamics are largely determined during the first round of interaction**. Furthermore, we provide three key observations: 1) *Certainty Preference*: reducing uncertainty at any stage for any agent is critical for guaranteeing correct solutions; 2) *Base Uncertainty*: base models with lower entropy during problem-solving directly benefit MAS performance; and 3) *Task Awareness*: entropy dynamics of MAS play varying roles across different tasks. Building on these insights, we introduce a simple yet effective algorithm, the Entropy Judger, to select solutions from MAS's pass@$k$ results, leading to consistent accuracy improvements across all MAS configurations and tasks. 
+Multi-agent systems (MAS) have emerged as a prominent paradigm for leveraging large language models (LLMs) to tackle complex tasks. However, the mechanisms governing the effectiveness of MAS built upon publicly available LLMs, specifically the underlying rationales for their success or failure, remain largely unexplored. In this paper, we revisit MAS through the perspective of \textit{entropy}, considering both intra- and inter-agent dynamics by investigating entropy transitions during problem-solving across various topologies, six reasoning benchmarks, and two agentic tasks. By analyzing 245 features spanning token-, agent-, and round-level entropy, we counterintuitively find that a single agent outperforms MAS in approximately 43.3\% of cases, and that entropy dynamics are largely determined during the first round of interaction. Furthermore, we provide three key observations: 1) \textit{Certainty Preference}: reducing peak entropy and maintaining stable entropy across agents strongly correlate with correctness; 2) \textit{Base Entropy}: base models with lower entropy during problem-solving directly benefit MAS performance; and 3) \textit{Task Awareness}: entropy dynamics of MAS play varying roles across different tasks. Building on these insights, we introduce a simple yet effective algorithm, the \textit{Entropy Judger}, to select solutions from MAS's pass@$k$ results, leading to consistent accuracy improvements across all MAS configurations and tasks. Our source code is available at \href{https://github.com/AgenticFinLab/multiagent-entropy}{this https URL}.
 
 ---
 
@@ -291,8 +291,8 @@ To add a new dataset:
 If you find this work useful, please cite:
 
 ```bibtex
-@article{multiagent-uncertainty,
-  title={On the Uncertainty of Large Language Model-Based Multi-Agent Systems},
+@article{multiagent-entropy,
+  title={When Does Multi-Agent Collaboration Help? An Entropy Perspective},
   author={Yuxuan Zhao, Sijia Chen, Ningxin Su},
   journal={arXiv preprint arXiv:2602.04234},
   year={2026},
