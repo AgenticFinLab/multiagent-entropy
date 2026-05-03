@@ -36,9 +36,55 @@ Multi-agent systems (MAS) have emerged as a prominent paradigm for leveraging la
 ### Installation
 
 ```bash
+# 1. Clone this repo and install the package
 git clone https://github.com/AgenticFinLab/multiagent-entropy.git
 cd multiagent-entropy
 pip install -e .
+
+# 2. Clone and install lmbase (dataset loading dependency)
+git clone https://github.com/AgenticFinLab/lmbase.git
+cd lmbase && pip install -e . && cd ..
+```
+
+---
+
+### Prerequisites
+
+#### Environment Variables
+
+Copy `.env.example` to `.env` and fill in the keys you need:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Required for | Description |
+| -------- | ------------ | ----------- |
+| `HF_TOKEN` | All experiments (gated models/datasets) | HuggingFace access token — [get it here](https://huggingface.co/settings/tokens) |
+| `SERPAPI_API_KEY` | FinAgent, GAIA | Web search (primary) — [serpapi.com](https://serpapi.com) |
+| `SERPER_API_KEY` | FinAgent, GAIA | Web search (fallback) — [serper.dev](https://serper.dev) |
+| `SEC_EDGAR_API_KEY` | FinAgent only | SEC EDGAR filings search — [sec-api.io](https://sec-api.io); optional, falls back to mock results if unset |
+| `ARK_API_KEY` | GAIA only | ByteDance ARK / Doubao multimodal API for image/audio/video attachments; text-only tasks work without it |
+
+The six standard benchmarks (GSM8K, HumanEval, MMLU, MATH500, AIME2024, AIME2025) require **no API keys** beyond an optional `HF_TOKEN` for gated repos.
+
+#### Datasets
+
+Datasets are **downloaded automatically from HuggingFace** on first run using paths configured in `experiments/configs/dataset_specific/*.yml`. No manual download is needed for the standard benchmarks.
+
+For **GAIA**, additionally download task attachments after the dataset is fetched:
+
+```bash
+python experiments/scripts/tools/download_gaia_attachments.py
+```
+
+#### Models
+
+Model weights are **pulled automatically from HuggingFace** using the `lm_name` field in each model config (e.g. `Qwen/Qwen3-4B`). To use a locally downloaded model, replace `lm_name` with the local directory path:
+
+```yaml
+# experiments/configs/model_specific/qwen3-4b.yml
+lm_name: /path/to/local/Qwen3-4B
 ```
 
 ---
@@ -73,8 +119,9 @@ multiagent-entropy/
 │   │   ├── run_finagent_experiment.py ## FinAgent finance benchmark runner
 │   │   ├── run_gaia_experiment.py     ## GAIA benchmark runner
 │   │   ├── config_loader.py           ## Configuration loader
-│   │   ├── download_gaia_attachments.py ## GAIA task attachment downloader
-│   │   ├── regenerate_gaia_evaluation.py ## Re-evaluate existing GAIA results
+│   │   ├── tools/
+│   │   │   ├── download_gaia_attachments.py ## GAIA task attachment downloader
+│   │   │   └── regenerate_gaia_evaluation.py ## Re-evaluate existing GAIA results
 │   │   ├── finagent_experiment/       ## FinAgent tools, evaluation, prompts
 │   │   └── gaia_experiment/           ## GAIA tools, evaluation, prompts
 │   ├── results/

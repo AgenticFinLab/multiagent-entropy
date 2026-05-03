@@ -2,6 +2,58 @@
 
 This directory contains the organized structure for running large-scale experiments with the MultiAgent-Entropy framework.
 
+## Prerequisites
+
+### Installation
+
+```bash
+# Clone and install the main repo
+git clone https://github.com/AgenticFinLab/multiagent-entropy.git
+cd multiagent-entropy
+pip install -e .
+
+# Clone and install lmbase (dataset loading dependency)
+git clone https://github.com/AgenticFinLab/lmbase.git
+cd lmbase && pip install -e . && cd ..
+```
+
+### Environment Variables
+
+Copy `.env.example` to `.env` and fill in the keys you need:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Required for | Notes |
+| -------- | ------------ | ----- |
+| `HF_TOKEN` | All (gated models/datasets) | [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) |
+| `SERPAPI_API_KEY` | FinAgent, GAIA | Web search primary — [serpapi.com](https://serpapi.com) |
+| `SERPER_API_KEY` | FinAgent, GAIA | Web search fallback — [serper.dev](https://serper.dev) |
+| `SEC_EDGAR_API_KEY` | FinAgent only | Optional; falls back to mock results if unset — [sec-api.io](https://sec-api.io) |
+| `ARK_API_KEY` | GAIA only | Doubao multimodal API for image/audio/video attachments — [volcengine.com/product/ark](https://www.volcengine.com/product/ark) |
+
+Standard benchmarks (GSM8K, HumanEval, MMLU, MATH-500, AIME2024, AIME2025) require no API keys beyond an optional `HF_TOKEN`.
+
+### Datasets
+
+Datasets are downloaded automatically from HuggingFace on first run. The HuggingFace dataset path for each benchmark is configured in `experiments/configs/dataset_specific/*.yml` — all standard configs are already provided.
+
+For GAIA, additionally download task file attachments after the dataset is fetched:
+
+```bash
+python experiments/scripts/tools/download_gaia_attachments.py
+```
+
+### Models
+
+Model weights are pulled automatically from HuggingFace using the `lm_name` in each model config (e.g. `Qwen/Qwen3-4B`). To load from a local directory instead, replace `lm_name` with the local path:
+
+```yaml
+# experiments/configs/model_specific/qwen3-4b.yml
+lm_name: /path/to/local/Qwen3-4B
+```
+
 ## Directory Structure
 
 ```
@@ -50,8 +102,9 @@ experiments/
     ├── run_experiment.py                   # Standard experiment runner
     ├── run_finagent_experiment.py          # FinAgent experiment runner
     ├── run_gaia_experiment.py              # GAIA benchmark experiment runner
-    ├── regenerate_gaia_evaluation.py       # Re-evaluates existing GAIA results
-    ├── download_gaia_attachments.py        # Downloads GAIA task attachments
+    ├── tools/                              # Utility scripts
+    │   ├── download_gaia_attachments.py    # Downloads GAIA task attachments
+    │   └── regenerate_gaia_evaluation.py   # Re-evaluates existing GAIA results
     ├── finagent_experiment/                # FinAgent-specific agent modules
     └── gaia_experiment/                    # GAIA-specific agent modules
 ```
@@ -411,6 +464,7 @@ In addition to all standard options above, `run_finagent_experiment.py` accepts:
 | `prompts.py` | Prompt templates |
 | `checkpoint.py` | Checkpoint / resume support |
 | `constants.py` | `MAX_END_DATE`, `FINAGENT_TASK_TYPE` |
+| `retry.py` | Retry logic for transient API/tool errors |
 
 Results are saved to `experiments/results_finagent/raw/`.
 

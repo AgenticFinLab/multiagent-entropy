@@ -20,6 +20,13 @@ data_mining/
 │   │   ├── io_utils.py                  # OutputManager, save_plot, load_dataset_csv
 │   │   ├── cli.py                       # Shared argparse builder helpers
 │   │   └── post_processor.py            # BasePostProcessor (experiment-iteration helper)
+│   ├── causal_analysis/                 # Causal inference subpackage
+│   │   ├── causal_discovery.py          # PC/FCI causal graph learning (causal-learn)
+│   │   ├── causal_effect_estimator.py   # ATE/CATE estimation with DoWhy
+│   │   ├── causal_mediation_analyzer.py # Mediation analysis (direct vs indirect effects)
+│   │   ├── causal_report_generator.py   # Unified causal analysis report generator
+│   │   ├── feature_selection_crossval.py # Cross-validated feature selection for causal pipeline
+│   │   └── run_causal_on_correlation_results.py # Orchestrator: runs 4-stage causal pipeline on existing correlation slices
 │   ├── regression_analyzer.py           # RegressionAnalyzer(BaseAnalyzer) — predicts exp_accuracy
 │   ├── classification_analyzer.py       # ClassificationAnalyzer(BaseAnalyzer) — predicts is_finally_correct
 │   ├── shap_analyzer.py                 # ShapAnalyzer(BaseAnalyzer) — SHAP interpretability
@@ -27,6 +34,7 @@ data_mining/
 │   ├── feature_ablation_analyzer.py     # FeatureAblationAnalyzer(BaseAnalyzer) — ablation study
 │   ├── calibration_analyzer.py          # CalibrationAnalyzer — probability calibration
 │   ├── data_mining_analyzer.py          # Unified orchestrator (delegates to specialized analyzers)
+│   ├── mas_causal_analysis.py           # SAS vs MAS separation-control causal analysis
 │   ├── aggregator.py                    # Experiment result aggregation
 │   ├── visualizer.py                    # Aggregated result visualization
 │   ├── summarizer.py                    # Statistical summarization
@@ -450,3 +458,63 @@ Additionally, when running with aggregation/visualization/summarization:
 - `shap/X_test_{model}_{task_type}.csv`: Test features used for SHAP analysis
 - `shap/shap_feature_importance_{model}_{task_type}.csv`: Mean absolute SHAP values per feature
 - `shap/shap_prediction_probabilities_{model}_{task_type}.csv`: Prediction probabilities (classification only)
+
+---
+
+## Causal Analysis
+
+The `causal_analysis/` subpackage and `mas_causal_analysis.py` provide two complementary causal analysis workflows.
+
+### 4-Stage Causal Pipeline (`causal_analysis/`)
+
+A modular pipeline for discovering and quantifying causal relationships between entropy features and MAS correctness.
+
+| Module | Purpose |
+| --- | --- |
+| `feature_selection_crossval.py` | Cross-validated feature selection; produces `selected_features.csv` as pipeline input |
+| `causal_discovery.py` | Learns causal graph structure using PC and FCI algorithms (via `causal-learn`); enforces domain-knowledge constraints (temporal ordering, forbidden edges) |
+| `causal_effect_estimator.py` | Estimates ATE/CATE for selected features using DoWhy |
+| `causal_mediation_analyzer.py` | Decomposes total causal effect into direct and indirect (mediated) components |
+| `causal_report_generator.py` | Aggregates all stage outputs into a unified causal analysis report |
+| `run_causal_on_correlation_results.py` | Orchestrator: runs the full 4-stage pipeline against every correlation-analysis slice in `data_mining/exp_*/results_aggregated/` |
+
+#### Running the 4-Stage Pipeline
+
+```bash
+cd data_mining/code
+# Run against all existing correlation result slices
+python causal_analysis/run_causal_on_correlation_results.py
+```
+
+Output per slice `<slice_id>` is written to:
+
+```
+data_mining/exp_<NAME>/results_causal/<slice_id>/
+    feature_selection/selected_features.csv
+    causal_discovery/
+    causal_effects/
+    causal_mediation/
+    causal_report/
+```
+
+### SAS vs MAS Separation-Control Analysis (`mas_causal_analysis.py`)
+
+Pairs matched single-agent (SAS) and multi-agent (MAS) samples on the same question to isolate the causal effect of agent topology on accuracy, controlling for question difficulty via entropy.
+
+Key analyses:
+
+- **SAS vs MAS Round-1 entropy comparison** — tests whether entropy in the first round predicts the outcome gap
+- **Entropy-change direction vs accuracy** — classifies samples by whether MAS entropy increases or decreases relative to SAS and measures the accuracy difference
+- **Three-way comparison plots** — visualizes (SAS correct, MAS wrong), (both correct), (MAS correct, SAS wrong) cases
+- **Paired scatter plots** — per-model/dataset scatter of SAS entropy vs MAS entropy coloured by outcome
+
+#### Running the SAS vs MAS Analysis
+
+```bash
+cd data_mining/code
+python mas_causal_analysis.py \
+  --data-path ../../evaluation/results/{dataset}/all_aggregated_data_exclude_agent.csv \
+  --output-dir ../../data_mining/results/{dataset}/causal_sas_mas/
+```
+
+Output includes PNG plots and a text report in the specified output directory.
