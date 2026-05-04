@@ -98,10 +98,10 @@ def assign_tier(feature: str) -> int:
         for kw in TIER_KEYWORDS[tier]:
             if kw in feature:
                 return tier
-    # Check aggregate keywords -> tier 1.5 (round to 1)
+    # Check aggregate keywords -> post-execution sample-level, same tier as Round 2
     for kw in AGGREGATE_KEYWORDS:
         if feature.startswith(kw):
-            return 1
+            return 2
     return 1  # default
 
 
