@@ -67,6 +67,12 @@ plots:
     data_dir: "{experiments_root}/results/raw"
     eval_dir: "{evaluation_root}/results_qwen"
 
+  causal:
+    causal_data_dir: "{data_mining_root}/exp_causal_complete"
+
+  causal_appendix:
+    causal_data_dir: "{data_mining_root}/exp_causal_complete"
+
   gaia:
     gaia_aggregated_path: "{evaluation_root}/results_gaia/gaia/all_aggregated_data.csv"
     gaia_aggregated_exclude_agent_path: "{evaluation_root}/results_gaia/gaia/all_aggregated_data_exclude_agent.csv"

@@ -113,6 +113,22 @@ def _build_appendix_arch(params):
     )
 
 
+def _build_causal(params):
+    from visualization.plots.causal import CausalPlot
+    return CausalPlot(
+        causal_data_dir=params["causal_data_dir"],
+        output_dir=params["output_dir"],
+    )
+
+
+def _build_causal_appendix(params):
+    from visualization.plots.causal_appendix import CausalAppendixPlot
+    return CausalAppendixPlot(
+        causal_data_dir=params["causal_data_dir"],
+        output_dir=params["output_dir"],
+    )
+
+
 def _build_gaia(params):
     from visualization.plots.gaia import GAIAPlot
     return GAIAPlot(
@@ -136,6 +152,8 @@ PLOT_BUILDERS: Dict[str, Callable] = {
     "base_model": _build_base_model,
     "rl_model": _build_rl_model,
     "appendix_arch": _build_appendix_arch,
+    "causal": _build_causal,
+    "causal_appendix": _build_causal_appendix,
     "gaia": _build_gaia,
 }
 
