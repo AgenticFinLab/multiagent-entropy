@@ -1,7 +1,5 @@
-
 <div align="center">
 <h1>When Does Multi-Agent Collaboration Help? An Entropy Perspective</h1>
-
 
 Yuxuan Zhao<sup>1,2</sup>,  Sijia Chen<sup>2</sup>†,  Ningxin Su<sup>2</sup>
 
@@ -9,8 +7,8 @@ Yuxuan Zhao<sup>1,2</sup>,  Sijia Chen<sup>2</sup>†,  Ningxin Su<sup>2</sup>
 
 <sup>†</sup> Corresponding Author  
 
-
 <a href="https://arxiv.org/abs/2602.04234"><img src='https://img.shields.io/badge/arXiv-Multi%20Agent%20Uncertainty-red' alt='Paper PDF'>  </a>
+
 </div>
 
 ### Overview
@@ -25,11 +23,9 @@ Multi-agent systems (MAS) have emerged as a prominent paradigm for leveraging la
 <img src="figures/accuracy_comparison.png" width="90%">
 </div>
 
-
 <div align="center">
 <img src="figures/mas_analysis.png" width="90%">
 </div>
-
 
 ---
 
@@ -58,13 +54,13 @@ Copy `.env.example` to `.env` and fill in the keys you need:
 cp .env.example .env
 ```
 
-| Variable | Required for | Description |
-| -------- | ------------ | ----------- |
-| `HF_TOKEN` | All experiments (gated models/datasets) | HuggingFace access token — [get it here](https://huggingface.co/settings/tokens) |
-| `SERPAPI_API_KEY` | FinAgent, GAIA | Web search (primary) — [serpapi.com](https://serpapi.com) |
-| `SERPER_API_KEY` | FinAgent, GAIA | Web search (fallback) — [serper.dev](https://serper.dev) |
-| `SEC_EDGAR_API_KEY` | FinAgent only | SEC EDGAR filings search — [sec-api.io](https://sec-api.io); optional, falls back to mock results if unset |
-| `ARK_API_KEY` | GAIA only | ByteDance ARK / Doubao multimodal API for image/audio/video attachments; text-only tasks work without it |
+| Variable            | Required for                            | Description                                                                                                |
+| ------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `HF_TOKEN`          | All experiments (gated models/datasets) | HuggingFace access token — [get it here](https://huggingface.co/settings/tokens)                           |
+| `SERPAPI_API_KEY`   | FinAgent, GAIA                          | Web search (primary) — [serpapi.com](https://serpapi.com)                                                  |
+| `SERPER_API_KEY`    | FinAgent, GAIA                          | Web search (fallback) — [serper.dev](https://serper.dev)                                                   |
+| `SEC_EDGAR_API_KEY` | FinAgent only                           | SEC EDGAR filings search — [sec-api.io](https://sec-api.io); optional, falls back to mock results if unset |
+| `ARK_API_KEY`       | GAIA only                               | ByteDance ARK / Doubao multimodal API for image/audio/video attachments; text-only tasks work without it   |
 
 The six standard benchmarks (GSM8K, HumanEval, MMLU, MATH500, AIME2024, AIME2025) require **no API keys** beyond an optional `HF_TOKEN` for gated repos.
 
@@ -169,10 +165,16 @@ multiagent-entropy/
 │   │   ├── utils.py                   ## Shared utility functions
 │   │   └── run_experiments.py         ## Automated batch experiment runner
 │   └── results/                       ## Analysis results
+├── entropy_judger/                    ## Entropy Judger: pass@K solution selection
+│   ├── train_judger.py                ## Train and serialize the judger from existing data
+│   ├── run_single.py                  ## Single-run wrapper (overrides save_folder)
+│   ├── run.sh                         ## Run K=20 repeated inferences
+│   └── evaluate.py                    ## Score runs and produce comparison tables
 └── docs/                              ## Documentation
     ├── experiment-guidance.md         ## Experiment guide
     ├── evaluation-guidance.md         ## Evaluation guide
-    └── data-mining-guidance.md        ## Data mining guide
+    ├── data-mining-guidance.md        ## Data mining guide
+    └── entropy-judger-guidance.md     ## Entropy Judger guide
 ```
 
 ---
@@ -216,11 +218,27 @@ cd data_mining/code
 python main.py --analysis-type all
 ```
 
+#### 4. Entropy Judger
+
+Train the judger on existing data, run repeated inferences, and evaluate pass@K selection:
+
+```bash
+# Train and freeze the judger
+python entropy_judger/train_judger.py
+
+# Run K=20 repeated inferences (scope controlled via env vars)
+bash entropy_judger/run.sh
+
+# Evaluate: Best-of-K and Early-Stop comparison tables
+python entropy_judger/evaluate.py
+```
+
 ---
 
 ### Extensibility and Supported Configurations
 
 #### 1. Supported MAS Architectures
+
 - **Single**: Baseline with a single solver agent
 - **Sequential**: Pipeline: planner → solver → critic → judger
 - **Centralized**: Two-layer: domain agents + central orchestrator
@@ -230,6 +248,7 @@ python main.py --analysis-type all
 - **Hybrid**: Two-layer with enhanced context sharing
 
 #### 2. Supported Models and Datasets
+
 - **Models**: Qwen3-0.6B, Qwen3-1.7B, Qwen3-4B, Qwen3-8B, LLaMA-3.1-8B-Instruct, LLaMA-3.2-3B-Instruct, Qwen2.5-7B-SimpleRL-Zoo
 - **Datasets**: GSM8K, AIME2024, AIME2025, MMLU, HumanEval, MATH-500, FinAgent, GAIA
 
@@ -237,6 +256,7 @@ python main.py --analysis-type all
 
 **New MAS Architectures**  
 To implement a custom architecture:  
+
 1. Create a Python file in `maep/language/` (e.g., `my_architecture.py`).  
 2. Define an architecture class following patterns in `centralized.py` or `hybrid.py`.  
 3. Add agent configurations in `experiments/configs/agent_specific/my_architecture_agents.yml`.  
@@ -244,14 +264,17 @@ To implement a custom architecture:
 
 **Custom Models**  
 To integrate a new model:  
+
 1. Create a YAML config in `experiments/configs/model_specific/` (e.g., `my_model.yml`):  
+   
    ```yaml
    lm_name: "path/to/your/model"
    inference_config:
      device: "cuda"
      torch_dtype: "float16"
-   ```  
+   ```
 2. Specify it at runtime:  
+   
    ```bash
    python experiments/scripts/run_experiment.py \
      --model-config experiments/configs/model_specific/my_model.yml
@@ -259,7 +282,9 @@ To integrate a new model:
 
 **Custom Datasets**  
 To add a new dataset:  
+
 1. Create a YAML config in `experiments/configs/dataset_specific/` (e.g., `my_dataset.yml`):  
+   
    ```yaml
    data:
      data_name: "MyDataset"
@@ -270,22 +295,26 @@ To add a new dataset:
    task_type: "math"  # math, code, or option
    generation_config:
      max_new_tokens: 2048
-   ```  
+   ```
 2. Place data in `experiments/data/MyDataset/` using the expected format.  
 3. Run with:  
+   
    ```bash
    python experiments/scripts/run_experiment.py \
      --dataset-config experiments/configs/dataset_specific/my_dataset.yml
    ```
 
 ---
+
 ### Documentation
 
 - [Experiment Guidance](docs/experiment-guidance.md): Experiment configuration and execution
 - [Evaluation Guidance](docs/evaluation-guidance.md): Evaluation framework and feature extraction
 - [Data Mining Guidance](docs/data-mining-guidance.md): Data mining and SHAP analysis
+- [Entropy Judger Guidance](docs/entropy-judger-guidance.md): pass@K solution selection experiment
 
 ---
+
 ### Citation
 
 If you find this work useful, please cite:
@@ -297,6 +326,4 @@ If you find this work useful, please cite:
   journal={arXiv preprint arXiv:2602.04234},
   year={2026},
 }
-
 ```
-
