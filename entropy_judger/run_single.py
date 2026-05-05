@@ -27,7 +27,6 @@ _REPO = Path(__file__).parent.parent
 sys.path.insert(0, str(_REPO / "experiments" / "scripts"))
 
 from config_loader import load_experiment_config
-from run_experiment import run_single_experiment
 
 from lmbase.dataset import registry as data_registry
 from maep.language.single import SingleAgent
@@ -37,7 +36,7 @@ from maep.language.decentralized import OrchestratorDecentralized
 from maep.language.full_decentralized import OrchestratorFullDecentralized
 from maep.language.debate import DebateMAS
 from maep.language.hybrid import OrchestratorHybrid
-from config_loader import is_aime25_all_subset, map_aime25_subset
+from config_loader import map_aime25_subset
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -78,6 +77,44 @@ def _count_completed_batches(exp_dir: str) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Dataset loading — local files take priority over HuggingFace
+# ---------------------------------------------------------------------------
+
+def _load_dataset(config: dict) -> object:
+    """
+    Load dataset, preferring local JSON files in data_path over HuggingFace.
+
+    Looks for {data_path}/{split}-all-samples.json first.  This file is
+    written by run_experiment.py on every standard run, so it will exist
+    after any previous experiment on the same dataset.  Falling back to
+    data_registry.get() only when the file is absent.
+    """
+    data_cfg = config["data"]
+    split = data_cfg["split"]
+    local_path = os.path.join(data_cfg["data_path"], f"{split}-all-samples.json")
+
+    if os.path.exists(local_path):
+        logger.info(f"Loading dataset from local file: {local_path}")
+        with open(local_path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        # Convert list-of-dicts → dict-of-lists (consistent with HF Dataset slicing)
+        if isinstance(raw, list) and raw:
+            return {k: [s[k] for s in raw] for k in raw[0].keys()}
+        return raw
+
+    # AIME2025 subset mapping before hitting HuggingFace
+    if data_cfg.get("data_name", "").lower() == "aime2025":
+        orig = data_cfg.get("subset", "")
+        mapped = map_aime25_subset(orig)
+        if mapped != orig:
+            logger.info(f"Mapped AIME2025 subset '{orig}' → '{mapped}'")
+            data_cfg["subset"] = mapped
+
+    logger.info(f"Local file not found, downloading from HuggingFace: {data_cfg['data_name']}")
+    return data_registry.get(config=data_cfg, split=split)
+
+
+# ---------------------------------------------------------------------------
 # Resume-aware inference loop (mirrors run_single_experiment internals)
 # ---------------------------------------------------------------------------
 
@@ -105,25 +142,8 @@ def _run_with_resume(config: dict, start_batch: int) -> dict:
         raise ValueError(f"Unsupported agent type: {agent_type}")
     agent = agent_map[agent_type](run_config=config)
 
-    # Load dataset (same logic as run_single_experiment)
-    if is_aime25_all_subset(config):
-        merged_path = os.path.join(data_cfg["data_path"], f"{data_cfg['split']}-all-samples.json")
-        if os.path.exists(merged_path):
-            with open(merged_path, "r", encoding="utf-8") as f:
-                raw = json.load(f)
-            dataset = (
-                {k: [s[k] for s in raw] for k in raw[0].keys()}
-                if isinstance(raw, list) and raw else raw
-            )
-        else:
-            dataset = data_registry.get(config=data_cfg, split=data_cfg["split"])
-    else:
-        if data_cfg.get("data_name", "").lower() == "aime2025":
-            orig = data_cfg.get("subset", "")
-            mapped = map_aime25_subset(orig)
-            if mapped != orig:
-                data_cfg["subset"] = mapped
-        dataset = data_registry.get(config=data_cfg, split=data_cfg["split"])
+    # Load dataset — local files first, HuggingFace as fallback
+    dataset = _load_dataset(config)
 
     dataset_len = (
         len(next(iter(dataset.values()))) if isinstance(dataset, dict) else len(dataset)
@@ -252,7 +272,7 @@ def main():
     if completed_batches > 0:
         _run_with_resume(config, start_batch=completed_batches)
     else:
-        run_single_experiment(config, dry_run=False)
+        _run_with_resume(config, start_batch=0)
 
 
 if __name__ == "__main__":
