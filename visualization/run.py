@@ -31,6 +31,7 @@ def _build_accuracy(params):
 
 def _build_single_superiority(params):
     from visualization.plots.single_superiority import SingleSuperiorityPlot
+
     return SingleSuperiorityPlot(
         csv_path=params["csv_path"],
         output_dir=params["output_dir"],
@@ -39,6 +40,7 @@ def _build_single_superiority(params):
 
 def _build_arch(params):
     from visualization.plots.arch import ArchPlot
+
     return ArchPlot(
         summary_json_path=params["summary_json_path"],
         results_dir=params["results_dir"],
@@ -49,6 +51,7 @@ def _build_arch(params):
 
 def _build_datasets(params):
     from visualization.plots.datasets import DatasetsPlot
+
     return DatasetsPlot(
         shap_data_root=params["shap_data_root"],
         accuracy_data_path=params["accuracy_data_path"],
@@ -58,6 +61,7 @@ def _build_datasets(params):
 
 def _build_mas(params):
     from visualization.plots.mas import MASPlot
+
     return MASPlot(
         results_dir=params["results_dir"],
         exp_key=params["exp_key"],
@@ -69,6 +73,7 @@ def _build_mas(params):
 
 def _build_round(params):
     from visualization.plots.round import RoundPlot
+
     return RoundPlot(
         r2_summary_path=params["r2_summary_path"],
         r5_summary_path=params["r5_summary_path"],
@@ -82,6 +87,7 @@ def _build_round(params):
 
 def _build_base_model(params):
     from visualization.plots.base_model import BaseModelPlot
+
     return BaseModelPlot(
         feature_importance_csv=params["feature_importance_csv"],
         shap_results_dir=params["shap_results_dir"],
@@ -92,6 +98,7 @@ def _build_base_model(params):
 
 def _build_rl_model(params):
     from visualization.plots.rl_model import RLModelPlot
+
     return RLModelPlot(
         combined_summary_path=params["combined_summary_path"],
         shap_x_test_path=params["shap_x_test_path"],
@@ -106,6 +113,7 @@ def _build_rl_model(params):
 
 def _build_appendix_arch(params):
     from visualization.plots.appendix_arch import AppendixArchPlot
+
     return AppendixArchPlot(
         data_dir=params["data_dir"],
         output_dir=params["output_dir"],
@@ -115,6 +123,7 @@ def _build_appendix_arch(params):
 
 def _build_causal(params):
     from visualization.plots.causal import CausalPlot
+
     return CausalPlot(
         causal_data_dir=params["causal_data_dir"],
         output_dir=params["output_dir"],
@@ -123,6 +132,7 @@ def _build_causal(params):
 
 def _build_causal_appendix(params):
     from visualization.plots.causal_appendix import CausalAppendixPlot
+
     return CausalAppendixPlot(
         causal_data_dir=params["causal_data_dir"],
         output_dir=params["output_dir"],
@@ -131,6 +141,7 @@ def _build_causal_appendix(params):
 
 def _build_gaia(params):
     from visualization.plots.gaia import GAIAPlot
+
     return GAIAPlot(
         gaia_aggregated_path=params["gaia_aggregated_path"],
         gaia_aggregated_exclude_agent_path=params["gaia_aggregated_exclude_agent_path"],
@@ -176,7 +187,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "plots",
         nargs="+",
-        help="Plot names to run, or 'all'. Available: " + ", ".join(sorted(PLOT_BUILDERS)),
+        help="Plot names to run, or 'all'. Available: "
+        + ", ".join(sorted(PLOT_BUILDERS)),
     )
     args = parser.parse_args(argv)
 

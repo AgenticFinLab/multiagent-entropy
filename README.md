@@ -41,7 +41,7 @@ git clone https://github.com/AgenticFinLab/multiagent-entropy.git
 cd multiagent-entropy
 pip install -e .
 
-# 2. Clone and install lmbase (dataset loading dependency)
+# 2. Clone and install lmbase (dataset loading and LLM inference dependency)
 git clone https://github.com/AgenticFinLab/lmbase.git
 cd lmbase && pip install -e . && cd ..
 ```
