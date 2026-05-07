@@ -128,21 +128,7 @@ def _run_with_resume(config: dict, start_batch: int) -> dict:
     agent_type = config["agent_type"]
     data_cfg = config["data"]
 
-    # Build agent
-    agent_map = {
-        "single": SingleAgent,
-        "sequential": SequentialAgents,
-        "centralized": OrchestratorCentralized,
-        "decentralized": OrchestratorDecentralized,
-        "full_decentralized": OrchestratorFullDecentralized,
-        "debate": DebateMAS,
-        "hybrid": OrchestratorHybrid,
-    }
-    if agent_type not in agent_map:
-        raise ValueError(f"Unsupported agent type: {agent_type}")
-    agent = agent_map[agent_type](run_config=config)
-
-    # Load dataset — local files first, HuggingFace as fallback
+    # Load dataset first (cheap) to determine total_batches before loading the model
     dataset = _load_dataset(config)
 
     dataset_len = (
@@ -155,9 +141,23 @@ def _run_with_resume(config: dict, start_batch: int) -> dict:
     total_batches = (total_samples + batch_size - 1) // batch_size
 
     if start_batch >= total_batches:
-        logger.info(f"All {total_batches} batches already completed, nothing to do.")
+        logger.info(f"All {total_batches} batches already completed, skipping model load.")
         return {"status": "completed", "experiment_name": experiment_name,
                 "samples_processed": total_samples, "resumed_from_batch": start_batch}
+
+    # Only load the model if there is actual work to do
+    agent_map = {
+        "single": SingleAgent,
+        "sequential": SequentialAgents,
+        "centralized": OrchestratorCentralized,
+        "decentralized": OrchestratorDecentralized,
+        "full_decentralized": OrchestratorFullDecentralized,
+        "debate": DebateMAS,
+        "hybrid": OrchestratorHybrid,
+    }
+    if agent_type not in agent_map:
+        raise ValueError(f"Unsupported agent type: {agent_type}")
+    agent = agent_map[agent_type](run_config=config)
 
     logger.info(
         f"Resuming {experiment_name}: skipping {start_batch} completed batches, "
