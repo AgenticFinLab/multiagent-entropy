@@ -20,11 +20,19 @@ Multi-agent systems (MAS) have emerged as a prominent paradigm for leveraging la
 ### Main Results
 
 <div align="center">
-<img src="figures/accuracy_comparison.png" width="90%">
+<img src="figures/accuracy_comparison.png" width="80%">
 </div>
 
 <div align="center">
-<img src="figures/mas_analysis.png" width="90%">
+<img src="figures/base_model.png" width="80%">
+</div>
+
+<div align="center">
+<img src="figures/mas_analysis.png" width="80%">
+</div>
+
+<div align="center">
+<img src="figures/task_arch.png" width="80%">
 </div>
 
 ---
