@@ -548,11 +548,11 @@ Raw experiment results are saved in:
 experiments/results/raw/<dataset_name>/<model_name>/<experiment_name>_<timestamp>_<ms>_<pid>/
 ```
 
-Contents:
-- `Batch_{N}_State.json`: Individual batch results
-- `Combined_FinalState.json`: Combined final results
-- `traces/tensors/`: Tensor files with entropy data
-- Configuration files
+Contents under `traces/`:
+- `Result-store-information.json`: Maps block filenames to result metadata
+- `Result_block_N.json`: Dict of `result_id → result data` for each block
+- `tensors/<result_id>/extras_entropy.pt`: Token entropy tensor for main inference
+- `tensors/<result_id>/extras_react_steps_{N}__entropy.pt`: Per-step entropy for ReAct loops (FinAgent/GAIA)
 
 #### Aggregated Results
 

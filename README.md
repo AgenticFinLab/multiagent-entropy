@@ -13,7 +13,7 @@ Yuxuan Zhao<sup>1,2</sup>,  Sijia Chen<sup>2</sup>†,  Ningxin Su<sup>2</sup>
 
 ### Overview
 
-Multi-agent systems (MAS) have emerged as a prominent paradigm for leveraging large language models (LLMs) to tackle complex tasks. However, the mechanisms governing the effectiveness of MAS built upon publicly available LLMs, specifically the underlying rationales for their success or failure, remain largely unexplored. In this paper, we revisit MAS through the perspective of \textit{entropy}, considering both intra- and inter-agent dynamics by investigating entropy transitions during problem-solving across various topologies, six reasoning benchmarks, and two agentic tasks. By analyzing 245 features spanning token-, agent-, and round-level entropy, we counterintuitively find that a single agent outperforms MAS in approximately 43.3\% of cases, and that entropy dynamics are largely determined during the first round of interaction. Furthermore, we provide three key observations: 1) \textit{Certainty Preference}: reducing peak entropy and maintaining stable entropy across agents strongly correlate with correctness; 2) \textit{Base Entropy}: base models with lower entropy during problem-solving directly benefit MAS performance; and 3) \textit{Task Awareness}: entropy dynamics of MAS play varying roles across different tasks. Building on these insights, we introduce a simple yet effective algorithm, the \textit{Entropy Judger}, to select solutions from MAS's pass@$k$ results, leading to consistent accuracy improvements across all MAS configurations and tasks. Our source code is available at \href{https://github.com/AgenticFinLab/multiagent-entropy}{this https URL}.
+Multi-agent systems (MAS) have emerged as a prominent paradigm for leveraging large language models (LLMs) to tackle complex tasks. However, the mechanisms governing the effectiveness of MAS built upon publicly available LLMs, specifically the underlying rationales for their success or failure, remain largely unexplored. In this paper, we revisit MAS through the perspective of \textit{entropy}, considering both intra- and inter-agent dynamics by investigating entropy transitions during problem-solving across various topologies, six reasoning benchmarks, and two agentic tasks. By analyzing 245 features spanning token-, agent-, and round-level entropy, we counterintuitively find that a single agent outperforms MAS in approximately 43.3\% of cases, and that entropy dynamics are largely determined during the first round of interaction. Furthermore, we provide three key observations: 1) \textit{Certainty Preference}: peak entropy directly harms and stable entropy directly benefits MAS correctness; 2) \textit{Base Entropy}: base models with lower entropy during problem-solving causally drive MAS performance; and 3) \textit{Task Awareness}: entropy dynamics of MAS play varying roles across different tasks. Building on these insights, we introduce a simple yet effective algorithm, the \textit{Entropy Judger}, to select solutions from MAS's pass@$k$ results, leading to consistent accuracy improvements across all MAS configurations and tasks.
 
 ---
 
@@ -103,7 +103,8 @@ multiagent-entropy/
 │       ├── full_decentralized.py      ## Full communication graph
 │       ├── debate.py                  ## Majority voting
 │       ├── hybrid.py                  ## Enhanced context sharing
-│       └── react_utils.py             ## ReAct agent utilities
+│       ├── react_utils.py             ## ReAct parsing helpers and constants
+│       └── react_loop.py              ## ReActExecutor — tool-augmented reasoning loop
 ├── experiments/                       ## Experiment execution
 │   ├── configs/                       ## Configuration files
 │   │   ├── base_config.yml            ## Base configuration
@@ -150,6 +151,13 @@ multiagent-entropy/
 │   │   │   ├── io_utils.py            ## OutputManager, save_plot, load_dataset_csv
 │   │   │   ├── cli.py                 ## Shared argparse builders
 │   │   │   └── post_processor.py      ## BasePostProcessor (experiment iteration)
+│   │   ├── causal_analysis/           ## Causal inference subpackage
+│   │   │   ├── causal_discovery.py    ## PC/FCI causal graph learning
+│   │   │   ├── causal_effect_estimator.py ## ATE/CATE estimation with DoWhy
+│   │   │   ├── causal_mediation_analyzer.py ## Mediation analysis (direct vs indirect effects)
+│   │   │   ├── causal_report_generator.py ## Unified causal analysis report
+│   │   │   ├── feature_selection_crossval.py ## Cross-validated feature selection
+│   │   │   └── run_causal_on_correlation_results.py ## 4-stage pipeline orchestrator
 │   │   ├── main.py                    ## Main CLI entry for data mining
 │   │   ├── data_mining_analyzer.py    ## Unified orchestrator
 │   │   ├── regression_analyzer.py     ## Experiment-level regression (BaseAnalyzer)
@@ -158,9 +166,11 @@ multiagent-entropy/
 │   │   ├── pca_analyzer.py            ## PCA feature redundancy (BaseAnalyzer)
 │   │   ├── feature_ablation_analyzer.py ## Feature ablation study (BaseAnalyzer)
 │   │   ├── calibration_analyzer.py    ## Calibration analysis
+│   │   ├── mas_causal_analysis.py     ## SAS vs MAS separation-control causal analysis
 │   │   ├── aggregator.py              ## Experiment result aggregation
 │   │   ├── visualizer.py              ## Aggregated result visualization
 │   │   ├── summarizer.py              ## Statistical summarization
+│   │   ├── data_collector.py          ## Data collection and merging
 │   │   ├── features.py                ## Feature group definitions
 │   │   ├── utils.py                   ## Shared utility functions
 │   │   └── run_experiments.py         ## Automated batch experiment runner

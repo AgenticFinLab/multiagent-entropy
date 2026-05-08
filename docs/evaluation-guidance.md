@@ -83,6 +83,7 @@ The evaluation module supports the following datasets defined in [evaluator.py](
 | `aime2024_16384` | AIME 2024 competition problems (16384 token context) |
 | `aime2025_16384` | AIME 2025 competition problems (16384 token context) |
 | `finagent` | Finance Agent Benchmark (rubric-based evaluation) |
+| `gaia` | GAIA general AI assistant benchmark (exact-match evaluation) |
 
 #### Examples
 
